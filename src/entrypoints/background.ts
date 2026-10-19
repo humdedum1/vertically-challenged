@@ -1,7 +1,6 @@
+import { startBackground } from '../background/index';
+
 export default defineBackground({
   type: 'module',
-  async main() {
-    const { startBackground } = await import('../background/index');
-    startBackground();
-  },
+  main: startBackground,
 });

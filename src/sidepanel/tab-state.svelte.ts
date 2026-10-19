@@ -55,6 +55,8 @@ export class TabState {
     // The worker is suspended after ~30s idle (or restarted on update). Reconnecting
     // wakes it, and the fresh snapshot it sends resynchronises us.
     port.onDisconnect.addListener(() => {
+      // Reading lastError marks it handled; the worker not being up yet is expected.
+      void browser.runtime.lastError;
       if (this.port !== port || this.disposed) return;
       this.port = null;
       this.status = 'connecting';

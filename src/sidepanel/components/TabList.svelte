@@ -21,14 +21,17 @@ import { actionFor } from '../../lib/keymap';
 import { FuzzyIndex } from '../../lib/search/fuzzy-index';
 import type { SearchIndex } from '../../lib/search/search-index';
 import type { Keymap, ShortcutAction } from '../../settings/schema';
+import type { PinItem } from '../../shared/layout';
 import type { PanelMessage } from '../../shared/protocol';
 import type { GroupInfo, TabInfo } from '../../shared/types';
 import { type Drag, type DropZone, type MultiDropContext, planDropMulti } from '../model/drop-plan';
-import { groupMenu, tabMenu, windowLabel, windowMenu } from '../model/menus';
+import { essentialMenu, groupMenu, tabMenu, windowLabel, windowMenu } from '../model/menus';
 import { buildSearchRows, buildWindowRows, type ListRow as Row, rowWindowId } from '../model/rows';
 import { pruneSelection, tabIdsBetween } from '../model/selection';
 import type { TabState } from '../tab-state.svelte';
+import { tintCache } from '../tint-cache.svelte';
 import ContextMenu from './ContextMenu.svelte';
+import EssentialsGrid from './EssentialsGrid.svelte';
 import GroupRow from './GroupRow.svelte';
 import Icon from './Icon.svelte';
 import type { MenuItem } from './menu-types';
@@ -139,6 +142,15 @@ const groupById = $derived(new Map<number, GroupInfo>(allGroups.map((g) => [g.id
 const windowName = (id: number): string =>
   windowLabel(windowNumber.get(id) ?? 0, id === tabState.windowId);
 const showUrl = $derived(twoLine || (rowHeight >= 34 && searching));
+
+// The home window's Essentials sit above the list as a grid; other windows' render as rows.
+const homeLayout = $derived(
+  tabState.windowId === null ? undefined : tabState.layoutOf(tabState.windowId),
+);
+const essentials = $derived(homeLayout?.essentials ?? []);
+const homeTabById = $derived(new Map(tabState.tabs.map((t) => [t.id, t])));
+const showGrid = $derived(!searching && essentials.length > 0);
+let grid: ReturnType<typeof EssentialsGrid> | undefined = $state();
 
 // --- Focus -----------------------------------------------------------------------------
 
@@ -307,7 +319,32 @@ $effect(() => {
 
 // --- Context menu ----------------------------------------------------------------------
 
-let menu = $state.raw<{ x: number; y: number; label: string; items: MenuItem[] } | null>(null);
+let menu = $state.raw<{
+  x: number;
+  y: number;
+  label: string;
+  items: MenuItem[];
+  /** Opened on an Essentials tile: focus goes back to the grid, not the tree. */
+  fromGrid?: boolean;
+} | null>(null);
+
+function openEssentialMenu(x: number, y: number, item: PinItem): void {
+  const windowId = tabState.windowId;
+  if (windowId === null) return;
+  menu = {
+    x,
+    y,
+    label: 'Essential actions',
+    fromGrid: true,
+    items: essentialMenu({
+      item,
+      tab: item.tabId === null ? null : (homeTabById.get(item.tabId) ?? null),
+      windowId,
+      pinnedCount: homeLayout?.pinned.length ?? 0,
+      send,
+    }),
+  };
+}
 
 function openMenu(i: number, x: number, y: number): void {
   const row = view[i];
@@ -373,8 +410,10 @@ function onContextMenu(e: MouseEvent, i: number): void {
 
 function closeMenu(): void {
   if (!menu) return;
+  const fromGrid = menu.fromGrid;
   menu = null;
-  tree()?.focus();
+  if (fromGrid && grid) grid.focus();
+  else tree()?.focus();
 }
 
 function openMenuFromKeyboard(): void {
@@ -640,6 +679,11 @@ function onkeydown(e: KeyboardEvent): void {
   switch (e.key) {
     case 'ArrowDown':
     case 'ArrowUp': {
+      // Up from the first row climbs into the Essentials grid.
+      if (e.key === 'ArrowUp' && !e.shiftKey && focusedIndex === 0 && showGrid && grid) {
+        grid.focus();
+        break;
+      }
       const next = Math.max(
         0,
         Math.min(view.length - 1, focusedIndex + (e.key === 'ArrowDown' ? 1 : -1)),
@@ -789,92 +833,110 @@ $effect(() => {
   {#if search === 'top'}{@render searchField()}{/if}
 
   <div class="body">
-    {#if searching && view.length === 0}
-      <p class="empty" role="status">No tabs match “{needle}”</p>
-    {:else}
-      <VirtualList
-        bind:this={list}
-        items={view}
-        {rowHeight}
-        key={(r) => r.key}
-        role="tree"
-        aria-label="Tabs in all windows"
-        aria-multiselectable="true"
-        tabindex={0}
-        aria-activedescendant={focusedRow ? `vc-row-${focusedRow.key}` : undefined}
-        {onkeydown}
-        onfocus={() => list?.reveal(focusedIndex)}
-        onpointerdown={onPointerDown}
-        onmousedown={onMouseDown}
-      >
-        {#snippet row(r, i)}
-          {#if r.kind === 'window'}
-            <WindowRow
-              name={windowLabel(r.number, r.isHome)}
-              count={r.count}
-              collapsed={r.collapsed}
-              incognito={r.info.incognito}
-              windowFocused={r.info.focused}
-              pos={r.pos}
-              size={r.size}
-              focused={i === focusedIndex}
-              onclick={() => onWindowClick(i)}
-              oncontextmenu={(e) => onContextMenu(e, i)}
-            />
-          {:else if r.kind === 'group'}
-            <GroupRow
-              group={r.group}
-              count={r.count}
-              pos={r.pos}
-              size={r.size}
-              level={r.level}
-              focused={i === focusedIndex}
-              renaming={renamingId === r.group.id}
-              onclick={(e) => onGroupClick(e, i)}
-              ondblclick={() => onGroupDblclick(i)}
-              oncontextmenu={(e) => onContextMenu(e, i)}
-              onrenamed={(title) => onRenamed(r.group.id, title)}
-            />
-          {:else}
-            <TabRow
-              tab={r.tab}
-              level={r.level}
-              grouped={r.level === groupLevel && groupById.has(r.tab.groupId)}
-              {nested}
-              windowTag={searching && r.tab.windowId !== tabState.windowId
-                ? windowName(r.tab.windowId)
-                : undefined}
-              pos={r.pos}
-              size={r.size}
-              focused={i === focusedIndex}
-              selected={selection.has(r.tab.id)}
-              selectedLook={selection.has(r.tab.id) && (selection.size > 1 || !r.tab.active)}
-              pinnedEnd={r.pinnedEnd}
-              groupColor={r.level === groupLevel && groupById.has(r.tab.groupId)
-                ? `var(--g-${groupById.get(r.tab.groupId)?.color})`
-                : undefined}
-              highlight={r.highlight}
-              {showUrl}
-              {showClose}
-              {showMute}
-              onclick={(e) => onTabClick(e, i, r.tab)}
-              oncontextmenu={(e) => onContextMenu(e, i)}
-              onclose={() => send({ type: 'close', tabIds: targetsOf(r.tab) })}
-              onmute={() => send({ type: 'setMuted', tabIds: targetsOf(r.tab), muted: !r.tab.muted })}
-            />
-          {/if}
-        {/snippet}
-        {#snippet overlay()}
-          {#if drop?.ok}
-            {#if drop.zone === 'inside' || view[drop.index]?.kind === 'window'}
-              <div class="drop-box" style:top="{drop.index * rowHeight}px" style:height="{rowHeight}px"></div>
-            {:else}
-              <div class="drop-line" style:top="{(drop.index + (drop.zone === 'after' ? 1 : 0)) * rowHeight - 1}px"></div>
-            {/if}
-          {/if}
-        {/snippet}
-      </VirtualList>
+    {#if showGrid && tabState.windowId !== null}
+      <EssentialsGrid
+        bind:this={grid}
+        windowId={tabState.windowId}
+        items={essentials}
+        tabs={homeTabById}
+        tints={tintCache}
+        {send}
+        {shortcuts}
+        onmenu={openEssentialMenu}
+        onexit={() => {
+          setFocus(0);
+          tree()?.focus();
+        }}
+      />
     {/if}
+    <div class="list">
+      {#if searching && view.length === 0}
+        <p class="empty" role="status">No tabs match “{needle}”</p>
+      {:else}
+        <VirtualList
+          bind:this={list}
+          items={view}
+          {rowHeight}
+          key={(r) => r.key}
+          role="tree"
+          aria-label="Tabs in all windows"
+          aria-multiselectable="true"
+          tabindex={0}
+          aria-activedescendant={focusedRow ? `vc-row-${focusedRow.key}` : undefined}
+          {onkeydown}
+          onfocus={() => list?.reveal(focusedIndex)}
+          onpointerdown={onPointerDown}
+          onmousedown={onMouseDown}
+        >
+          {#snippet row(r, i)}
+            {#if r.kind === 'window'}
+              <WindowRow
+                name={windowLabel(r.number, r.isHome)}
+                count={r.count}
+                collapsed={r.collapsed}
+                incognito={r.info.incognito}
+                windowFocused={r.info.focused}
+                pos={r.pos}
+                size={r.size}
+                focused={i === focusedIndex}
+                onclick={() => onWindowClick(i)}
+                oncontextmenu={(e) => onContextMenu(e, i)}
+              />
+            {:else if r.kind === 'group'}
+              <GroupRow
+                group={r.group}
+                count={r.count}
+                pos={r.pos}
+                size={r.size}
+                level={r.level}
+                focused={i === focusedIndex}
+                renaming={renamingId === r.group.id}
+                onclick={(e) => onGroupClick(e, i)}
+                ondblclick={() => onGroupDblclick(i)}
+                oncontextmenu={(e) => onContextMenu(e, i)}
+                onrenamed={(title) => onRenamed(r.group.id, title)}
+              />
+            {:else}
+              <TabRow
+                tab={r.tab}
+                level={r.level}
+                grouped={r.level === groupLevel && groupById.has(r.tab.groupId)}
+                {nested}
+                windowTag={searching && r.tab.windowId !== tabState.windowId
+                  ? windowName(r.tab.windowId)
+                  : undefined}
+                pos={r.pos}
+                size={r.size}
+                focused={i === focusedIndex}
+                selected={selection.has(r.tab.id)}
+                selectedLook={selection.has(r.tab.id) && (selection.size > 1 || !r.tab.active)}
+                pinnedEnd={r.pinnedEnd}
+                groupColor={r.level === groupLevel && groupById.has(r.tab.groupId)
+                  ? `var(--g-${groupById.get(r.tab.groupId)?.color})`
+                  : undefined}
+                highlight={r.highlight}
+                {showUrl}
+                {showClose}
+                {showMute}
+                onclick={(e) => onTabClick(e, i, r.tab)}
+                oncontextmenu={(e) => onContextMenu(e, i)}
+                onclose={() => send({ type: 'close', tabIds: targetsOf(r.tab) })}
+                onmute={() => send({ type: 'setMuted', tabIds: targetsOf(r.tab), muted: !r.tab.muted })}
+              />
+            {/if}
+          {/snippet}
+          {#snippet overlay()}
+            {#if drop?.ok}
+              {#if drop.zone === 'inside' || view[drop.index]?.kind === 'window'}
+                <div class="drop-box" style:top="{drop.index * rowHeight}px" style:height="{rowHeight}px"></div>
+              {:else}
+                <div class="drop-line" style:top="{(drop.index + (drop.zone === 'after' ? 1 : 0)) * rowHeight - 1}px"></div>
+              {/if}
+            {/if}
+          {/snippet}
+        </VirtualList>
+      {/if}
+    </div>
   </div>
 
   {#if search === 'bottom'}{@render searchField()}{/if}
@@ -956,6 +1018,13 @@ $effect(() => {
   }
 
   .body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .list {
     flex: 1;
     min-height: 0;
   }

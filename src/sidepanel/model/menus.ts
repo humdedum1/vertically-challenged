@@ -1,4 +1,5 @@
 import { hostOf, matchesHostPattern } from '../../shared/host-pattern';
+import type { PinItem } from '../../shared/layout';
 import type { PanelMessage } from '../../shared/protocol';
 import type { GroupInfo, TabInfo, WindowInfo } from '../../shared/types';
 import type { MenuItem } from '../components/menu-types';
@@ -269,5 +270,91 @@ export function windowMenu(c: WindowMenuContext): MenuItem[] {
           disabled: ids.length === 0,
           onselect: closeAll,
         },
+  ];
+}
+
+/**
+ * Whether a pinned tab has left its home page. The hash is ignored: single-page apps
+ * (mail, chat) rewrite it constantly without the user going anywhere. An empty URL is a
+ * tab that hasn't committed yet, not one that navigated away.
+ */
+export function awayFromHome(url: string, homeUrl: string): boolean {
+  if (!url) return false;
+  const strip = (u: string): string => u.split('#', 1)[0] ?? u;
+  return strip(url) !== strip(homeUrl);
+}
+
+export interface EssentialMenuContext {
+  item: PinItem;
+  /** The live tab, or null while the item is dormant. */
+  tab: TabInfo | null;
+  windowId: number;
+  /** Root nodes of the window's pinned tree: "Remove from Essentials" lands after them. */
+  pinnedCount: number;
+  send: (msg: PanelMessage) => void;
+}
+
+export function essentialMenu(c: EssentialMenuContext): MenuItem[] {
+  const { item, tab, windowId } = c;
+  const itemId = item.id;
+  // Mirrors pinSetHome in the worker: the live URL, else where the item was last.
+  const current = tab?.url ?? item.lastUrl;
+  return [
+    { type: 'item', label: 'Open', onselect: () => c.send({ type: 'pinOpen', windowId, itemId }) },
+    {
+      type: 'item',
+      label: 'Back to home URL',
+      // A dormant item reopens at its home URL anyway.
+      disabled: tab === null || !awayFromHome(tab.url, item.homeUrl),
+      onselect: () => c.send({ type: 'pinHome', windowId, itemId }),
+    },
+    {
+      type: 'item',
+      label: 'Set this page as home',
+      disabled: !awayFromHome(current, item.homeUrl),
+      onselect: () => c.send({ type: 'pinSetHome', windowId, itemId }),
+    },
+    SEP,
+    {
+      type: 'item',
+      label: tab?.muted ? 'Unmute' : 'Mute',
+      disabled: tab === null,
+      onselect: () => {
+        if (tab) c.send({ type: 'setMuted', tabIds: [tab.id], muted: !tab.muted });
+      },
+    },
+    {
+      type: 'item',
+      label: 'Suspend',
+      disabled: tab === null || tab.discarded,
+      onselect: () => c.send({ type: 'pinClose', windowId, itemIds: [itemId] }),
+    },
+    SEP,
+    {
+      type: 'item',
+      label: 'Remove from Essentials',
+      onselect: () =>
+        c.send({
+          type: 'pinMove',
+          windowId,
+          nodeId: itemId,
+          toWindowId: windowId,
+          dest: { zone: 'pinned', folderId: null, index: c.pinnedCount },
+        }),
+    },
+    {
+      type: 'item',
+      label: 'Unpin',
+      onselect: () => c.send({ type: 'pinRemove', windowId, itemId, mode: 'unpin' }),
+    },
+    SEP,
+    {
+      type: 'item',
+      label: 'Close tab',
+      danger: true,
+      // Closing for real (tile and tab); the close button and shortcut only suspend.
+      disabled: tab === null,
+      onselect: () => c.send({ type: 'pinRemove', windowId, itemId, mode: 'close' }),
+    },
   ];
 }

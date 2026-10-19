@@ -8,3 +8,4 @@ web-ext.config.ts
 .idea
 .vscode/*
 !.vscode/extensions.json
+.superpowers/

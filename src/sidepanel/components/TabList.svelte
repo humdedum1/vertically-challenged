@@ -36,9 +36,22 @@ interface Props {
   tabState: TabState;
   /** Driven by the density setting; applyAppearance sets the matching --row-height. */
   rowHeight: number;
+  /** Where the search field sits relative to the list, or hidden (then search is disabled). */
+  search?: 'top' | 'bottom' | 'hidden';
+  /** Title + URL rows. */
+  twoLine?: boolean;
+  showClose?: boolean;
+  showMute?: boolean;
 }
 
-let { tabState, rowHeight }: Props = $props();
+let {
+  tabState,
+  rowHeight,
+  search = 'top',
+  twoLine = false,
+  showClose = true,
+  showMute = true,
+}: Props = $props();
 
 const send = (msg: PanelMessage): void => tabState.send(msg);
 
@@ -60,7 +73,7 @@ const treeRows = $derived(buildRows(tabState.tabs, tabState.groups));
 const view: Row[] = $derived(searching ? buildSearchRows(fedTabs, index.search(needle)) : treeRows);
 const keyIndex = $derived(new Map(view.map((r, i) => [r.key, i])));
 const groupById = $derived(new Map(tabState.groups.map((g) => [g.id, g])));
-const showUrl = $derived(rowHeight >= 34);
+const showUrl = $derived(twoLine || (rowHeight >= 34 && searching));
 
 // --- Focus -----------------------------------------------------------------------------
 
@@ -541,6 +554,11 @@ function onSearchKeydown(e: KeyboardEvent): void {
   }
 }
 
+// A filter with no field to clear it would trap the list in a filtered state.
+$effect(() => {
+  if (search === 'hidden') query = '';
+});
+
 $effect(() => {
   const onKey = (e: KeyboardEvent) => {
     const t = e.target as HTMLElement | null;
@@ -548,7 +566,7 @@ $effect(() => {
       t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t?.isContentEditable;
     const find = (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'f';
     const slash = e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !typing;
-    if (!find && !slash) return;
+    if ((!find && !slash) || !searchInput) return;
     e.preventDefault();
     searchInput?.focus();
     searchInput?.select();
@@ -558,8 +576,8 @@ $effect(() => {
 });
 </script>
 
-<div class="wrap">
-  <div class="search">
+{#snippet searchField()}
+  <div class="search" class:bottom={search === 'bottom'}>
     <span class="lead"><Icon name="search" size={14} /></span>
     <input
       bind:this={searchInput}
@@ -578,6 +596,10 @@ $effect(() => {
       </button>
     {/if}
   </div>
+{/snippet}
+
+<div class="wrap">
+  {#if search === 'top'}{@render searchField()}{/if}
 
   <div class="body">
     {#if searching && view.length === 0}
@@ -626,7 +648,9 @@ $effect(() => {
                 ? `var(--g-${groupById.get(r.tab.groupId)?.color})`
                 : undefined}
               highlight={r.highlight}
-              showUrl={showUrl && searching}
+              {showUrl}
+              {showClose}
+              {showMute}
               onclick={(e) => onTabClick(e, i, r.tab)}
               oncontextmenu={(e) => onContextMenu(e, i)}
               onclose={() => send({ type: 'close', tabIds: targetsOf(r.tab) })}
@@ -646,6 +670,8 @@ $effect(() => {
       </VirtualList>
     {/if}
   </div>
+
+  {#if search === 'bottom'}{@render searchField()}{/if}
 
   {#if menu}
     <ContextMenu x={menu.x} y={menu.y} label={menu.label} items={menu.items} onclose={closeMenu} />
@@ -670,6 +696,10 @@ $effect(() => {
     position: relative;
     flex: none;
     margin: 2px 8px 6px;
+  }
+
+  .search.bottom {
+    margin: 6px 8px 8px;
   }
 
   .search input {

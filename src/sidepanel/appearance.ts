@@ -1,29 +1,43 @@
-import { type Appearance, DEFAULT_SETTINGS, ROW_HEIGHT } from '../settings/schema';
-import { findTheme } from '../themes/builtin';
+import { rowHeight, type Settings } from '../settings/schema';
+import { withAccent } from '../themes/accent';
+import type { Theme } from '../themes/palette';
 import { themeToCss } from '../themes/token-mapper';
 
-const CACHE_KEY = 'vc:appearance';
-let appliedThemeId: string | null = null;
+const CACHE_KEY = 'vc:appearance:v2';
+let appliedCss: string | null = null;
+
+function setThemeCss(css: string): void {
+  if (css === appliedCss) return;
+  let el = document.getElementById('vc-theme');
+  if (!el) {
+    el = document.createElement('style');
+    el.id = 'vc-theme';
+    document.head.append(el);
+  }
+  el.textContent = css;
+  appliedCss = css;
+}
 
 /**
- * Applies settings to the document. Colours go into one generated <style>; non-colour
- * tokens are inline custom properties on <html> so they override base.css defaults.
+ * Applies settings to the document. A null theme (custom theme not loaded yet) keeps the
+ * current colours. Colours go into one generated <style>; non-colour
+ * tokens are inline custom properties on <html> so they override base.css defaults;
+ * behaviour switches (hover vs always-visible actions, row layout) are data attributes.
  */
-export function applyAppearance(a: Appearance): void {
+export function applyAppearance(
+  settings: Settings,
+  theme: Theme | null,
+  { persist = true }: { persist?: boolean } = {},
+): void {
+  const a = settings.appearance;
+  if (theme) setThemeCss(themeToCss(withAccent(theme, a.accent)));
+
   const root = document.documentElement;
-  if (a.themeId !== appliedThemeId) {
-    let el = document.getElementById('vc-theme');
-    if (!el) {
-      el = document.createElement('style');
-      el.id = 'vc-theme';
-      document.head.append(el);
-    }
-    el.textContent = themeToCss(findTheme(a.themeId));
-    appliedThemeId = a.themeId;
-  }
   if (a.mode === 'system') delete root.dataset.mode;
   else root.dataset.mode = a.mode;
   root.dataset.density = a.density;
+  root.dataset.rowLayout = settings.tabs.layout;
+  root.dataset.actions = settings.tabs.actions;
 
   const s = root.style;
   s.setProperty('--radius-card', `${a.radius}px`);
@@ -31,24 +45,30 @@ export function applyAppearance(a: Appearance): void {
   s.setProperty('--radius-control', `${Math.max(0, a.radius - 6)}px`);
   s.setProperty('--font', a.fontFamily);
   s.setProperty('--font-size', `${a.fontSize}px`);
-  s.setProperty('--row-height', `${ROW_HEIGHT[a.density]}px`);
+  s.setProperty('--row-height', `${rowHeight(settings)}px`);
 
+  // Unsaved editor drafts are previewed but never become the next first paint.
+  if (!persist) return;
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(a));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ settings, css: appliedCss }));
   } catch {
     // Storage blocked; first paint just falls back to defaults.
   }
 }
 
 /**
- * chrome.storage is async, so the first frame would otherwise paint default colours and
- * then flip. The last applied appearance is mirrored in localStorage for a sync read.
- * Its contents are re-validated by the caller via migrateSettings.
+ * chrome.storage is async (and custom themes need a second read), so the first frame would
+ * otherwise paint defaults and then flip. The last applied settings and the generated
+ * theme CSS are mirrored in localStorage for a synchronous read. Settings are re-validated
+ * by the caller; the CSS is only ever written by applyAppearance above.
  */
-export function readCachedAppearance(): unknown {
+export function applyCachedAppearance(): unknown {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? { version: DEFAULT_SETTINGS.version, appearance: JSON.parse(raw) } : null;
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as { settings?: unknown; css?: unknown };
+    if (typeof cached.css === 'string') setThemeCss(cached.css);
+    return cached.settings ?? null;
   } catch {
     return null;
   }

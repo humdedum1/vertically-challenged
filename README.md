@@ -4,11 +4,10 @@ Fast, customizable vertical tabs in Chrome's Side Panel. Local-first.
 
 ## Status
 
-**Milestone 3: core tab management.** Live vertical tab list (M1), themes and layout (M2), plus pinned tabs, native tab groups, multi-select, drag and drop, context menus, and fuzzy search.
+**Milestone 4: customization.** Everything from M1–M3, plus a settings panel with live preview, custom themes with a colour editor, and JSON import/export.
 
 Roadmap:
 
-4. **Customization settings.** Persisted settings via `chrome.storage`.
 5. **Extras.** Tab suspension, sessions, bookmarks, history, multi-window, keyboard shortcuts, context menus.
 6. **Profiling.** Benchmarks against a 1,500-tab synthetic test.
 
@@ -111,6 +110,18 @@ A theme is a JSON file in the [Noctalia](https://github.com/noctalia-dev/noctali
 - A unit test asserts that every text/background pair in Abyss meets WCAG AA (4.5:1) in both modes.
 
 Settings are versioned (`src/settings/schema.ts`). `migrateSettings` upgrades older data, validates every field, and reads settings written by a newer version best-effort instead of resetting them.
+
+## Customization
+
+Settings (the Settings panel) apply live and sync through your Chrome profile:
+
+- **Appearance:** colour mode, theme, density, row layout (single line or title + URL), corner radius, font family and size, accent colour.
+- **Tab rows:** actions on hover or always visible; show or hide the close, mute and new-tab buttons and the tab count.
+- **Layout:** order and visibility of panels and of the sections in the Tabs panel.
+- **Themes:** duplicate any theme and edit all 16 roles for dark and light in the colour editor, with live preview and a WCAG contrast check. Import a Noctalia palette JSON file (including community palettes); export any theme back to Noctalia format.
+- **Backup:** export settings and custom themes to one JSON file and import it on another machine.
+
+Each custom theme is stored as its own `chrome.storage.sync` key because of Chrome's 8 KB per-item limit; up to 40 custom themes fit in the sync quota. Imported files are validated before use: colours must be exact `#rrggbb`, settings go through the same migration as stored ones, and invalid entries are skipped with a warning.
 
 ## Search
 

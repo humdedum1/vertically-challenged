@@ -1,0 +1,66 @@
+<script lang="ts">
+interface Props {
+  id?: string;
+  value: string;
+  label: string;
+  oninput: (value: string) => void;
+  placeholder?: string;
+  maxlength?: number;
+  invalid?: boolean;
+  describedby?: string;
+  mono?: boolean;
+}
+
+let {
+  id,
+  value,
+  label,
+  oninput,
+  placeholder,
+  maxlength,
+  invalid = false,
+  describedby,
+  mono = false,
+}: Props = $props();
+</script>
+
+<input
+  {id}
+  type="text"
+  class:mono
+  aria-label={label}
+  aria-invalid={invalid}
+  aria-describedby={describedby}
+  {placeholder}
+  {maxlength}
+  {value}
+  spellcheck="false"
+  autocomplete="off"
+  oninput={(e) => oninput(e.currentTarget.value)}
+/>
+
+<style>
+  input {
+    width: 100%;
+    min-width: 0;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    background: var(--surface-0);
+    color: var(--mOnSurface);
+    font: inherit;
+  }
+
+  input.mono {
+    font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  }
+
+  input[aria-invalid='true'] {
+    border-color: var(--mError);
+  }
+
+  input::placeholder {
+    color: var(--mOnSurfaceVariant);
+  }
+</style>

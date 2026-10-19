@@ -1,17 +1,22 @@
 import { mount } from 'svelte';
 import { migrateSettings } from '../../settings/migrate';
 import App from '../../sidepanel/App.svelte';
-import { applyAppearance, readCachedAppearance } from '../../sidepanel/appearance';
+import { applyAppearance, applyCachedAppearance } from '../../sidepanel/appearance';
 import { SettingsState } from '../../sidepanel/settings-state.svelte';
+import { ThemeRegistry } from '../../sidepanel/theme-registry.svelte';
 import '../../sidepanel/styles/base.css';
 
 const target = document.getElementById('app');
 if (!target) throw new Error('Missing #app mount point');
 
-// Apply the last-known appearance before mounting so the first frame has the right
-// theme, mode and density; storage then reconciles asynchronously.
-const settings = new SettingsState(migrateSettings(readCachedAppearance()));
-applyAppearance(settings.value.appearance);
+// The cached theme CSS and settings are applied before mounting so the first frame is
+// already right; storage then reconciles asynchronously (settings, then custom themes).
+const settings = new SettingsState(migrateSettings(applyCachedAppearance()));
+const themes = new ThemeRegistry();
+if (!document.getElementById('vc-theme')) {
+  applyAppearance(settings.value, themes.resolveReady(settings.value.appearance.themeId));
+}
 void settings.start();
+void themes.start();
 
-mount(App, { target, props: { settings } });
+mount(App, { target, props: { settings, themes } });

@@ -1,135 +1,123 @@
 <script lang="ts">
-import type { ColorMode, Density } from '../../settings/schema';
-import { BUILTIN_THEMES, findTheme } from '../../themes/builtin';
-import Field from '../components/controls/Field.svelte';
-import SegmentedControl from '../components/controls/SegmentedControl.svelte';
+import { tick } from 'svelte';
+import type { Theme } from '../../themes/palette';
 import Icon from '../components/Icon.svelte';
-import SegmentCard from '../components/SegmentCard.svelte';
 import type { SettingsState } from '../settings-state.svelte';
+import type { ThemeDraft } from '../theme-draft.svelte';
+import type { ThemeRegistry } from '../theme-registry.svelte';
+import AppearanceCard from './settings/AppearanceCard.svelte';
+import BackupCard from './settings/BackupCard.svelte';
+import LayoutCard from './settings/LayoutCard.svelte';
+import PreviewCard from './settings/PreviewCard.svelte';
+import TabRowsCard from './settings/TabRowsCard.svelte';
+import ThemeEditor from './settings/ThemeEditor.svelte';
+import ThemesCard from './settings/ThemesCard.svelte';
 
-let { settings }: { settings: SettingsState } = $props();
-
-const MODES: { value: ColorMode; label: string }[] = [
-  { value: 'system', label: 'System' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-];
-const DENSITIES: { value: Density; label: string }[] = [
-  { value: 'compact', label: 'Compact' },
-  { value: 'comfortable', label: 'Comfortable' },
-];
-
-const a = $derived(settings.value.appearance);
-const theme = $derived(findTheme(a.themeId));
-
-// "system" resolves through the media query, which is also what the injected stylesheet uses.
-const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
-let systemDark = $state(prefersDark.matches);
-$effect(() => {
-  const on = (e: MediaQueryListEvent) => {
-    systemDark = e.matches;
-  };
-  prefersDark.addEventListener('change', on);
-  return () => prefersDark.removeEventListener('change', on);
-});
-
-const effective = $derived(a.mode === 'system' ? (systemDark ? 'dark' : 'light') : a.mode);
-const palette = $derived(theme[effective]);
-const swatches = $derived([
-  ['Primary', palette.mPrimary],
-  ['Secondary', palette.mSecondary],
-  ['Tertiary', palette.mTertiary],
-  ['Surface variant', palette.mSurfaceVariant],
-  ['On surface', palette.mOnSurface],
-] as const);
-
-function patch(p: Partial<typeof a>): void {
-  settings.update((s) => ({ ...s, appearance: { ...s.appearance, ...p } }));
+interface Props {
+  settings: SettingsState;
+  themes: ThemeRegistry;
+  /** Where the editor publishes its working copy so the whole panel previews it. */
+  draft: ThemeDraft;
 }
+
+let { settings, themes, draft }: Props = $props();
+
+interface Editing {
+  theme: Theme;
+  isNew: boolean;
+  origin: { id: string; action: 'edit' | 'duplicate' };
+}
+let editing = $state.raw<Editing | null>(null);
+let saved = $state('');
+
+function focusAction(id: string, action: string): void {
+  void tick().then(() => {
+    const el = document.querySelector<HTMLElement>(
+      `[data-theme-id="${id}"] [data-action="${action}"]`,
+    );
+    (el ?? document.getElementById('vc-themes-anchor'))?.focus();
+  });
+}
+
+function open(theme: Theme, origin: Editing['origin']): void {
+  saved = '';
+  editing = { theme, isNew: origin.action === 'duplicate', origin };
+}
+
+function close(focus: { id: string; action: string }): void {
+  editing = null;
+  focusAction(focus.id, focus.action);
+}
+
+async function save(theme: Theme): Promise<string | null> {
+  try {
+    await themes.save(theme);
+  } catch (err) {
+    return err instanceof Error ? err.message : 'Couldn’t save the theme';
+  }
+  settings.update((s) => ({ ...s, appearance: { ...s.appearance, themeId: theme.id } }));
+  saved = `Saved “${theme.name}” and switched to it.`;
+  close({ id: theme.id, action: 'edit' });
+  return null;
+}
+
+// Leaving the panel mid-edit discards the draft; the editor's own teardown also clears it.
+$effect(() => () => {
+  draft.theme = null;
+});
 </script>
 
-<div class="panel">
-  <SegmentCard title="Appearance">
-    {#snippet icon()}<Icon name="palette" size={12} />{/snippet}
-    <div class="fields">
-      <Field label="Colour mode">
-        <SegmentedControl label="Colour mode" options={MODES} value={a.mode} onchange={(mode) => patch({ mode })} />
-      </Field>
+<div class="settings">
+  <PreviewCard settings={settings.value} />
 
-      <Field label="Theme" for="vc-theme-select">
-        <div class="theme-row">
-          <select id="vc-theme-select" value={a.themeId} onchange={(e) => patch({ themeId: e.currentTarget.value })}>
-            {#each BUILTIN_THEMES as t (t.id)}
-              <option value={t.id}>{t.name}</option>
-            {/each}
-          </select>
-          <ul class="swatches" aria-label="Theme preview">
-            {#each swatches as [name, color] (name)}
-              <li style:background={color} title={name}></li>
-            {/each}
-          </ul>
-        </div>
-      </Field>
-
-      <Field label="Density">
-        <SegmentedControl label="Density" options={DENSITIES} value={a.density} onchange={(density) => patch({ density })} />
-      </Field>
+  {#if editing}
+    {#key editing.theme.id}
+      <ThemeEditor
+        {settings}
+        drafts={draft}
+        initial={editing.theme}
+        isNew={editing.isNew}
+        onsave={save}
+        oncancel={() => editing && close(editing.origin)}
+      />
+    {/key}
+  {:else}
+    <div class="cards">
+      <AppearanceCard {settings} {themes} />
+      <TabRowsCard {settings} />
+      <LayoutCard {settings} />
+      <!-- Focus fallback when the theme a flow started from no longer has a button. -->
+      <span id="vc-themes-anchor" tabindex="-1"></span>
+      <ThemesCard {settings} {themes} onedit={open} />
+      <BackupCard {settings} {themes} />
     </div>
-  </SegmentCard>
+    <p class="saved" role="status">{saved}</p>
+  {/if}
 </div>
 
 <style>
-  .panel {
+  .settings {
     padding-bottom: var(--pad-panel);
   }
 
-  .fields {
+  .cards {
     display: flex;
     flex-direction: column;
-    gap: calc(var(--gap) + 4px);
-    padding: 6px var(--pad-card) var(--pad-card);
+    gap: var(--gap);
   }
 
-  .theme-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  .saved {
+    margin: var(--gap) 0 0;
+    color: var(--mOnSurfaceVariant);
+    font-size: 12px;
   }
 
-  select {
-    flex: 1;
-    min-width: 0;
-    height: 32px;
-    padding: 0 10px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-control);
-    background: var(--surface-0);
-    color: var(--mOnSurface);
-    cursor: pointer;
+  .saved:empty {
+    display: none;
   }
 
-  select:hover {
-    background: color-mix(in srgb, var(--surface-0) 92%, var(--mOnSurface));
-  }
-
-  .swatches {
-    flex: none;
-    display: flex;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .swatches li {
-    width: 18px;
-    height: 18px;
-    margin-left: -5px;
-    border-radius: 50%;
-    border: 1.5px solid var(--surface-1);
-    box-shadow: 0 0 0 1px var(--border);
-  }
-
-  .swatches li:first-child {
-    margin-left: 0;
+  #vc-themes-anchor {
+    height: 0;
+    outline: none;
   }
 </style>

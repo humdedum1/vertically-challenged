@@ -19,8 +19,10 @@ interface Props {
   /** CSS colour of the owning group, for the indent guide. */
   groupColor?: string;
   highlight?: { title: Range[]; url: Range[] };
-  /** Second (URL) line in search results; only when the row is tall enough. */
+  /** Second (URL) line: always in the two-line layout, and in search results when tall enough. */
   showUrl: boolean;
+  showClose?: boolean;
+  showMute?: boolean;
   onclick: (e: MouseEvent) => void;
   oncontextmenu: (e: MouseEvent) => void;
   onclose: () => void;
@@ -39,6 +41,8 @@ let {
   groupColor,
   highlight,
   showUrl,
+  showClose = true,
+  showMute = true,
   onclick,
   oncontextmenu,
   onclose,
@@ -115,9 +119,9 @@ function muteClick(e: MouseEvent): void {
     <span class="label"
       >{#if titleParts}{#each titleParts as s, i (i)}{#if s.hit}<mark>{s.text}</mark>{:else}{s.text}{/if}{/each}{:else}{label}{/if}</span
     >
-    {#if showUrl && urlParts}
+    {#if showUrl && shownUrl}
       <span class="url"
-        >{#each urlParts as s, i (i)}{#if s.hit}<mark>{s.text}</mark>{:else}{s.text}{/if}{/each}</span
+        >{#if urlParts}{#each urlParts as s, i (i)}{#if s.hit}<mark>{s.text}</mark>{:else}{s.text}{/if}{/each}{:else}{shownUrl}{/if}</span
       >
     {/if}
   </span>
@@ -128,7 +132,7 @@ function muteClick(e: MouseEvent): void {
     </svg>
   {/if}
 
-  {#if tab.audible || tab.muted}
+  {#if showMute && (tab.audible || tab.muted)}
     <button
       class="mute"
       class:muted={tab.muted}
@@ -149,11 +153,13 @@ function muteClick(e: MouseEvent): void {
     </button>
   {/if}
 
-  <button class="close" type="button" tabindex="-1" aria-label="Close tab: {label}" onclick={closeClick}>
-    <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-      <path d="m4 4 8 8m0-8-8 8" />
-    </svg>
-  </button>
+  {#if showClose}
+    <button class="close" type="button" tabindex="-1" aria-label="Close tab: {label}" onclick={closeClick}>
+      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <path d="m4 4 8 8m0-8-8 8" />
+      </svg>
+    </button>
+  {/if}
 </div>
 
 <style>
@@ -346,6 +352,11 @@ function muteClick(e: MouseEvent): void {
   .row.focused .close,
   .row.active .close,
   .close:focus-visible {
+    opacity: 1;
+  }
+
+  /* Setting: keep the buttons visible on every row, not only on hover/focus/active. */
+  :global(html[data-actions='always']) .close {
     opacity: 1;
   }
 

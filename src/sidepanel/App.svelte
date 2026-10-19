@@ -1,27 +1,58 @@
 <script lang="ts">
-import { ROW_HEIGHT } from '../settings/schema';
+import { type PanelId, rowHeight } from '../settings/schema';
 import { applyAppearance } from './appearance';
 import Icon from './components/Icon.svelte';
 import PanelStrip, { type PanelDef } from './components/PanelStrip.svelte';
 import SegmentCard from './components/SegmentCard.svelte';
 import TabList from './components/TabList.svelte';
 import TopBar from './components/TopBar.svelte';
+import { IMPLEMENTED_PANELS, PANEL_ICONS, PANEL_LABELS } from './panel-defs';
 import type { SettingsState } from './settings-state.svelte';
 import { TabState } from './tab-state.svelte';
+import { ThemeDraft } from './theme-draft.svelte';
+import type { ThemeRegistry } from './theme-registry.svelte';
 
-let { settings }: { settings: SettingsState } = $props();
+let { settings, themes }: { settings: SettingsState; themes: ThemeRegistry } = $props();
 
-// Data-driven so Sessions / Bookmarks / History only need an entry here and a branch below.
-const PANELS = [
-  { id: 'tabs', label: 'Tabs', icon: 'tabs' },
-  { id: 'settings', label: 'Settings', icon: 'settings' },
-] as const satisfies readonly PanelDef<string>[];
-type PanelId = (typeof PANELS)[number]['id'];
+// The strip follows the user's order and visibility; panels not built yet are skipped.
+const panels = $derived(
+  settings.value.layout.panels
+    .filter((p) => p.visible && IMPLEMENTED_PANELS.has(p.id))
+    .map(
+      (p): PanelDef<PanelId> => ({
+        id: p.id,
+        label: PANEL_LABELS[p.id],
+        icon: PANEL_ICONS[p.id] ?? 'list',
+      }),
+    ),
+);
 
-let panel: PanelId = $state('tabs');
-const current = $derived(PANELS.find((p) => p.id === panel) ?? PANELS[0]);
+let selected: PanelId = $state('tabs');
+// A hidden panel can't stay selected (settings and tabs can't be hidden, so 'tabs' always exists).
+const panel = $derived(panels.some((p) => p.id === selected) ? selected : 'tabs');
+const currentLabel = $derived(PANEL_LABELS[panel]);
 
-$effect(() => applyAppearance(settings.value.appearance));
+// A theme open in the settings editor overrides the saved one so edits preview live.
+const draft = new ThemeDraft();
+$effect(() => {
+  const s = settings.value;
+  if (draft.theme) {
+    // Preview in the palette being edited, whatever the saved colour mode is.
+    const preview = { ...s, appearance: { ...s.appearance, mode: draft.mode } };
+    applyAppearance(preview, draft.theme, { persist: false });
+  } else {
+    applyAppearance(s, themes.resolveReady(s.appearance.themeId));
+  }
+});
+
+const sections = $derived(settings.value.layout.sections);
+const searchPos = $derived.by((): 'top' | 'bottom' | 'hidden' => {
+  const s = sections.find((x) => x.id === 'search');
+  if (!s?.visible) return 'hidden';
+  return sections.findIndex((x) => x.id === 'search') < sections.findIndex((x) => x.id === 'tabs')
+    ? 'top'
+    : 'bottom';
+});
 
 let tabState = $state.raw(new TabState());
 
@@ -37,13 +68,13 @@ const count = $derived(tabState.tabs.length);
 
 <main>
   <TopBar
-    title={current.label}
+    title={currentLabel}
     showBack={panel !== 'tabs'}
     mode={settings.value.appearance.mode}
-    onback={() => (panel = 'tabs')}
+    onback={() => (selected = 'tabs')}
     onmode={(mode) => settings.update((s) => ({ ...s, appearance: { ...s.appearance, mode } }))}
   />
-  <PanelStrip panels={PANELS} selected={panel} onselect={(id) => (panel = id)} />
+  <PanelStrip {panels} selected={panel} onselect={(id) => (selected = id)} />
 
   <div class="panel" role="tabpanel" id="vc-panel-{panel}" aria-labelledby="vc-tab-{panel}">
     {#if panel === 'tabs'}
@@ -51,18 +82,22 @@ const count = $derived(tabState.tabs.length);
         {#snippet icon()}<Icon name="list" size={12} />{/snippet}
         {#snippet trailing()}
           {#if tabState.status === 'ready'}
-            <span class="count" role="img" aria-label="{count} tabs">{count}</span>
-            <button
-              type="button"
-              class="add"
-              aria-label="New tab"
-              title="New tab"
-              onclick={() => {
-                if (tabState.windowId !== null) tabState.send({ type: 'newTab', windowId: tabState.windowId, afterTabId: null });
-              }}
-            >
-              <Icon name="plus" size={14} />
-            </button>
+            {#if settings.value.tabs.showCount}
+              <span class="count" role="img" aria-label="{count} tabs">{count}</span>
+            {/if}
+            {#if settings.value.tabs.showNewTabButton}
+              <button
+                type="button"
+                class="add"
+                aria-label="New tab"
+                title="New tab"
+                onclick={() => {
+                  if (tabState.windowId !== null) tabState.send({ type: 'newTab', windowId: tabState.windowId, afterTabId: null });
+                }}
+              >
+                <Icon name="plus" size={14} />
+              </button>
+            {/if}
           {/if}
         {/snippet}
 
@@ -83,7 +118,14 @@ const count = $derived(tabState.tabs.length);
         {:else if count === 0}
           <p class="message empty">No tabs in this window</p>
         {:else}
-          <TabList {tabState} rowHeight={ROW_HEIGHT[settings.value.appearance.density]} />
+          <TabList
+            {tabState}
+            rowHeight={rowHeight(settings.value)}
+            search={searchPos}
+            twoLine={settings.value.tabs.layout === 'double'}
+            showClose={settings.value.tabs.showClose}
+            showMute={settings.value.tabs.showMute}
+          />
         {/if}
       </SegmentCard>
     {:else if panel === 'settings'}
@@ -91,7 +133,7 @@ const count = $derived(tabState.tabs.length);
       {#await import('./panels/SettingsPanel.svelte')}
         <p class="message" role="status">Loading…</p>
       {:then m}
-        <m.default {settings} />
+        <m.default {settings} {themes} {draft} />
       {:catch}
         <p class="message" role="alert">Could not load settings.</p>
       {/await}

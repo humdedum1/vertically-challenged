@@ -36,15 +36,17 @@ describe('migrateSettings: versions', () => {
     radius: 8,
     fontFamily: 'Georgia, serif',
     fontSize: 15,
+    accent: null,
   };
+  const full = { ...DEFAULT_SETTINGS, appearance: valid };
 
   it('keeps valid appearance on an unversioned object and stamps the version', () => {
     const r = migrateSettings({ appearance: valid });
-    expect(r).toEqual({ version: SETTINGS_VERSION, appearance: valid });
+    expect(r).toEqual(full);
   });
 
   it('current-version round-trip is identity', () => {
-    const s = { version: SETTINGS_VERSION, appearance: valid };
+    const s = full;
     expect(migrateSettings(s)).toEqual(s);
     expect(migrateSettings(migrateSettings(s))).toEqual(s);
     expect(migrateSettings(DEFAULT_SETTINGS)).toEqual(DEFAULT_SETTINGS);
@@ -56,7 +58,7 @@ describe('migrateSettings: versions', () => {
       appearance: { ...valid, futureThing: true, mode: 'dark' },
       somethingNew: { a: 1 },
     });
-    expect(r).toEqual({ version: SETTINGS_VERSION, appearance: valid });
+    expect(r).toEqual(full);
     expect(r).not.toHaveProperty('somethingNew');
     expect(r.appearance).not.toHaveProperty('futureThing');
   });

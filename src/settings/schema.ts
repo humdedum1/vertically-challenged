@@ -1,10 +1,25 @@
 import { DEFAULT_THEME_ID } from '../themes/builtin';
 
 /** Bump when the stored shape changes, and add a step to MIGRATIONS in migrate.ts. */
-export const SETTINGS_VERSION = 1;
+export const SETTINGS_VERSION = 2;
 
 export type ColorMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'comfortable';
+export type RowLayout = 'single' | 'double';
+export type ActionVisibility = 'hover' | 'always';
+
+/**
+ * Every panel the strip can show, including ones not built yet, so a setting saved by a
+ * newer build (or an older one) keeps its meaning. The UI filters to implemented panels.
+ */
+export const PANEL_IDS = ['tabs', 'sessions', 'bookmarks', 'history', 'settings'] as const;
+export type PanelId = (typeof PANEL_IDS)[number];
+/** Hiding these would leave no way back to the settings or the tab list. */
+export const UNHIDEABLE_PANELS: readonly PanelId[] = ['tabs', 'settings'];
+
+/** Sections inside the Tabs panel, top to bottom. */
+export const SECTION_IDS = ['search', 'tabs', 'recentlyClosed'] as const;
+export type SectionId = (typeof SECTION_IDS)[number];
 
 export interface Appearance {
   themeId: string;
@@ -15,14 +30,49 @@ export interface Appearance {
   fontFamily: string;
   /** Base font size in px. */
   fontSize: number;
+  /** Overrides the theme's mPrimary in both modes; null uses the theme's own. */
+  accent: string | null;
+}
+
+export interface TabRowSettings {
+  layout: RowLayout;
+  actions: ActionVisibility;
+  showClose: boolean;
+  showMute: boolean;
+  showNewTabButton: boolean;
+  showCount: boolean;
+}
+
+export interface Ordered<T extends string> {
+  id: T;
+  visible: boolean;
+}
+
+export interface LayoutSettings {
+  /** Full permutation of PANEL_IDS. */
+  panels: Ordered<PanelId>[];
+  /** Full permutation of SECTION_IDS. */
+  sections: Ordered<SectionId>[];
 }
 
 export interface Settings {
   version: typeof SETTINGS_VERSION;
   appearance: Appearance;
+  tabs: TabRowSettings;
+  layout: LayoutSettings;
 }
 
 export const DEFAULT_FONT = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+
+/** Local fonts only; nothing is ever downloaded. */
+export const FONT_PRESETS: readonly { label: string; value: string }[] = [
+  { label: 'Default (Inter / system)', value: DEFAULT_FONT },
+  { label: 'System UI', value: 'system-ui, sans-serif' },
+  { label: 'Segoe UI', value: '"Segoe UI", system-ui, sans-serif' },
+  { label: 'Roboto', value: 'Roboto, system-ui, sans-serif' },
+  { label: 'Serif', value: 'Georgia, "Times New Roman", serif' },
+  { label: 'Monospace', value: '"JetBrains Mono", "Cascadia Code", Consolas, monospace' },
+];
 
 export const DEFAULT_SETTINGS: Settings = {
   version: SETTINGS_VERSION,
@@ -33,6 +83,19 @@ export const DEFAULT_SETTINGS: Settings = {
     radius: 14,
     fontFamily: DEFAULT_FONT,
     fontSize: 13,
+    accent: null,
+  },
+  tabs: {
+    layout: 'single',
+    actions: 'hover',
+    showClose: true,
+    showMute: true,
+    showNewTabButton: true,
+    showCount: true,
+  },
+  layout: {
+    panels: PANEL_IDS.map((id) => ({ id, visible: true })),
+    sections: SECTION_IDS.map((id) => ({ id, visible: true })),
   },
 };
 
@@ -41,5 +104,10 @@ export const LIMITS = {
   fontSize: { min: 11, max: 16 },
 } as const;
 
-/** Row heights per density; the virtual list and CSS both read these. */
-export const ROW_HEIGHT: Record<Density, number> = { compact: 28, comfortable: 34 };
+/** Row heights per layout and density; the virtual list and CSS both read these. */
+export const ROW_HEIGHTS: Record<RowLayout, Record<Density, number>> = {
+  single: { compact: 28, comfortable: 34 },
+  double: { compact: 40, comfortable: 46 },
+};
+
+export const rowHeight = (s: Settings): number => ROW_HEIGHTS[s.tabs.layout][s.appearance.density];

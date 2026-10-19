@@ -4,11 +4,10 @@ Fast, customizable vertical tabs in Chrome's Side Panel. Local-first.
 
 ## Status
 
-**Milestone 1: scaffold and live vertical tab list.** The service worker tracks every tab in the browser and the side panel mirrors the current window.
+**Milestone 2: theme system and layout.** Live vertical tab list (M1), plus design tokens, the Abyss theme, light/dark/system mode, density, and the segmented card layout.
 
 Roadmap:
 
-2. **Theme system and layout.** Themes, density, and row layout.
 3. **Core tab management.** Pinned tabs, drag and drop, native tab groups, search.
 4. **Customization settings.** Persisted settings via `chrome.storage`.
 5. **Extras.** Tab suspension, sessions, bookmarks, history, multi-window, keyboard shortcuts, context menus.
@@ -87,6 +86,17 @@ Directory map:
 | `tests/` | Vitest unit tests for pure logic |
 | `scripts/` | Build helpers, such as `generate-icons.mjs` |
 
+## Themes
+
+A theme is a JSON file in the [Noctalia](https://github.com/noctalia-dev/noctalia-shell) palette format: a `dark` and a `light` object, each with the same 16 roles (`mPrimary`, `mOnPrimary`, `mSecondary`, `mOnSecondary`, `mTertiary`, `mOnTertiary`, `mError`, `mOnError`, `mSurface`, `mOnSurface`, `mSurfaceVariant`, `mOnSurfaceVariant`, `mOutline`, `mShadow`, `mHover`, `mOnHover`), each an exact `#rrggbb` value. A single flat palette is also accepted and used for both modes.
+
+- The default theme, Abyss, lives entirely in `src/themes/abyss.json`; replace that file to change it.
+- `src/themes/token-mapper.ts` turns a theme into CSS custom properties. State layers, elevations and shadows are derived in `src/sidepanel/styles/base.css` with `color-mix()`, so themes only carry the 16 roles.
+- Non-colour tokens (radius, density, font) come from settings, not the theme.
+- A unit test asserts that every text/background pair in Abyss meets WCAG AA (4.5:1) in both modes.
+
+Settings are versioned (`src/settings/schema.ts`). `migrateSettings` upgrades older data, validates every field, and reads settings written by a newer version best-effort instead of resetting them.
+
 ## Permissions
 
 | Permission | Why |
@@ -94,8 +104,9 @@ Directory map:
 | `tabs` | Read tab titles and URLs for the list and search, and switch or close tabs |
 | `sidePanel` | Render the UI in Chrome's side panel and open it from the shortcut or toolbar icon |
 | `favicon` | Load page favicons through `_favicon` without host permissions |
+| `storage` | Save settings in `chrome.storage.sync` (follows your Chrome profile); later, local data in `chrome.storage.local` |
 
-No host permissions are requested. `storage`, `tabGroups`, `sessions`, `bookmarks`, and `history` will be added only in the milestones that use them.
+No host permissions are requested. `tabGroups`, `sessions`, `bookmarks`, and `history` will be added only in the milestones that use them.
 
 ## Platform limits
 

@@ -4,15 +4,14 @@ import type { TabInfo } from '../../shared/types';
 import TabRow from './TabRow.svelte';
 import VirtualList from './VirtualList.svelte';
 
-/** Must match --row-height in base.css; applied inline below so there is one source. */
-const ROW_HEIGHT = 34;
-
 interface Props {
   tabs: TabInfo[];
   send: (msg: PanelMessage) => void;
+  /** Driven by the density setting; applyAppearance sets the matching --row-height. */
+  rowHeight: number;
 }
 
-let { tabs, send }: Props = $props();
+let { tabs, send, rowHeight }: Props = $props();
 
 let list: ReturnType<typeof VirtualList<TabInfo>> | undefined = $state();
 let focusedIndex = $state(0);
@@ -83,11 +82,11 @@ function onkeydown(e: KeyboardEvent): void {
 }
 </script>
 
-<div class="wrap" style:--row-height="{ROW_HEIGHT}px">
+<div class="wrap">
   <VirtualList
     bind:this={list}
     items={tabs}
-    rowHeight={ROW_HEIGHT}
+    {rowHeight}
     key={(t) => t.id}
     role="listbox"
     aria-label="Tabs in this window"

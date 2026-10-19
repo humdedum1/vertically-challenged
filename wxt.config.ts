@@ -15,6 +15,9 @@ export default defineConfig({
       'sidePanel',
       // Load page favicons via chrome-extension://<id>/_favicon/ without host permissions.
       'favicon',
+      // Persist settings (sync, so they follow the user's Chrome profile) and later
+      // local data such as layout and sessions.
+      'storage',
     ],
     action: { default_title: 'Vertically Challenged' },
     commands: {

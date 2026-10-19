@@ -102,7 +102,7 @@ function closeClick(e: MouseEvent): void {
     border-radius: var(--radius-row);
     cursor: default;
     user-select: none;
-    transition: background-color var(--dur);
+    transition: background-color var(--dur) var(--ease);
   }
 
   .row:hover {
@@ -114,9 +114,8 @@ function closeClick(e: MouseEvent): void {
   }
 
   .row.active {
-    background: var(--mHover);
-    color: var(--mOnHover);
-    box-shadow: 0 1px 3px color-mix(in srgb, var(--mShadow) 30%, transparent);
+    background: var(--state-selected);
+    color: var(--mOnSurface);
   }
 
   .row.active::before {

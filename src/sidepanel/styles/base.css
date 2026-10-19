@@ -1,51 +1,50 @@
-/* Temporary tokens; the Milestone 2 theme loader replaces the colour block. */
+/* Design tokens. The 16 --m* colour roles are injected by applyAppearance (theme stylesheet);
+   everything below is derived from them with color-mix() so a theme never carries more than roles. */
 :root {
-  --mPrimary: #3fd0c4;
-  --mOnPrimary: #04201f;
-  --mSecondary: #4f8fbf;
-  --mTertiary: #c9a45c;
-  --mError: #e0605a;
-  --mSurface: #0b1215;
-  --mOnSurface: #d6e4e6;
-  --mHover: #1a2b31;
-  --mOnHover: #e6f2f3;
-  --mSurfaceVariant: #121e23;
-  --mOnSurfaceVariant: #8fa6ab;
-  --mOutline: #2a3d44;
-  --mShadow: #000000;
-
+  /* Non-colour defaults; applyAppearance overrides these inline. */
   --radius-card: 14px;
   --radius-row: 10px;
+  --radius-control: 8px;
   --row-height: 34px;
   --font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-size: 13px;
   --dur: 120ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
 
+  --gap: 10px;
+  --pad-card: 14px;
+  --pad-panel: 10px;
+
+  /* State layers (Material 3 opacities). */
   --state-hover: color-mix(in srgb, var(--mOnSurface) 8%, transparent);
+  --state-focus: color-mix(in srgb, var(--mOnSurface) 10%, transparent);
   --state-pressed: color-mix(in srgb, var(--mOnSurface) 12%, transparent);
-  --focus-ring: var(--mPrimary);
+  --state-selected: color-mix(in srgb, var(--mPrimary) 14%, transparent);
 
-  color-scheme: dark;
+  /* Elevation: higher surfaces drift toward the foreground colour. */
+  --surface-0: var(--mSurface);
+  --surface-1: var(--mSurfaceVariant);
+  --surface-2: color-mix(in srgb, var(--mSurfaceVariant) 95%, var(--mOnSurface));
+  --surface-3: color-mix(in srgb, var(--mSurfaceVariant) 92%, var(--mOnSurface));
+
+  --shadow-1: 0 1px 3px color-mix(in srgb, var(--mShadow) 30%, transparent);
+  --shadow-2: 0 4px 12px color-mix(in srgb, var(--mShadow) 38%, transparent);
+  --glass: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--mOnSurface) 4%, transparent),
+    transparent 40%
+  );
+
+  /* --border is decorative; controls that must reach 3:1 use --border-strong. */
+  --border: var(--mOutline);
+  --border-strong: var(--mOnSurfaceVariant);
+  --focus-ring: var(--mPrimary);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --mPrimary: #0f7f77;
-    --mOnPrimary: #ffffff;
-    --mSecondary: #2c6a99;
-    --mTertiary: #8a6a1f;
-    --mError: #b3372f;
-    --mSurface: #e9f1f2;
-    --mOnSurface: #0f1c20;
-    --mHover: #c9dadd;
-    --mOnHover: #0f1c20;
-    --mSurfaceVariant: #d5e3e5;
-    --mOnSurfaceVariant: #3d565b;
-    --mOutline: #9bb4b8;
-    --mShadow: #000000;
-
-    color-scheme: light;
-  }
+html[data-density="compact"] {
+  --gap: 6px;
+  --pad-card: 10px;
+  --pad-panel: 8px;
 }
 
 *,
@@ -72,9 +71,15 @@ body {
   height: 100%;
 }
 
-button {
+button,
+select {
   font: inherit;
   color: inherit;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--mOutline) transparent;
 }
 
 :focus-visible {
@@ -90,5 +95,7 @@ button {
     transition: none !important;
     /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
     animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
+    scroll-behavior: auto !important;
   }
 }

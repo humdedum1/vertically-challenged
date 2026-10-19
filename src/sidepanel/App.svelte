@@ -1,6 +1,27 @@
 <script lang="ts">
+import { ROW_HEIGHT } from '../settings/schema';
+import { applyAppearance } from './appearance';
+import Icon from './components/Icon.svelte';
+import PanelStrip, { type PanelDef } from './components/PanelStrip.svelte';
+import SegmentCard from './components/SegmentCard.svelte';
 import TabList from './components/TabList.svelte';
+import TopBar from './components/TopBar.svelte';
+import type { SettingsState } from './settings-state.svelte';
 import { TabState } from './tab-state.svelte';
+
+let { settings }: { settings: SettingsState } = $props();
+
+// Data-driven so Sessions / Bookmarks / History only need an entry here and a branch below.
+const PANELS = [
+  { id: 'tabs', label: 'Tabs', icon: 'tabs' },
+  { id: 'settings', label: 'Settings', icon: 'settings' },
+] as const satisfies readonly PanelDef<string>[];
+type PanelId = (typeof PANELS)[number]['id'];
+
+let panel: PanelId = $state('tabs');
+const current = $derived(PANELS.find((p) => p.id === panel) ?? PANELS[0]);
+
+$effect(() => applyAppearance(settings.value.appearance));
 
 let tabState = $state.raw(new TabState());
 
@@ -15,45 +36,56 @@ const count = $derived(tabState.tabs.length);
 </script>
 
 <main>
-  <header class="bar">
-    <img src="/icon/32.png" width="18" height="18" alt="" />
-    <h1>Tabs</h1>
-    {#if tabState.status === 'ready'}
-      <span class="count" aria-label="{count} tabs">{count}</span>
+  <TopBar
+    title={current.label}
+    showBack={panel !== 'tabs'}
+    mode={settings.value.appearance.mode}
+    onback={() => (panel = 'tabs')}
+    onmode={(mode) => settings.update((s) => ({ ...s, appearance: { ...s.appearance, mode } }))}
+  />
+  <PanelStrip panels={PANELS} selected={panel} onselect={(id) => (panel = id)} />
+
+  <div class="panel" role="tabpanel" id="vc-panel-{panel}" aria-labelledby="vc-tab-{panel}">
+    {#if panel === 'tabs'}
+      <SegmentCard title="Open tabs" fill>
+        {#snippet icon()}<Icon name="list" size={12} />{/snippet}
+        {#snippet trailing()}
+          {#if tabState.status === 'ready'}
+            <span class="count" role="img" aria-label="{count} tabs">{count}</span>
+          {/if}
+        {/snippet}
+
+        <!-- The worker is suspended when idle and the port reconnects; keep showing the last
+             known list meanwhile instead of unmounting it and losing scroll position. -->
+        {#if tabState.status === 'connecting' && count === 0}
+          <div class="skeleton" role="status" aria-live="polite">
+            <span class="sr">Connecting…</span>
+            {#each { length: 8 } as _, i (i)}
+              <div class="sk-row" aria-hidden="true"><span class="sk-icon"></span><span class="sk-text" style:width="{45 + ((i * 17) % 40)}%"></span></div>
+            {/each}
+          </div>
+        {:else if tabState.status === 'error'}
+          <div class="message" role="alert">
+            <p>{tabState.error ?? 'Could not connect to the extension.'}</p>
+            <button type="button" onclick={() => (tabState = new TabState())}>Retry</button>
+          </div>
+        {:else if count === 0}
+          <p class="message empty">No tabs in this window</p>
+        {:else}
+          <TabList tabs={tabState.tabs} send={(m) => tabState.send(m)} rowHeight={ROW_HEIGHT[settings.value.appearance.density]} />
+        {/if}
+      </SegmentCard>
+    {:else if panel === 'settings'}
+      <!-- Lazy: settings UI is rarely opened, so keep it out of the initial bundle. -->
+      {#await import('./panels/SettingsPanel.svelte')}
+        <p class="message" role="status">Loading…</p>
+      {:then m}
+        <m.default {settings} />
+      {:catch}
+        <p class="message" role="alert">Could not load settings.</p>
+      {/await}
     {/if}
-  </header>
-
-  <section class="card">
-    <h2 class="section">
-      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
-        <rect x="2" y="3" width="12" height="10" rx="2" />
-        <path d="M2 6.5h12" />
-      </svg>
-      Open tabs
-    </h2>
-
-    <div class="body">
-      <!-- The worker is suspended when idle and the port reconnects; keep showing the last
-           known list meanwhile instead of unmounting it and losing scroll position. -->
-      {#if tabState.status === 'connecting' && count === 0}
-        <div class="skeleton" role="status" aria-live="polite">
-          <span class="sr">Connecting…</span>
-          {#each { length: 8 } as _, i (i)}
-            <div class="sk-row" aria-hidden="true"><span class="sk-icon"></span><span class="sk-text" style:width="{45 + ((i * 17) % 40)}%"></span></div>
-          {/each}
-        </div>
-      {:else if tabState.status === 'error'}
-        <div class="message" role="alert">
-          <p>{tabState.error ?? 'Could not connect to the extension.'}</p>
-          <button type="button" onclick={() => (tabState = new TabState())}>Retry</button>
-        </div>
-      {:else if count === 0}
-        <p class="message empty">No tabs in this window</p>
-      {:else}
-        <TabList tabs={tabState.tabs} send={(m) => tabState.send(m)} />
-      {/if}
-    </div>
-  </section>
+  </div>
 </main>
 
 <style>
@@ -61,68 +93,28 @@ const count = $derived(tabState.tabs.length);
     display: flex;
     flex-direction: column;
     height: 100%;
-    padding: 8px;
-    gap: 8px;
+    padding: var(--pad-panel);
+    gap: var(--gap);
   }
 
-  .bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 2px 6px;
-  }
-
-  h1 {
-    margin: 0;
+  .panel {
     flex: 1;
-    font-size: 14px;
-    font-weight: 600;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
   }
 
   .count {
     min-width: 22px;
     padding: 1px 7px;
     border-radius: 999px;
-    background: var(--mSurfaceVariant);
-    border: 1px solid var(--mOutline);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
     color: var(--mOnSurfaceVariant);
     font-size: 11px;
     text-align: center;
     font-variant-numeric: tabular-nums;
-  }
-
-  .card {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    background: linear-gradient(
-      to bottom,
-      var(--mSurfaceVariant),
-      color-mix(in srgb, var(--mSurfaceVariant) 92%, var(--mSurface))
-    );
-    border: 1px solid var(--mOutline);
-    border-radius: var(--radius-card);
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--mShadow) 25%, transparent);
-    overflow: hidden;
-  }
-
-  .section {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-    padding: 10px 14px 4px;
-    color: var(--mOnSurfaceVariant);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  .body {
-    flex: 1;
-    min-height: 0;
   }
 
   .message {

@@ -1,4 +1,11 @@
 import type { Range, SearchHit } from '../../lib/search/search-index';
+import {
+  flattenItems,
+  type PinFolder,
+  type PinItem,
+  type PinNode,
+  type WindowLayout,
+} from '../../shared/layout';
 import type { GroupInfo, TabInfo, WindowInfo } from '../../shared/types';
 
 interface TreePos {
@@ -39,13 +46,69 @@ export type WindowRow = TreePos & {
   isHome: boolean;
   count: number;
   collapsed: boolean;
+  /** Layout name, else the window's active tab title, else "Window N". */
+  name: string;
+  /** null until the window's layout has been received. */
+  layoutId: string | null;
 };
 
-export type Row = TabRow | GroupRow | WindowRow;
+export type PinRow = TreePos & {
+  kind: 'pin';
+  key: string;
+  windowId: number;
+  item: PinItem;
+  /** null when the item is dormant. */
+  tab: TabInfo | null;
+  /** 1 at the pinned root, +1 per enclosing folder. */
+  depth: number;
+  /** Always false in rows (Essentials render as tiles); kept so the grid and menus can share the type. */
+  essential: boolean;
+};
+
+export type FolderRow = TreePos & {
+  kind: 'folder';
+  key: string;
+  windowId: number;
+  folder: PinFolder;
+  /** 1 at the pinned root, +1 per enclosing folder. */
+  depth: number;
+  /** Items in the folder subtree. */
+  count: number;
+};
+
+export type DividerRow = TreePos & {
+  kind: 'divider';
+  key: string;
+  windowId: number;
+  /** Unpinned tabs in the window that are not active. */
+  clearable: number;
+};
+
+export type TilesRow = TreePos & {
+  kind: 'tiles';
+  key: string;
+  windowId: number;
+  tiles: { item: PinItem; tab: TabInfo | null }[];
+};
+
+/** What the legacy multi-window view (buildWindowRows, search) emits; TabList moves to Row in a later task. */
+export type ListRow = TabRow | GroupRow | WindowRow;
+
+export type Row = TabRow | GroupRow | WindowRow | PinRow | FolderRow | DividerRow | TilesRow;
 
 /** The window a row belongs to. */
-export const rowWindowId = (r: Row): number =>
-  r.kind === 'tab' ? r.tab.windowId : r.kind === 'group' ? r.group.windowId : r.info.id;
+export const rowWindowId = (r: Row): number => {
+  switch (r.kind) {
+    case 'tab':
+      return r.tab.windowId;
+    case 'group':
+      return r.group.windowId;
+    case 'window':
+      return r.info.id;
+    default:
+      return r.windowId;
+  }
+};
 
 /**
  * Flattens a window into the rows the virtual list renders, in tab-strip order. Group
@@ -146,8 +209,8 @@ export function buildWindowRows(
   windows: readonly { info: WindowInfo; tabs: readonly TabInfo[]; groups: readonly GroupInfo[] }[],
   homeId: number | null,
   collapsed: ReadonlySet<number>,
-): Row[] {
-  const rows: Row[] = [];
+): ListRow[] {
+  const rows: ListRow[] = [];
   windows.forEach((w, i) => {
     const isCollapsed = collapsed.has(w.info.id);
     rows.push({
@@ -158,11 +221,189 @@ export function buildWindowRows(
       isHome: w.info.id === homeId,
       count: w.tabs.length,
       collapsed: isCollapsed,
+      name: windowName(w.tabs, undefined, i + 1),
+      layoutId: null,
       level: 1,
       pos: i + 1,
       size: windows.length,
     });
     if (!isCollapsed) rows.push(...buildRows(w.tabs, w.groups, 1));
+  });
+  return rows;
+}
+
+const windowName = (tabs: readonly TabInfo[], layout: WindowLayout | undefined, number: number) =>
+  layout?.name || tabs.find((t) => t.active)?.title || `Window ${number}`;
+
+const countItems = (nodes: readonly PinNode[]): number =>
+  nodes.reduce((n, x) => n + (x.kind === 'item' ? 1 : countItems(x.children)), 0);
+
+/** Rows for one window's pinned tree; `offset` is 1 under a window header. */
+function pinnedTreeRows(
+  nodes: readonly PinNode[],
+  windowId: number,
+  byTab: ReadonlyMap<number, TabInfo>,
+  offset: number,
+  depth = 1,
+): Row[] {
+  const rows: Row[] = [];
+  const pinRow = (item: PinItem, d: number, pos: number, size: number): PinRow => ({
+    kind: 'pin',
+    key: `p${item.id}`,
+    windowId,
+    item,
+    tab: item.tabId === null ? null : (byTab.get(item.tabId) ?? null),
+    depth: d,
+    essential: false,
+    level: d + offset,
+    pos,
+    size,
+  });
+  nodes.forEach((node, i) => {
+    if (node.kind === 'item') {
+      rows.push(pinRow(node, depth, i + 1, nodes.length));
+      return;
+    }
+    rows.push({
+      kind: 'folder',
+      key: `f${node.id}`,
+      windowId,
+      folder: node,
+      depth,
+      count: countItems(node.children),
+      level: depth + offset,
+      pos: i + 1,
+      size: nodes.length,
+    });
+    if (!node.collapsed) {
+      rows.push(...pinnedTreeRows(node.children, windowId, byTab, offset, depth + 1));
+      return;
+    }
+    // A collapsed folder still shows the tab you are on, so the active tab never vanishes.
+    const active = pinnedTreeRows(node.children, windowId, byTab, offset, depth + 1).find(
+      (r): r is PinRow => r.kind === 'pin' && r.tab?.active === true,
+    );
+    if (active)
+      rows.push({ ...active, depth: depth + 1, level: depth + 1 + offset, pos: 1, size: 1 });
+  });
+  return rows;
+}
+
+/**
+ * Everything the panel list renders, across windows: per window, Essentials tiles
+ * (other windows only; the home grid is separate), the pinned tree, a divider, then the
+ * unpinned tabs. Other windows sit one level under a header. A window whose layout
+ * hasn't arrived renders its pinned tabs as plain tab rows so the list never blanks.
+ */
+export function buildPanelRows(
+  windows: readonly {
+    info: WindowInfo;
+    tabs: readonly TabInfo[];
+    groups: readonly GroupInfo[];
+    layout: WindowLayout | undefined;
+  }[],
+  homeId: number | null,
+  opts: { tilesPerRow: number },
+): Row[] {
+  const homeLayout = windows.find((w) => w.info.id === homeId)?.layout;
+  const perRow = Math.max(1, opts.tilesPerRow);
+  const rows: Row[] = [];
+
+  windows.forEach((w, wi) => {
+    const windowId = w.info.id;
+    const isHome = windowId === homeId;
+    const offset = isHome ? 0 : 1;
+    const { layout } = w;
+
+    if (!isHome) {
+      const collapsed =
+        layout !== undefined && (homeLayout?.collapsed.includes(layout.id) ?? false);
+      rows.push({
+        kind: 'window',
+        key: `w${windowId}`,
+        info: w.info,
+        number: wi + 1,
+        isHome,
+        count: w.tabs.length,
+        collapsed,
+        name: windowName(w.tabs, layout, wi + 1),
+        layoutId: layout?.id ?? null,
+        level: 1,
+        pos: wi + 1,
+        size: windows.length,
+      });
+      if (collapsed) return;
+    }
+
+    if (!layout) {
+      rows.push(...buildRows(w.tabs, w.groups, offset));
+      return;
+    }
+
+    const byTab = new Map(w.tabs.map((t) => [t.id, t]));
+    const referenced = new Set<number>();
+    for (const item of flattenItems(layout))
+      if (item.tabId !== null && byTab.has(item.tabId)) referenced.add(item.tabId);
+
+    // Same-level siblings across tiles, pinned tree, strays, divider and unpinned tops.
+    const top: Row[] = [];
+    const level = 1 + offset;
+
+    if (!isHome) {
+      for (let i = 0; i < layout.essentials.length; i += perRow) {
+        top.push({
+          kind: 'tiles',
+          key: `x${windowId}-${i / perRow}`,
+          windowId,
+          tiles: layout.essentials.slice(i, i + perRow).map((item) => ({
+            item,
+            tab: item.tabId === null ? null : (byTab.get(item.tabId) ?? null),
+          })),
+          level,
+          pos: 0,
+          size: 0,
+        });
+      }
+    }
+    rows.push(...top);
+    const topStart = rows.length - top.length;
+
+    rows.push(...pinnedTreeRows(layout.pinned, windowId, byTab, offset));
+    let strays = 0;
+    for (const t of w.tabs) {
+      if (!t.pinned || referenced.has(t.id)) continue;
+      strays++;
+      rows.push({
+        kind: 'tab',
+        key: `t${t.id}`,
+        tab: t,
+        pinnedEnd: false,
+        level,
+        pos: 0,
+        size: 0,
+      });
+    }
+
+    const unpinned = w.tabs.filter((t) => !t.pinned);
+    if (flattenItems(layout).length > 0 || layout.pinned.length > 0 || strays > 0) {
+      rows.push({
+        kind: 'divider',
+        key: `d${windowId}`,
+        windowId,
+        clearable: unpinned.reduce((n, t) => n + (t.active ? 0 : 1), 0),
+        level,
+        pos: 0,
+        size: 0,
+      });
+    }
+    rows.push(...buildRows(unpinned, w.groups, offset));
+
+    // Renumber this window's rows at the top level; deeper levels were numbered by their parents.
+    const own = rows.slice(topStart).filter((r) => r.level === level);
+    own.forEach((r, i) => {
+      r.pos = i + 1;
+      r.size = own.length;
+    });
   });
   return rows;
 }

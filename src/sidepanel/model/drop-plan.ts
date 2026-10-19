@@ -32,7 +32,7 @@ export function planDrop(
   zone: DropZone,
 ): PanelMessage | null {
   const target = rows[index];
-  if (!target || target.kind === 'window') return null;
+  if (!target || (target.kind !== 'tab' && target.kind !== 'group')) return null;
 
   const moving = new Set(
     drag.kind === 'tabs'

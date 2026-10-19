@@ -1,0 +1,84 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`built-in themes > records contrast issues of the bundled Noctalia palettes 1`] = `
+{
+  "ayu": [
+    "light mOnPrimary/mPrimary 2.15",
+    "light mOnSecondary/mSecondary 2.35",
+    "light mOnTertiary/mTertiary 2.25",
+    "light mOnError/mError 3.54",
+    "light mOnSurfaceVariant/mSurfaceVariant 3.73",
+    "light mOnHover/mHover 2.25",
+    "light mOnSurfaceVariant/mSurface 4.43",
+  ],
+  "catppuccin": [
+    "light mOnSecondary/mSecondary 2.64",
+    "light mOnTertiary/mTertiary 2.96",
+    "light mOnError/mError 4.10",
+    "light mOnSurfaceVariant/mSurfaceVariant 3.20",
+    "light mOnHover/mHover 2.96",
+    "light mOnSurfaceVariant/mSurface 4.37",
+  ],
+  "dracula": [
+    "light mOnSecondary/mSecondary 3.62",
+    "light mOnTertiary/mTertiary 3.39",
+    "light mOnHover/mHover 3.39",
+  ],
+  "eldritch": [
+    "light mOnTertiary/mTertiary 4.21",
+    "light mOnHover/mHover 4.21",
+  ],
+  "gruvbox": [
+    "dark mOnError/mError 4.29",
+    "light mOnPrimary/mPrimary 2.73",
+    "light mOnSecondary/mSecondary 2.19",
+    "light mOnTertiary/mTertiary 3.73",
+    "light mOnSurfaceVariant/mSurfaceVariant 3.55",
+    "light mOnHover/mHover 3.73",
+    "light mOnSurfaceVariant/mSurface 4.29",
+  ],
+  "kanagawa": [
+    "dark mOnError/mError 3.22",
+    "dark mOnSurfaceVariant/mSurfaceVariant 3.28",
+    "dark mOnSurfaceVariant/mSurface 3.80",
+    "light mOnPrimary/mPrimary 3.26",
+    "light mOnSecondary/mSecondary 4.15",
+    "light mOnError/mError 4.06",
+    "light mOnSurfaceVariant/mSurfaceVariant 2.56",
+    "light mOnSurfaceVariant/mSurface 2.93",
+  ],
+  "noctalia": [
+    "light mOnPrimary/mPrimary 3.37",
+    "light mOnSecondary/mSecondary 2.14",
+  ],
+  "nord": [
+    "dark mOnTertiary/mTertiary 3.10",
+    "dark mOnError/mError 3.05",
+    "dark mOnHover/mHover 3.10",
+    "light mOnPrimary/mPrimary 3.50",
+    "light mOnSecondary/mSecondary 2.20",
+    "light mOnTertiary/mTertiary 2.30",
+    "light mOnError/mError 3.55",
+    "light mOnHover/mHover 2.30",
+  ],
+  "rose-pine": [
+    "dark mOnTertiary/mTertiary 3.96",
+    "light mOnPrimary/mPrimary 2.60",
+    "light mOnSecondary/mSecondary 3.14",
+    "light mOnError/mError 3.84",
+    "light mOnSurfaceVariant/mSurfaceVariant 3.67",
+    "light mOnHover/mHover 4.49",
+    "light mOnSurfaceVariant/mSurface 4.23",
+  ],
+  "tokyo-night": [
+    "light mOnPrimary/mPrimary 3.11",
+    "light mOnSecondary/mSecondary 3.33",
+    "light mOnTertiary/mTertiary 4.04",
+    "light mOnError/mError 3.01",
+    "light mOnSurfaceVariant/mSurfaceVariant 3.15",
+    "light mOnHover/mHover 4.04",
+    "light mOnSurface/mSurfaceVariant 3.99",
+    "light mOnSurfaceVariant/mSurface 3.57",
+  ],
+}
+`;

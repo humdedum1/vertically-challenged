@@ -1,4 +1,4 @@
-import type { TabInfo, WindowPatch } from '../shared/types';
+import type { GroupInfo, TabInfo, WindowPatch } from '../shared/types';
 
 /**
  * Raw chrome.tabs events accumulated between flushes. Kept separate from the store so the
@@ -12,13 +12,16 @@ export class ChangeSet {
   readonly resync = new Set<number>();
   /** Last activated tab per window; activation is applied locally to avoid a query. */
   readonly activations = new Map<number, number>();
+  /** Windows whose tab groups changed; their group list is re-queried. */
+  readonly groupWindows = new Set<number>();
 
   get isEmpty(): boolean {
     return (
       this.upserts.size === 0 &&
       this.removed.size === 0 &&
       this.resync.size === 0 &&
-      this.activations.size === 0
+      this.activations.size === 0 &&
+      this.groupWindows.size === 0
     );
   }
 }
@@ -41,6 +44,20 @@ export function tabsEqual(a: TabInfo, b: TabInfo): boolean {
   return FIELDS.every((f) => a[f] === b[f]);
 }
 
+const groupsEqual = (a: readonly GroupInfo[], b: readonly GroupInfo[]): boolean =>
+  a.length === b.length &&
+  a.every((g, i) => {
+    const h = b[i];
+    return (
+      h !== undefined &&
+      g.id === h.id &&
+      g.title === h.title &&
+      g.color === h.color &&
+      g.collapsed === h.collapsed &&
+      g.windowId === h.windowId
+    );
+  });
+
 const arraysEqual = (a: readonly number[], b: readonly number[]): boolean =>
   a.length === b.length && a.every((v, i) => v === b[i]);
 
@@ -48,7 +65,7 @@ const arraysEqual = (a: readonly number[], b: readonly number[]): boolean =>
 class PatchBuilder {
   private readonly byWindow = new Map<
     number,
-    { upserts: Map<number, TabInfo>; removed: Set<number>; order?: number[] }
+    { upserts: Map<number, TabInfo>; removed: Set<number>; order?: number[]; groups?: GroupInfo[] }
   >();
 
   private entry(windowId: number) {
@@ -76,6 +93,10 @@ class PatchBuilder {
     this.entry(windowId).order = order;
   }
 
+  groups(windowId: number, groups: GroupInfo[]): void {
+    this.entry(windowId).groups = groups;
+  }
+
   build(): WindowPatch[] {
     const out: WindowPatch[] = [];
     for (const [windowId, e] of this.byWindow) {
@@ -83,7 +104,8 @@ class PatchBuilder {
       if (e.upserts.size) patch.upserts = [...e.upserts.values()];
       if (e.removed.size) patch.removed = [...e.removed];
       if (e.order) patch.order = e.order;
-      if (patch.upserts || patch.removed || patch.order) out.push(patch);
+      if (e.groups) patch.groups = e.groups;
+      if (patch.upserts || patch.removed || patch.order || patch.groups) out.push(patch);
     }
     return out;
   }
@@ -96,15 +118,25 @@ class PatchBuilder {
 export class TabStore {
   private readonly tabs = new Map<number, TabInfo>();
   private readonly orders = new Map<number, number[]>();
+  private readonly groupsByWindow = new Map<number, GroupInfo[]>();
 
-  snapshot(windowId: number): { tabs: TabInfo[]; order: number[] } {
+  snapshot(windowId: number): { tabs: TabInfo[]; order: number[]; groups: GroupInfo[] } {
     const order = this.orders.get(windowId) ?? [];
     const tabs: TabInfo[] = [];
     for (const id of order) {
       const t = this.tabs.get(id);
       if (t) tabs.push(t);
     }
-    return { tabs, order: [...order] };
+    return { tabs, order: [...order], groups: [...(this.groupsByWindow.get(windowId) ?? [])] };
+  }
+
+  /** Live tab order of a window (a copy), for resolving move targets. */
+  order(windowId: number): number[] {
+    return [...(this.orders.get(windowId) ?? [])];
+  }
+
+  groups(windowId: number): readonly GroupInfo[] {
+    return this.groupsByWindow.get(windowId) ?? [];
   }
 
   get(tabId: number): TabInfo | undefined {
@@ -115,9 +147,22 @@ export class TabStore {
    * @param resynced fresh, index-sorted query results for every window in `changes.resync`.
    *   A query runs after all events in the ChangeSet, so for those windows it is the newest
    *   truth and the older per-tab events are skipped.
+   * @param groupsResynced fresh group lists for every window in `changes.groupWindows`.
    */
-  apply(changes: ChangeSet, resynced: ReadonlyMap<number, TabInfo[]>): WindowPatch[] {
+  apply(
+    changes: ChangeSet,
+    resynced: ReadonlyMap<number, TabInfo[]>,
+    groupsResynced: ReadonlyMap<number, GroupInfo[]> = new Map(),
+  ): WindowPatch[] {
     const out = new PatchBuilder();
+
+    for (const [windowId, groups] of groupsResynced) {
+      const prev = this.groupsByWindow.get(windowId) ?? [];
+      if (groupsEqual(prev, groups)) continue;
+      if (groups.length === 0) this.groupsByWindow.delete(windowId);
+      else this.groupsByWindow.set(windowId, groups);
+      out.groups(windowId, groups);
+    }
 
     for (const id of changes.removed) {
       const prev = this.tabs.get(id);

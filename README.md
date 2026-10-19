@@ -4,11 +4,10 @@ Fast, customizable vertical tabs in Chrome's Side Panel. Local-first.
 
 ## Status
 
-**Milestone 2: theme system and layout.** Live vertical tab list (M1), plus design tokens, the Abyss theme, light/dark/system mode, density, and the segmented card layout.
+**Milestone 3: core tab management.** Live vertical tab list (M1), themes and layout (M2), plus pinned tabs, native tab groups, multi-select, drag and drop, context menus, and fuzzy search.
 
 Roadmap:
 
-3. **Core tab management.** Pinned tabs, drag and drop, native tab groups, search.
 4. **Customization settings.** Persisted settings via `chrome.storage`.
 5. **Extras.** Tab suspension, sessions, bookmarks, history, multi-window, keyboard shortcuts, context menus.
 6. **Profiling.** Benchmarks against a 1,500-tab synthetic test.
@@ -86,6 +85,22 @@ Directory map:
 | `tests/` | Vitest unit tests for pure logic |
 | `scripts/` | Build helpers, such as `generate-icons.mjs` |
 
+## Keyboard
+
+In the tab list (the Tabs panel):
+
+| Key | Action |
+| --- | --- |
+| Up / Down, Home / End | Move focus |
+| Left / Right | Collapse or expand a group; go to the parent group or first child |
+| Enter | Switch to the tab, or toggle the group |
+| Space, Shift+Up/Down, Ctrl+A | Select tabs |
+| Delete | Close the selected or focused tabs |
+| F2 | Rename the focused group |
+| Alt+Up / Alt+Down | Move the tab, selection or group (crossing a group edge first joins or leaves it) |
+| Shift+F10 or the Menu key | Context menu |
+| `/` or Ctrl+F | Search; Enter opens the top result, Escape clears |
+
 ## Themes
 
 A theme is a JSON file in the [Noctalia](https://github.com/noctalia-dev/noctalia-shell) palette format: a `dark` and a `light` object, each with the same 16 roles (`mPrimary`, `mOnPrimary`, `mSecondary`, `mOnSecondary`, `mTertiary`, `mOnTertiary`, `mError`, `mOnError`, `mSurface`, `mOnSurface`, `mSurfaceVariant`, `mOnSurfaceVariant`, `mOutline`, `mShadow`, `mHover`, `mOnHover`), each an exact `#rrggbb` value. A single flat palette is also accepted and used for both modes.
@@ -97,6 +112,10 @@ A theme is a JSON file in the [Noctalia](https://github.com/noctalia-dev/noctali
 
 Settings are versioned (`src/settings/schema.ts`). `migrateSettings` upgrades older data, validates every field, and reads settings written by a newer version best-effort instead of resetting them.
 
+## Search
+
+Search goes through the `SearchIndex` interface (`src/lib/search/search-index.ts`). The current implementation, `FuzzyIndex`, is a TypeScript linear scan over titles and URLs: every query word must match, whole-word and substring matches rank above scattered ones, and titles outweigh URLs. Queries take under 1 ms at 1,500 tabs, so there is no Rust/WASM build; one could replace `FuzzyIndex` without touching the UI.
+
 ## Permissions
 
 | Permission | Why |
@@ -104,9 +123,10 @@ Settings are versioned (`src/settings/schema.ts`). `migrateSettings` upgrades ol
 | `tabs` | Read tab titles and URLs for the list and search, and switch or close tabs |
 | `sidePanel` | Render the UI in Chrome's side panel and open it from the shortcut or toolbar icon |
 | `favicon` | Load page favicons through `_favicon` without host permissions |
+| `tabGroups` | Show, create, rename, recolour, collapse and move native tab groups |
 | `storage` | Save settings in `chrome.storage.sync` (follows your Chrome profile); later, local data in `chrome.storage.local` |
 
-No host permissions are requested. `tabGroups`, `sessions`, `bookmarks`, and `history` will be added only in the milestones that use them.
+No host permissions are requested. `sessions`, `bookmarks`, and `history` will be added only in the milestones that use them.
 
 ## Platform limits
 

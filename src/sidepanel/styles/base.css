@@ -41,6 +41,46 @@
   --focus-ring: var(--mPrimary);
 }
 
+/* Chrome's own tab-group colours (theme-independent): dark-mode variant by default,
+   light-mode variant under the same selectors themeToCss uses for the --m* roles. */
+:root {
+  --g-grey: #dadce0;
+  --g-blue: #8ab4f8;
+  --g-red: #f28b82;
+  --g-yellow: #fdd663;
+  --g-green: #81c995;
+  --g-pink: #ff8bcb;
+  --g-purple: #d7aefb;
+  --g-cyan: #78d9ec;
+  --g-orange: #fcad70;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-mode="dark"]) {
+    --g-grey: #5f6368;
+    --g-blue: #1a73e8;
+    --g-red: #d93025;
+    --g-yellow: #f9ab00;
+    --g-green: #1e8e3e;
+    --g-pink: #d01884;
+    --g-purple: #9334e6;
+    --g-cyan: #007b83;
+    --g-orange: #fa903e;
+  }
+}
+
+:root[data-mode="light"] {
+  --g-grey: #5f6368;
+  --g-blue: #1a73e8;
+  --g-red: #d93025;
+  --g-yellow: #f9ab00;
+  --g-green: #1e8e3e;
+  --g-pink: #d01884;
+  --g-purple: #9334e6;
+  --g-cyan: #007b83;
+  --g-orange: #fa903e;
+}
+
 html[data-density="compact"] {
   --gap: 6px;
   --pad-card: 10px;

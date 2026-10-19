@@ -1,6 +1,6 @@
 import { type Browser, browser } from 'wxt/browser';
 import { PANEL_PORT_NAME, type PanelMessage, type WorkerMessage } from '../shared/protocol';
-import type { TabInfo, WindowPatch } from '../shared/types';
+import type { GroupInfo, TabInfo, WindowPatch } from '../shared/types';
 
 export type ConnectionStatus = 'connecting' | 'ready' | 'error';
 
@@ -11,13 +11,14 @@ export type ConnectionStatus = 'connecting' | 'ready' | 'error';
  */
 export class TabState {
   tabs = $state.raw<TabInfo[]>([]);
+  groups = $state.raw<GroupInfo[]>([]);
   status = $state<ConnectionStatus>('connecting');
   error = $state<string | null>(null);
 
   private byId = new Map<number, TabInfo>();
   private order: number[] = [];
   private port: Browser.runtime.Port | null = null;
-  private windowId: number | null = null;
+  windowId: number | null = null;
   private retries = 0;
   private disposed = false;
 
@@ -70,6 +71,7 @@ export class TabState {
     if (msg.type === 'snapshot') {
       this.byId = new Map(msg.tabs.map((t) => [t.id, t]));
       this.order = msg.order;
+      this.groups = msg.groups;
       this.retries = 0;
       this.status = 'ready';
       this.error = null;
@@ -82,8 +84,10 @@ export class TabState {
   private applyPatch(patch: WindowPatch): void {
     for (const id of patch.removed ?? []) this.byId.delete(id);
     for (const t of patch.upserts ?? []) this.byId.set(t.id, t);
+    if (patch.groups) this.groups = patch.groups;
     if (patch.order) this.order = patch.order;
-    this.rebuild();
+    // Group-only patches (rename, recolour, collapse) leave the tab array untouched.
+    if (patch.upserts || patch.removed || patch.order) this.rebuild();
   }
 
   /** O(n) over ids only; cheap enough for 1,500 tabs and keeps object identity stable. */

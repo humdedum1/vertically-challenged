@@ -1,4 +1,4 @@
-import type { TabInfo } from '../src/shared/types';
+import type { GroupInfo, TabInfo } from '../src/shared/types';
 
 export function tab(id: number, overrides: Partial<TabInfo> = {}): TabInfo {
   return {
@@ -14,6 +14,17 @@ export function tab(id: number, overrides: Partial<TabInfo> = {}): TabInfo {
     loading: false,
     groupId: -1,
     incognito: false,
+    ...overrides,
+  };
+}
+
+export function group(id: number, overrides: Partial<GroupInfo> = {}): GroupInfo {
+  return {
+    id,
+    windowId: 1,
+    title: `Group ${id}`,
+    color: 'blue',
+    collapsed: false,
     ...overrides,
   };
 }

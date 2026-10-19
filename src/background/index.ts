@@ -1,9 +1,10 @@
 import { type Browser, browser } from 'wxt/browser';
 import { PANEL_PORT_NAME, parsePanelMessage, type WorkerMessage } from '../shared/protocol';
-import type { TabInfo } from '../shared/types';
+import type { GroupInfo, TabInfo } from '../shared/types';
 import { createBatcher } from './batcher';
+import { runCommand } from './commands';
 import { ChangeSet, TabStore } from './tab-store';
-import { toTabInfo } from './to-tab-info';
+import { toGroupInfo, toTabInfo } from './to-tab-info';
 
 /**
  * Everything is registered synchronously inside this call: MV3 only delivers the event
@@ -32,6 +33,16 @@ export function startBackground(): void {
     }
   }
 
+  async function queryGroups(windowId: number): Promise<GroupInfo[]> {
+    try {
+      return (await browser.tabGroups.query({ windowId }))
+        .map(toGroupInfo)
+        .sort((a, b) => a.id - b.id);
+    } catch {
+      return [];
+    }
+  }
+
   /**
    * Nothing about tabs is persisted: when Chrome suspends the worker, the live browser is
    * the source of truth, so waking up just re-reads every window. Events that arrive before
@@ -50,7 +61,15 @@ export function startBackground(): void {
       }
       list.push(info);
     }
-    store.apply(new ChangeSet(), byWindow);
+    const groupsByWindow = new Map<number, GroupInfo[]>();
+    for (const g of (await browser.tabGroups.query({}))
+      .map(toGroupInfo)
+      .sort((a, b) => a.id - b.id)) {
+      const list = groupsByWindow.get(g.windowId) ?? [];
+      list.push(g);
+      groupsByWindow.set(g.windowId, list);
+    }
+    store.apply(new ChangeSet(), byWindow, groupsByWindow);
   })();
 
   const batcher = createBatcher(async () => {
@@ -59,8 +78,12 @@ export function startBackground(): void {
     pending = new ChangeSet();
     if (changes.isEmpty) return;
     const resynced = new Map<number, TabInfo[]>();
-    await Promise.all([...changes.resync].map(async (w) => resynced.set(w, await queryWindow(w))));
-    for (const patch of store.apply(changes, resynced)) {
+    const groups = new Map<number, GroupInfo[]>();
+    await Promise.all([
+      ...[...changes.resync].map(async (w) => resynced.set(w, await queryWindow(w))),
+      ...[...changes.groupWindows].map(async (w) => groups.set(w, await queryGroups(w))),
+    ]);
+    for (const patch of store.apply(changes, resynced, groups)) {
       broadcast(patch.windowId, { type: 'patch', patch });
     }
   });
@@ -113,6 +136,23 @@ export function startBackground(): void {
     );
   });
 
+  const GROUP_COMMANDS = new Set<string>([
+    'group',
+    'ungroup',
+    'updateGroup',
+    'move',
+    'moveGroup',
+    'closeGroup',
+  ]);
+  const markGroups = (g: { windowId: number }) => {
+    pending.groupWindows.add(g.windowId);
+    batcher.schedule();
+  };
+  browser.tabGroups.onCreated.addListener(markGroups);
+  browser.tabGroups.onUpdated.addListener(markGroups);
+  browser.tabGroups.onRemoved.addListener(markGroups);
+  browser.tabGroups.onMoved.addListener(markGroups);
+
   browser.runtime.onConnect.addListener((port) => {
     if (port.name !== PANEL_PORT_NAME || port.sender?.id !== browser.runtime.id) return;
     let windowId: number | null = null;
@@ -136,13 +176,16 @@ export function startBackground(): void {
           port.postMessage({ type: 'snapshot', windowId, ...snap } satisfies WorkerMessage);
           break;
         }
-        case 'activate': {
-          await browser.tabs.update(msg.tabId, { active: true }).catch(() => {});
-          break;
-        }
-        case 'close':
-          await browser.tabs.remove(msg.tabIds).catch(() => {});
-          break;
+        default:
+          // Tabs can vanish between the click and the call; failures are expected noise,
+          // and the panel converges through events either way.
+          await runCommand(msg).catch((err: unknown) =>
+            console.debug('[vc] command failed', msg.type, err),
+          );
+          // chrome.tabGroups.onUpdated is not reliably delivered for API-driven changes
+          // (observed: no event for title/colour/collapsed updates on Chrome 145), so group
+          // commands re-read the window's groups themselves. Unchanged lists produce no patch.
+          if (windowId !== null && GROUP_COMMANDS.has(msg.type)) markGroups({ windowId });
       }
     });
 

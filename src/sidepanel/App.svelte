@@ -52,6 +52,17 @@ const count = $derived(tabState.tabs.length);
         {#snippet trailing()}
           {#if tabState.status === 'ready'}
             <span class="count" role="img" aria-label="{count} tabs">{count}</span>
+            <button
+              type="button"
+              class="add"
+              aria-label="New tab"
+              title="New tab"
+              onclick={() => {
+                if (tabState.windowId !== null) tabState.send({ type: 'newTab', windowId: tabState.windowId, afterTabId: null });
+              }}
+            >
+              <Icon name="plus" size={14} />
+            </button>
           {/if}
         {/snippet}
 
@@ -72,7 +83,7 @@ const count = $derived(tabState.tabs.length);
         {:else if count === 0}
           <p class="message empty">No tabs in this window</p>
         {:else}
-          <TabList tabs={tabState.tabs} send={(m) => tabState.send(m)} rowHeight={ROW_HEIGHT[settings.value.appearance.density]} />
+          <TabList {tabState} rowHeight={ROW_HEIGHT[settings.value.appearance.density]} />
         {/if}
       </SegmentCard>
     {:else if panel === 'settings'}
@@ -115,6 +126,30 @@ const count = $derived(tabState.tabs.length);
     font-size: 11px;
     text-align: center;
     font-variant-numeric: tabular-nums;
+  }
+
+  .add {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    margin-left: 6px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--mOnSurfaceVariant);
+    cursor: pointer;
+    transition: background-color var(--dur) var(--ease);
+  }
+
+  .add:hover {
+    background: var(--state-hover);
+    color: var(--mOnSurface);
+  }
+
+  .add:active {
+    background: var(--state-pressed);
   }
 
   .message {

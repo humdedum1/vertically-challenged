@@ -4,14 +4,16 @@ import type { HTMLAttributes } from 'svelte/elements';
 import { computeRange, scrollToReveal } from '../../lib/virtual-range';
 
 interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'onscroll'> {
-  items: T[];
+  items: readonly T[];
   rowHeight: number;
-  key: (item: T) => number;
+  key: (item: T) => string | number;
+  /** Rendered inside the scrolling content (e.g. a drop indicator), in content coordinates. */
+  overlay?: Snippet;
   row: Snippet<[T, number]>;
 }
 
 // Remaining attributes land on the scroll container so the parent can make it the listbox.
-let { items, rowHeight, key, row, ...rest }: Props = $props();
+let { items, rowHeight, key, row, overlay, ...rest }: Props = $props();
 
 let el: HTMLDivElement | undefined = $state();
 let scrollTop = $state(0);
@@ -19,6 +21,10 @@ let viewportHeight = $state(0);
 
 const range = $derived(computeRange(scrollTop, viewportHeight, rowHeight, items.length));
 const visible = $derived(items.slice(range.start, range.end));
+
+export function scroller(): HTMLDivElement | undefined {
+  return el;
+}
 
 export function reveal(index: number): void {
   if (!el) return;
@@ -46,6 +52,7 @@ function onscroll(e: Event & { currentTarget: HTMLDivElement }): void {
         {@render row(item, range.start + i)}
       {/each}
     </div>
+    {@render overlay?.()}
   </div>
 </div>
 

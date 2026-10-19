@@ -18,6 +18,8 @@ export default defineConfig({
       // Persist settings (sync, so they follow the user's Chrome profile) and later
       // local data such as layout and sessions.
       'storage',
+      // Show, create, rename, recolour, collapse and move native tab groups.
+      'tabGroups',
     ],
     action: { default_title: 'Vertically Challenged' },
     commands: {

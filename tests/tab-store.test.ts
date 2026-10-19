@@ -63,7 +63,7 @@ describe('TabStore', () => {
     expect(snap.tabs.map((t) => t.id)).toEqual([2, 1, 3]);
     snap.order.push(99);
     expect(store.snapshot(1).order).toEqual([2, 1, 3]);
-    expect(store.snapshot(42)).toEqual({ tabs: [], order: [] });
+    expect(store.snapshot(42)).toEqual({ tabs: [], order: [], groups: [] });
     expect(store.get(2)?.id).toBe(2);
     expect(store.get(99)).toBeUndefined();
   });
@@ -326,7 +326,7 @@ describe('TabStore', () => {
     expect(patches).toEqual([{ windowId: 1, removed: [1, 2], order: [] }]);
     expect(store.get(1)).toBeUndefined();
     expect(store.get(2)).toBeUndefined();
-    expect(store.snapshot(1)).toEqual({ tabs: [], order: [] });
+    expect(store.snapshot(1)).toEqual({ tabs: [], order: [], groups: [] });
     expect(store.get(3)).toBeDefined();
   });
 

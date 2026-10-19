@@ -19,6 +19,28 @@ export interface TabInfo {
   incognito: boolean;
 }
 
+/** Chrome's fixed tab-group colour names. */
+export const GROUP_COLORS = [
+  'grey',
+  'blue',
+  'red',
+  'yellow',
+  'green',
+  'pink',
+  'purple',
+  'cyan',
+  'orange',
+] as const;
+export type GroupColor = (typeof GROUP_COLORS)[number];
+
+export interface GroupInfo {
+  id: number;
+  windowId: number;
+  title: string;
+  color: GroupColor;
+  collapsed: boolean;
+}
+
 /** Changes for one window since the last flush. Empty fields are omitted on the wire. */
 export interface WindowPatch {
   windowId: number;
@@ -26,4 +48,6 @@ export interface WindowPatch {
   removed?: number[];
   /** Full tab-id order, sent only when it changed. */
   order?: number[];
+  /** Full group list for the window, sent only when it changed (windows have few groups). */
+  groups?: GroupInfo[];
 }

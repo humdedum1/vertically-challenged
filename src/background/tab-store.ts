@@ -1,0 +1,201 @@
+import type { TabInfo, WindowPatch } from '../shared/types';
+
+/**
+ * Raw chrome.tabs events accumulated between flushes. Kept separate from the store so the
+ * flush can swap it out atomically while events keep arriving during async window queries.
+ */
+export class ChangeSet {
+  /** Latest tab object seen per id (from onUpdated / onCreated). */
+  readonly upserts = new Map<number, TabInfo>();
+  readonly removed = new Set<number>();
+  /** Windows whose order/membership must be re-read from chrome.tabs.query. */
+  readonly resync = new Set<number>();
+  /** Last activated tab per window; activation is applied locally to avoid a query. */
+  readonly activations = new Map<number, number>();
+
+  get isEmpty(): boolean {
+    return (
+      this.upserts.size === 0 &&
+      this.removed.size === 0 &&
+      this.resync.size === 0 &&
+      this.activations.size === 0
+    );
+  }
+}
+
+const FIELDS: readonly (keyof TabInfo)[] = [
+  'windowId',
+  'title',
+  'url',
+  'pinned',
+  'active',
+  'audible',
+  'muted',
+  'discarded',
+  'loading',
+  'groupId',
+  'incognito',
+];
+
+export function tabsEqual(a: TabInfo, b: TabInfo): boolean {
+  return FIELDS.every((f) => a[f] === b[f]);
+}
+
+const arraysEqual = (a: readonly number[], b: readonly number[]): boolean =>
+  a.length === b.length && a.every((v, i) => v === b[i]);
+
+/** Collects per-window output while a ChangeSet is applied. */
+class PatchBuilder {
+  private readonly byWindow = new Map<
+    number,
+    { upserts: Map<number, TabInfo>; removed: Set<number>; order?: number[] }
+  >();
+
+  private entry(windowId: number) {
+    let e = this.byWindow.get(windowId);
+    if (!e) {
+      e = { upserts: new Map(), removed: new Set() };
+      this.byWindow.set(windowId, e);
+    }
+    return e;
+  }
+
+  upsert(tab: TabInfo): void {
+    const e = this.entry(tab.windowId);
+    e.removed.delete(tab.id);
+    e.upserts.set(tab.id, tab);
+  }
+
+  remove(windowId: number, tabId: number): void {
+    const e = this.entry(windowId);
+    e.upserts.delete(tabId);
+    e.removed.add(tabId);
+  }
+
+  order(windowId: number, order: number[]): void {
+    this.entry(windowId).order = order;
+  }
+
+  build(): WindowPatch[] {
+    const out: WindowPatch[] = [];
+    for (const [windowId, e] of this.byWindow) {
+      const patch: WindowPatch = { windowId };
+      if (e.upserts.size) patch.upserts = [...e.upserts.values()];
+      if (e.removed.size) patch.removed = [...e.removed];
+      if (e.order) patch.order = e.order;
+      if (patch.upserts || patch.removed || patch.order) out.push(patch);
+    }
+    return out;
+  }
+}
+
+/**
+ * Canonical tab state owned by the service worker. All mutation goes through `apply`,
+ * which returns the minimal per-window patches the panels need.
+ */
+export class TabStore {
+  private readonly tabs = new Map<number, TabInfo>();
+  private readonly orders = new Map<number, number[]>();
+
+  snapshot(windowId: number): { tabs: TabInfo[]; order: number[] } {
+    const order = this.orders.get(windowId) ?? [];
+    const tabs: TabInfo[] = [];
+    for (const id of order) {
+      const t = this.tabs.get(id);
+      if (t) tabs.push(t);
+    }
+    return { tabs, order: [...order] };
+  }
+
+  get(tabId: number): TabInfo | undefined {
+    return this.tabs.get(tabId);
+  }
+
+  /**
+   * @param resynced fresh, index-sorted query results for every window in `changes.resync`.
+   *   A query runs after all events in the ChangeSet, so for those windows it is the newest
+   *   truth and the older per-tab events are skipped.
+   */
+  apply(changes: ChangeSet, resynced: ReadonlyMap<number, TabInfo[]>): WindowPatch[] {
+    const out = new PatchBuilder();
+
+    for (const id of changes.removed) {
+      const prev = this.tabs.get(id);
+      if (!prev) continue;
+      this.tabs.delete(id);
+      out.remove(prev.windowId, id);
+      const order = this.orders.get(prev.windowId);
+      if (order?.includes(id)) {
+        const next = order.filter((x) => x !== id);
+        this.orders.set(prev.windowId, next);
+        out.order(prev.windowId, next);
+      }
+    }
+
+    for (const [windowId, tabs] of resynced) this.replaceWindow(windowId, tabs, out);
+
+    for (const tab of changes.upserts.values()) {
+      if (changes.removed.has(tab.id) || resynced.has(tab.windowId)) continue;
+      const prev = this.tabs.get(tab.id);
+      // Membership changes come through resync; an upsert for a tab we don't place yet
+      // would have no position, so wait for its window's resync.
+      if (!prev || prev.windowId !== tab.windowId) continue;
+      // Activation is tracked separately, so a stale onUpdated payload can't undo it.
+      const next = { ...tab, active: prev.active };
+      if (!tabsEqual(prev, next)) {
+        this.tabs.set(tab.id, next);
+        out.upsert(next);
+      }
+    }
+
+    for (const [windowId, tabId] of changes.activations) {
+      if (resynced.has(windowId)) continue;
+      for (const id of this.orders.get(windowId) ?? []) {
+        const t = this.tabs.get(id);
+        if (!t) continue;
+        const active = id === tabId;
+        if (t.active !== active) {
+          const next = { ...t, active };
+          this.tabs.set(id, next);
+          out.upsert(next);
+        }
+      }
+    }
+
+    return out.build();
+  }
+
+  private replaceWindow(windowId: number, tabs: TabInfo[], out: PatchBuilder): void {
+    const prevOrder = this.orders.get(windowId) ?? [];
+    const nextOrder = tabs.map((t) => t.id);
+    const present = new Set(nextOrder);
+
+    for (const id of prevOrder) {
+      if (present.has(id)) continue;
+      out.remove(windowId, id);
+      // The tab may have moved to another window that was already resynced; only drop it
+      // from the global map if it still belongs here.
+      if (this.tabs.get(id)?.windowId === windowId) this.tabs.delete(id);
+    }
+
+    for (const tab of tabs) {
+      const prev = this.tabs.get(tab.id);
+      if (prev && prev.windowId !== windowId) {
+        // Moved in from another window: drop it there too, in case that window isn't resynced.
+        const other = this.orders.get(prev.windowId);
+        if (other?.includes(tab.id)) {
+          const next = other.filter((x) => x !== tab.id);
+          this.orders.set(prev.windowId, next);
+          out.remove(prev.windowId, tab.id);
+          out.order(prev.windowId, next);
+        }
+      }
+      if (!prev || !tabsEqual(prev, tab)) out.upsert(tab);
+      this.tabs.set(tab.id, tab);
+    }
+
+    if (nextOrder.length === 0) this.orders.delete(windowId);
+    else this.orders.set(windowId, nextOrder);
+    if (!arraysEqual(prevOrder, nextOrder)) out.order(windowId, nextOrder);
+  }
+}

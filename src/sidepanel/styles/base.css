@@ -1,0 +1,94 @@
+/* Temporary tokens; the Milestone 2 theme loader replaces the colour block. */
+:root {
+  --mPrimary: #3fd0c4;
+  --mOnPrimary: #04201f;
+  --mSecondary: #4f8fbf;
+  --mTertiary: #c9a45c;
+  --mError: #e0605a;
+  --mSurface: #0b1215;
+  --mOnSurface: #d6e4e6;
+  --mHover: #1a2b31;
+  --mOnHover: #e6f2f3;
+  --mSurfaceVariant: #121e23;
+  --mOnSurfaceVariant: #8fa6ab;
+  --mOutline: #2a3d44;
+  --mShadow: #000000;
+
+  --radius-card: 14px;
+  --radius-row: 10px;
+  --row-height: 34px;
+  --font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-size: 13px;
+  --dur: 120ms;
+
+  --state-hover: color-mix(in srgb, var(--mOnSurface) 8%, transparent);
+  --state-pressed: color-mix(in srgb, var(--mOnSurface) 12%, transparent);
+  --focus-ring: var(--mPrimary);
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --mPrimary: #0f7f77;
+    --mOnPrimary: #ffffff;
+    --mSecondary: #2c6a99;
+    --mTertiary: #8a6a1f;
+    --mError: #b3372f;
+    --mSurface: #e9f1f2;
+    --mOnSurface: #0f1c20;
+    --mHover: #c9dadd;
+    --mOnHover: #0f1c20;
+    --mSurfaceVariant: #d5e3e5;
+    --mOnSurfaceVariant: #3d565b;
+    --mOutline: #9bb4b8;
+    --mShadow: #000000;
+
+    color-scheme: light;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--mSurface);
+  color: var(--mOnSurface);
+  font: var(--font-size) / 1.3 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
+    transition: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
+    animation: none !important;
+  }
+}

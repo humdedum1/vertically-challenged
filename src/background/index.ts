@@ -251,6 +251,7 @@ export function startBackground(): void {
               ...store.snapshot(id),
             } satisfies WorkerMessage);
           }
+          // Outside the pins queue; layoutOf is synchronous and at most creates an empty layout.
           for (const id of ids) {
             port.postMessage({
               type: 'layout',

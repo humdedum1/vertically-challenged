@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ALIVE_KEY, PinManager, type PinManagerDeps } from '../src/background/pins/pin-manager';
+import {
+  ALIVE_KEY,
+  MOVING_KEY,
+  PinManager,
+  type PinManagerDeps,
+} from '../src/background/pins/pin-manager';
 import { ChangeSet, TabStore } from '../src/background/tab-store';
 import {
   flattenItems,
   INCOGNITO_LAYOUTS_KEY,
   LAYOUTS_KEY,
   type LayoutStore,
+  MAX_ITEMS,
   MAX_SETUPS,
   type PinItem,
   type WindowLayout,
@@ -75,6 +81,10 @@ function setup(opts: {
   session?: Record<string, unknown>;
   incognito?: number[];
   focused?: number;
+  /** Overrides the window list derived from `windows` (e.g. [] for a failed query). */
+  windowList?: WindowInfo[];
+  /** Replaces the fake move, e.g. with one that always fails. */
+  move?: (id: number, index: number) => Promise<void>;
 }) {
   const store = new TabStore();
   store.apply(new ChangeSet(), new Map(Object.entries(opts.windows).map(([k, v]) => [+k, v])));
@@ -83,11 +93,13 @@ function setup(opts: {
   const sent: { windowId: number | null; msg: WorkerMessage }[] = [];
   const notices: { windowId: number; text: string }[] = [];
   const moves: { id: number; index: number }[] = [];
-  let windows: WindowInfo[] = Object.keys(opts.windows).map((k) => ({
-    id: +k,
-    incognito: opts.incognito?.includes(+k) ?? false,
-    focused: +k === opts.focused,
-  }));
+  let windows: WindowInfo[] =
+    opts.windowList ??
+    Object.keys(opts.windows).map((k) => ({
+      id: +k,
+      incognito: opts.incognito?.includes(+k) ?? false,
+      focused: +k === opts.focused,
+    }));
   const deps: PinManagerDeps = {
     store,
     ready: Promise.resolve(),
@@ -95,6 +107,7 @@ function setup(opts: {
       // Applies the move to the store, as the flush following Chrome's onMoved would.
       move: async (id, p) => {
         moves.push({ id, index: p.index });
+        if (opts.move) return opts.move(id, p.index);
         const t = store.get(id);
         if (!t) return;
         const tabs = store.snapshot(t.windowId).tabs.filter((x) => x.id !== id);
@@ -140,6 +153,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('PinManager loading', () => {
@@ -371,5 +385,165 @@ describe('PinManager reconciling', () => {
     expect(t.moves).toEqual([{ id: 10, index: 1 }]);
     expect(t.store.order(1)).toEqual([11, 10]);
     expect(flattenItems(pins.layoutOf(1)).map((i) => i.tabId)).toEqual([11, 10]);
+  });
+});
+
+describe('PinManager fix round 1', () => {
+  const order = (pins: PinManager, w: number) => flattenItems(pins.layoutOf(w)).map((i) => i.tabId);
+
+  it('F1: failing moves are retried guarded, then dropped without adopting Chrome order', async () => {
+    vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const abc = () => [
+      pinned(10, 1, 'https://a.com/'),
+      pinned(11, 1, 'https://b.com/'),
+      pinned(12, 1, 'https://c.com/'),
+    ];
+    const t = setup({
+      windows: { 1: abc() },
+      session: { [ALIVE_KEY]: true },
+      move: async () => {
+        throw new Error('Tabs cannot be edited right now');
+      },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    await pins.mutate(1, (l) => ({ ...l, pinned: [...l.pinned].reverse() }));
+    await vi.advanceTimersByTimeAsync(10_000);
+    // Two moves per batch: the first batch plus three retries, then the manager gives up.
+    expect(t.moves).toHaveLength(8);
+    expect(order(pins, 1)).toEqual([12, 11, 10]);
+
+    // A later unrelated flush must not adopt Chrome's unchanged (old) order either.
+    await pins.afterFlush([1]);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(order(pins, 1)).toEqual([12, 11, 10]);
+    expect(t.moves).toHaveLength(8);
+
+    // A real reorder in Chrome's strip is still adopted.
+    const [a, b, c] = abc() as [TabInfo, TabInfo, TabInfo];
+    t.resync(1, [b, a, c]);
+    await pins.afterFlush([1]);
+    await settle();
+    expect(order(pins, 1)).toEqual([11, 10, 12]);
+  });
+
+  it('F2: a wake with moves outstanding pushes the stored layout to Chrome', async () => {
+    const saved = layout(1, [item('ia', 'https://a.com/', 10), item('ib', 'https://b.com/', 11)]);
+    const t = setup({
+      // Half-moved: Chrome shows b before a, the layout says a before b.
+      windows: { 1: [pinned(11, 1, 'https://b.com/'), pinned(10, 1, 'https://a.com/')] },
+      local: { [LAYOUTS_KEY]: stored([saved], [{ windowId: 1, layoutId: ID(1) }]) },
+      session: { [ALIVE_KEY]: true, [MOVING_KEY]: [1] },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    expect(order(pins, 1)).toEqual([10, 11]);
+    expect(t.moves.length).toBeGreaterThan(0);
+    expect(t.store.order(1)).toEqual([10, 11]);
+    // The marker is cleared once the moves are done.
+    await pins.afterFlush([1]);
+    await settle();
+    expect(t.session.data.get(MOVING_KEY)).toEqual([]);
+  });
+
+  it('F3: a failed load never overwrites the saved layouts', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const t = setup({
+      windows: { 1: [pinned(10, 1, 'https://a.com/')] },
+      session: { [ALIVE_KEY]: true },
+    });
+    t.local.get = async () => {
+      throw new Error('storage unavailable');
+    };
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    await pins.mutate(1, (l) => ({ ...l, name: 'x' }));
+    pins.onWindowRemoved(1);
+    await settle();
+
+    expect(t.local.sets).toEqual([]);
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('F4: a window of unknown incognito status never reaches storage.local', async () => {
+    const t = setup({ windows: { 1: [tab(1)] }, session: { [ALIVE_KEY]: true } });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    // Window 5 is not in windows() yet and has no tabs in the store.
+    const l = pins.layoutOf(5);
+    t.resync(5, [pinned(50, 5, 'https://secret.com/', { incognito: true })]);
+    await pins.afterFlush([5]);
+    await settle();
+
+    expect(order(pins, 5)).toEqual([50]);
+    for (const write of t.local.sets) {
+      const text = JSON.stringify(write);
+      expect(text).not.toContain(l.id);
+      expect(text).not.toContain('secret.com');
+    }
+    expect(JSON.stringify(t.session.data.get(INCOGNITO_LAYOUTS_KEY))).toContain('secret.com');
+  });
+
+  it('F5: restart matching waits until the window list is known', async () => {
+    const saved = layout(1, [item('ia', 'https://a.com/'), item('ib', 'https://b.com/')]);
+    const t = setup({
+      windows: { 7: [pinned(10, 7, 'https://a.com/'), pinned(11, 7, 'https://b.com/')] },
+      windowList: [],
+      local: { [LAYOUTS_KEY]: stored([saved]) },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await pins.afterFlush([7]);
+    await settle();
+    expect(t.session.data.get(ALIVE_KEY)).toBeUndefined();
+
+    t.setWindows([{ id: 7, incognito: false, focused: true }]);
+    await pins.afterFlush([7]);
+    await settle();
+    const l = pins.layoutOf(7);
+    expect(l.id).toBe(ID(1));
+    expect(flattenItems(l).map((i) => [i.id, i.tabId])).toEqual([
+      ['ia', 10],
+      ['ib', 11],
+    ]);
+    expect(t.session.data.get(ALIVE_KEY)).toBe(true);
+  });
+
+  it('F6: a transfer into a full layout keeps the item (dormant) in its source', async () => {
+    const full = layout(
+      2,
+      Array.from({ length: MAX_ITEMS }, (_, k) => item(`f${k}`, `https://f${k}.com/`)),
+    );
+    const src = layout(1, [item('ia', 'https://a.com/', 10)]);
+    const t = setup({
+      windows: { 1: [pinned(10, 1, 'https://a.com/')], 2: [tab(20, { windowId: 2 })] },
+      local: {
+        [LAYOUTS_KEY]: stored(
+          [src, full],
+          [
+            { windowId: 1, layoutId: ID(1) },
+            { windowId: 2, layoutId: ID(2) },
+          ],
+        ),
+      },
+      session: { [ALIVE_KEY]: true },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    t.resync(1, []);
+    t.resync(2, [pinned(10, 2, 'https://a.com/'), tab(20, { windowId: 2 })]);
+    await pins.afterFlush([1, 2]);
+    await settle();
+
+    expect(flattenItems(pins.layoutOf(1)).map((i) => [i.id, i.tabId])).toEqual([['ia', null]]);
+    expect(flattenItems(pins.layoutOf(2))).toHaveLength(MAX_ITEMS);
   });
 });

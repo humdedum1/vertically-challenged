@@ -23,15 +23,9 @@ import type { SearchIndex } from '../../lib/search/search-index';
 import type { Keymap, ShortcutAction } from '../../settings/schema';
 import type { PanelMessage } from '../../shared/protocol';
 import type { GroupInfo, TabInfo } from '../../shared/types';
-import {
-  type Drag,
-  type DropZone,
-  type MultiDropContext,
-  planDrop,
-  planDropMulti,
-} from '../model/drop-plan';
+import { type Drag, type DropZone, type MultiDropContext, planDropMulti } from '../model/drop-plan';
 import { groupMenu, tabMenu, windowLabel, windowMenu } from '../model/menus';
-import { buildRows, buildSearchRows, buildWindowRows, type Row, rowWindowId } from '../model/rows';
+import { buildSearchRows, buildWindowRows, type Row, rowWindowId } from '../model/rows';
 import { pruneSelection, tabIdsBetween } from '../model/selection';
 import type { TabState } from '../tab-state.svelte';
 import ContextMenu from './ContextMenu.svelte';

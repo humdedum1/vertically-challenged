@@ -122,6 +122,8 @@ export class TabState {
         return;
       }
       case 'patch': {
+        // Only windows the worker listed for this panel; anything else is not ours to show.
+        if (!this.windowList.some((w) => w.id === msg.patch.windowId)) return;
         let m = this.mirrors.get(msg.patch.windowId);
         // A window opened after we subscribed: its first patch describes it in full
         // (the store diffs against an empty window), so start a mirror from it.

@@ -16,7 +16,7 @@ import { PinManager } from './pins/pin-manager';
 import { createSuspender } from './suspend/suspender';
 import { ChangeSet, TabStore } from './tab-store';
 import { toGroupInfo, toTabInfo } from './to-tab-info';
-import { visibleTo } from './visibility';
+import { shouldDeliver, visibleWindows } from './visibility';
 
 /**
  * Everything is registered synchronously inside this call: MV3 only delivers the event
@@ -31,9 +31,10 @@ export function startBackground(): void {
   let pending = new ChangeSet();
   /**
    * Open panels: the window each one lives in, and whether that window is incognito. A
-   * panel sees every window of its own kind; unknown counts as incognito (fail closed).
+   * panel sees every window of its own kind; a panel whose kind isn't
+   * known yet (null) is sent nothing window-scoped.
    */
-  const subs = new Map<Browser.runtime.Port, { windowId: number; incognito: boolean }>();
+  const subs = new Map<Browser.runtime.Port, { windowId: number; incognito: boolean | null }>();
   const hasPanel = (windowId: number) => [...subs.values()].some((s) => s.windowId === windowId);
   /** Set by the "focus search" shortcut when the panel isn't connected yet. */
   const pendingFocus = new Set<number>();
@@ -122,13 +123,14 @@ export function startBackground(): void {
    * filtered per panel and everything else unscoped (null) goes to every panel.
    */
   function broadcast(windowId: number | null, msg: WorkerMessage): void {
-    const scopeIncognito = windowId === null ? null : windowIncognito(windowId);
+    const scope = windowId === null ? null : { incognito: windowIncognito(windowId) };
     for (const [port, sub] of subs) {
-      if (scopeIncognito !== null && !visibleTo(sub.incognito, { incognito: scopeIncognito }))
-        continue;
+      if (!shouldDeliver(sub, scope)) continue;
+      // The window list is per panel; an unknown-kind panel gets it with its snapshots.
+      if (msg.type === 'windows' && sub.incognito === null) continue;
       const out =
         msg.type === 'windows'
-          ? { ...msg, windows: msg.windows.filter((w) => visibleTo(sub.incognito, w)) }
+          ? { ...msg, windows: visibleWindows(sub.incognito, msg.windows) }
           : msg;
       try {
         port.postMessage(out);
@@ -262,9 +264,9 @@ export function startBackground(): void {
       const msg = parsePanelMessage(raw);
       if (!msg) return;
       if (msg.type === 'subscribe') {
-        // Re-subscribing just replaces the registration. Until the window is known the
-        // panel counts as incognito, so nothing normal leaks to it.
-        subs.set(port, { windowId: msg.windowId, incognito: true });
+        // Re-subscribing keeps a known kind (it can't change for a window); a new port is
+        // unknown, hence sent nothing, until the window list has loaded.
+        subs.set(port, { windowId: msg.windowId, incognito: subs.get(port)?.incognito ?? null });
         await ready;
         await windowsReady;
         await pins.loaded;
@@ -272,7 +274,7 @@ export function startBackground(): void {
         subs.set(port, { windowId: msg.windowId, incognito });
         // Patches are deltas against the store, so a snapshot of the store as it is now
         // lines up exactly with the next patch, even if events are still pending.
-        const visible = windowList.filter((w) => visibleTo(incognito, w));
+        const visible = visibleWindows(incognito, windowList);
         const ids = visible.map((w) => w.id);
         if (!ids.includes(msg.windowId)) ids.unshift(msg.windowId);
         try {

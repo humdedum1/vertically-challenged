@@ -1,11 +1,17 @@
 import { type Browser, browser } from 'wxt/browser';
 import { migrateSettings } from '../settings/migrate';
 import { hostOf } from '../shared/host-pattern';
-import { PANEL_PORT_NAME, parsePanelMessage, type WorkerMessage } from '../shared/protocol';
+import {
+  isPinMessage,
+  PANEL_PORT_NAME,
+  parsePanelMessage,
+  type WorkerMessage,
+} from '../shared/protocol';
 import type { GroupInfo, TabInfo, WindowInfo } from '../shared/types';
 import { createBatcher } from './batcher';
 import { type CommandDeps, runCommand } from './commands';
 import { registerContextMenus } from './context-menus';
+import { runPinCommand } from './pins/commands';
 import { PinManager } from './pins/pin-manager';
 import { createSuspender } from './suspend/suspender';
 import { ChangeSet, TabStore } from './tab-store';
@@ -218,6 +224,7 @@ export function startBackground(): void {
       (scope === 'all' ? windowList.map((w) => w.id) : [windowId]).map((id) => store.snapshot(id)),
     tab: (id) => store.get(id),
     restoreDiscarded: async () => (await settingsNow()).sessions.restoreDiscarded,
+    chrome: { tabs: browser.tabs, windows: browser.windows },
   };
 
   const suspender = createSuspender(async () => {
@@ -269,7 +276,9 @@ export function startBackground(): void {
       }
       const home = subs.get(port)?.windowId ?? null;
       try {
-        const text = await runCommand(msg, deps);
+        const text = isPinMessage(msg)
+          ? await runPinCommand(msg, pins, deps)
+          : await runCommand(msg, deps);
         if (text) port.postMessage({ type: 'notice', level: 'info', text } satisfies WorkerMessage);
       } catch (err) {
         // Tabs can vanish between the click and the call; those failures are expected
@@ -278,7 +287,8 @@ export function startBackground(): void {
         if (
           msg.type === 'restoreSession' ||
           msg.type === 'saveSession' ||
-          msg.type === 'moveToNewWindow'
+          msg.type === 'moveToNewWindow' ||
+          msg.type === 'setupOpen'
         ) {
           const text = `Couldn't complete that: ${err instanceof Error ? err.message : 'unknown error'}`;
           try {

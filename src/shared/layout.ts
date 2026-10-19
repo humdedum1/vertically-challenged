@@ -153,7 +153,8 @@ export function findNode(l: WindowLayout, id: string): NodeHit | null {
 const isObj = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
-const validUrl = (v: unknown): v is string => {
+/** Whether a URL survives parsing; anything else is dropped from the stored layout on load. */
+export const isLayoutUrl = (v: unknown): v is string => {
   if (typeof v !== 'string' || !v || v.length > MAX_URL) return false;
   try {
     return SCHEMES.has(new URL(v).protocol);
@@ -176,7 +177,12 @@ function freshId(v: unknown, ctx: Ctx): v is string {
 
 function parseItem(r: Record<string, unknown>, ctx: Ctx): PinItem | null {
   const { id, homeUrl, lastUrl } = r;
-  if (ctx.items >= MAX_ITEMS || !freshId(id, ctx) || !validUrl(homeUrl) || !validUrl(lastUrl)) {
+  if (
+    ctx.items >= MAX_ITEMS ||
+    !freshId(id, ctx) ||
+    !isLayoutUrl(homeUrl) ||
+    !isLayoutUrl(lastUrl)
+  ) {
     return null;
   }
   ctx.ids.add(id);

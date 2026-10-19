@@ -36,8 +36,17 @@ export function reconcile(
   windowId: number,
   windowTabs: readonly TabInfo[],
   tabs: TabLookup,
-  opts: { inFlight: boolean },
+  opts: {
+    inFlight: boolean;
+    /**
+     * Tabs our own commands are still turning into pinned tabs, by the window they will be
+     * pinned in (null: being closed or unpinned). Until the tab shows up pinned there, its
+     * item keeps the binding, and no window adopts the tab as a new item.
+     */
+    pending?: ReadonlyMap<number, number | null>;
+  },
 ): ReconcileResult {
+  const pending = opts.pending ?? new Map<number, number | null>();
   const transfers: ReconcileResult['transfers'] = [];
   let out = layout;
   /** Copy-on-write: the input is returned as-is when nothing needed changing. */
@@ -55,6 +64,10 @@ export function reconcile(
   for (const orig of flattenItems(layout)) {
     if (orig.tabId === null) continue;
     const t = tabs.get(orig.tabId);
+    if (pending.get(orig.tabId) === windowId && !(t?.pinned && t.windowId === windowId)) {
+      bound.add(orig.tabId);
+      continue;
+    }
     // A second item claiming the same tab would make two tiles drive one tab.
     if (!t || bound.has(orig.tabId)) {
       setFields(own(), orig.id, { tabId: null });
@@ -79,7 +92,7 @@ export function reconcile(
   // Rule 2: pinned tabs no item knows about become plain items; rule 3 then places them.
   const budget = MAX_ITEMS - flattenItems(out).length;
   const fresh: PinItem[] = windowTabs
-    .filter((t) => t.pinned && !bound.has(t.id))
+    .filter((t) => t.pinned && !bound.has(t.id) && !pending.has(t.id))
     .slice(0, Math.max(0, budget))
     .map((t) => ({
       kind: 'item',

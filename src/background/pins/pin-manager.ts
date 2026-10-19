@@ -6,12 +6,17 @@
 import type { Browser } from 'wxt/browser';
 import {
   emptyLayout,
+  findNode,
   flattenItems,
   INCOGNITO_LAYOUTS_KEY,
   isEmptyLayout,
   LAYOUTS_KEY,
   type LayoutStore,
+  MAX_ITEMS,
+  MAX_NAME,
   MAX_SETUPS,
+  newId,
+  type PinDest,
   type PinItem,
   type PinNode,
   parseLayoutStore,
@@ -22,7 +27,7 @@ import type { TabInfo, WindowInfo } from '../../shared/types';
 import type { SingleMove } from '../move-plan';
 import type { TabStore } from '../tab-store';
 import { matchLayouts } from './match';
-import { insertItems, removeItem } from './ops';
+import { appendLayout, insertItems, removeItem } from './ops';
 import { type ReconcileResult, reconcile } from './reconcile';
 
 /** The slice of chrome.storage.StorageArea the manager uses. */
@@ -67,6 +72,8 @@ const SETTLE_TIMEOUT_MS = 1000;
 const MAX_MOVE_RETRIES = 3;
 /** A transfer re-queues its target window; the cap keeps a bug from spinning a flush forever. */
 const MAX_PASSES = 4;
+/** How long a tab our command is pinning may take to show up pinned before reconcile stops waiting. */
+const PENDING_TIMEOUT_MS = 5000;
 
 interface Settled {
   windowId: number;
@@ -108,6 +115,13 @@ export class PinManager {
   private dirty = { local: false, session: false };
   private lastSetups = '[]';
   private lastMoving = '[]';
+  /** Tabs our own commands are pinning into a window, or (null) closing or unpinning; see reconcile's `pending`. */
+  private readonly pending = new Map<
+    number,
+    { windowId: number | null; timer: ReturnType<typeof setTimeout> }
+  >();
+  /** Dormant items whose tab is being created; a second open of the same item is dropped. */
+  private readonly opening = new Set<string>();
 
   constructor(private readonly deps: PinManagerDeps) {
     this.loaded = this.load().catch((err: unknown) => {
@@ -317,18 +331,276 @@ export class PinManager {
   /** Applies a panel edit, then brings Chrome's pinned block into the edited order. */
   mutate(windowId: number, fn: (l: WindowLayout) => WindowLayout): Promise<void> {
     return this.exclusive(() => {
-      if (this.closed.has(windowId)) return;
-      const l = this.layoutOf(windowId);
-      const next = fn(l);
-      if (next === l) return;
-      this.layouts.set(l.id, { ...next, id: l.id });
-      // A fresh edit gets a fresh set of attempts at moving Chrome.
+      this.edit(windowId, fn);
+    });
+  }
+
+  /** mutate's body, for operations already running inside the queue. */
+  private edit(windowId: number, fn: (l: WindowLayout) => WindowLayout): void {
+    if (this.closed.has(windowId)) return;
+    const l = this.layoutOf(windowId);
+    const next = fn(l);
+    if (next === l) return;
+    this.layouts.set(l.id, { ...next, id: l.id });
+    // A fresh edit gets a fresh set of attempts at moving Chrome.
+    this.stale.delete(windowId);
+    this.retries.delete(windowId);
+    // seq 0 acknowledges no settled moves: an edit is not a flush.
+    const changed = this.pass([windowId], 0, windowId);
+    changed.add(windowId);
+    this.publish(changed);
+  }
+
+  // --- Panel commands that need the queue -------------------------------------------------
+
+  /**
+   * Re-creates a dormant item's tab at its home URL. The create and the binding happen in
+   * one exclusive step, and the tab stays pending until the store has seen it, so neither
+   * rule 1 (tab unknown → dormant) nor rule 2 (unknown pinned tab → new item) can split it
+   * off. A second open while the first is in flight is dropped. Resolves to false when
+   * the item is not dormant (anymore), so the caller can activate it instead.
+   */
+  openItem(windowId: number, itemId: string): Promise<boolean> {
+    if (this.opening.has(itemId)) return Promise.resolve(true);
+    this.opening.add(itemId);
+    return this.exclusive(async () => {
+      try {
+        if (this.closed.has(windowId)) return true;
+        const hit = findNode(this.layoutOf(windowId), itemId);
+        if (hit?.node.kind !== 'item') return true;
+        if (hit.node.tabId !== null) return false;
+        const url = hit.node.homeUrl;
+        const tab = await this.deps.tabsApi.create({ windowId, url, pinned: true, active: true });
+        if (tab.id === undefined) return true;
+        const tabId = tab.id;
+        this.expect(tabId, windowId);
+        this.edit(windowId, (l) =>
+          findNode(l, itemId) ? withTabIds(l, (i) => (i.id === itemId ? tabId : i.tabId)) : l,
+        );
+        return true;
+      } finally {
+        this.opening.delete(itemId);
+      }
+    });
+  }
+
+  /**
+   * Places items at `dest` of `windowId`'s layout in one step. `moved` items (by the
+   * window whose layout holds them) are taken out of their layouts; `tabs` reuse the item
+   * already bound to them in any window, else get a new item. Returns the tabs Chrome
+   * still has to move into the window and/or pin (they are pending until it has), or null
+   * when nothing was placed (the window is gone, the layout is full or `dest` is missing).
+   */
+  pinInto(
+    windowId: number,
+    dest: PinDest,
+    tabs: readonly TabInfo[],
+    moved: readonly { windowId: number; itemId: string }[],
+  ): Promise<number[] | null> {
+    return this.exclusive(() => {
+      if (this.closed.has(windowId)) return null;
+      const target = this.layoutOf(windowId);
+      const work = new Map<string, WindowLayout>();
+      const get = (id: string) => work.get(id) ?? (this.layouts.get(id) as WindowLayout);
+      const owner = new Map<string, number>([...this.bindings].map(([w, id]) => [id, w]));
+      const picked: PinItem[] = [];
+      const take = (layoutId: string, itemId: string): boolean => {
+        const l = get(layoutId);
+        const hit = findNode(l, itemId);
+        if (hit?.node.kind !== 'item' || picked.some((p) => p.id === itemId)) return false;
+        picked.push(hit.node);
+        work.set(layoutId, removeItem(l, itemId));
+        return true;
+      };
+      for (const m of moved) {
+        const id = this.bindings.get(m.windowId);
+        if (id !== undefined) take(id, m.itemId);
+      }
+      for (const t of tabs) {
+        if (picked.some((p) => p.tabId === t.id)) continue;
+        // A tab that already has an item, in any window, moves as that item.
+        const owned = [...this.bindings.values()].find((id) =>
+          flattenItems(get(id)).some((x) => x.tabId === t.id),
+        );
+        const existing = owned && flattenItems(get(owned)).find((x) => x.tabId === t.id);
+        if (owned && existing && take(owned, existing.id)) continue;
+        picked.push({
+          kind: 'item',
+          id: newId('i'),
+          homeUrl: t.url,
+          lastUrl: t.url,
+          title: t.title,
+          tabId: t.id,
+        });
+      }
+      const base = get(target.id);
+      const next = insertItems(base, picked, dest);
+      if (next === base) return null;
+      work.set(target.id, next);
+
+      const touched: number[] = [];
+      for (const [id, l] of work) {
+        this.layouts.set(id, l);
+        const w = owner.get(id);
+        if (w !== undefined && w !== windowId) touched.push(w);
+      }
+      const chrome: number[] = [];
+      for (const i of picked) {
+        if (i.tabId === null) continue;
+        const t = this.deps.store.get(i.tabId);
+        if (t?.pinned && t.windowId === windowId) continue;
+        this.expect(i.tabId, windowId);
+        chrome.push(i.tabId);
+      }
+      // As in edit(): a fresh edit gets a fresh set of attempts at moving Chrome.
       this.stale.delete(windowId);
       this.retries.delete(windowId);
-      // seq 0 acknowledges no settled moves: an edit is not a flush.
+      const changed = this.pass([windowId, ...touched], 0, windowId);
+      for (const w of [windowId, ...touched]) changed.add(w);
+      this.publish(changed);
+      this.publishSetups();
+      return chrome;
+    });
+  }
+
+  /**
+   * Tabs a command is about to close or unpin while it removes their items. Until the
+   * store shows them gone or unpinned, no window adopts them as new items.
+   */
+  expectGone(tabIds: readonly number[]): void {
+    for (const id of tabIds) this.expect(id, null);
+  }
+
+  /** Marks a tab as pending for `windowId`; see reconcile's `pending`. */
+  private expect(tabId: number, windowId: number | null): void {
+    const old = this.pending.get(tabId);
+    if (old) clearTimeout(old.timer);
+    const entry = {
+      windowId,
+      timer: setTimeout(
+        () =>
+          void this.exclusive(() => {
+            if (this.pending.get(tabId) !== entry) return;
+            this.pending.delete(tabId);
+            if (windowId !== null) this.publish(this.pass([windowId], 0, null));
+          }),
+        PENDING_TIMEOUT_MS,
+      ),
+    };
+    this.pending.set(tabId, entry);
+  }
+
+  /** Our command failed; the tab is no longer expected anywhere. */
+  dropPending(tabIds: readonly number[]): Promise<void> {
+    return this.exclusive(() => {
+      const ws = new Set<number>();
+      for (const id of tabIds) {
+        const p = this.pending.get(id);
+        if (!p) continue;
+        clearTimeout(p.timer);
+        this.pending.delete(id);
+        if (p.windowId !== null) ws.add(p.windowId);
+      }
+      if (ws.size) this.publish(this.pass([...ws], 0, null));
+    });
+  }
+
+  /**
+   * Clears the window's pending tabs that Chrome now shows pinned there (and any closed
+   * or unpinned tabs that are gone or unpinned now). True when the
+   * window had any: their arrival at the end of the pinned block is our doing, not a
+   * user reorder, so that pass must not adopt Chrome's order.
+   */
+  private settlePending(windowId: number): boolean {
+    let any = false;
+    for (const [id, p] of this.pending) {
+      // Another window's arrivals are settled when that window is reconciled, which is
+      // the pass that must not adopt them.
+      if (p.windowId !== null && p.windowId !== windowId) continue;
+      const t = this.deps.store.get(id);
+      const done = p.windowId === null ? !t?.pinned : t?.pinned === true && t.windowId === windowId;
+      if (p.windowId === windowId) any = true;
+      if (done) {
+        clearTimeout(p.timer);
+        this.pending.delete(id);
+      }
+    }
+    return any;
+  }
+
+  // --- Setups (commands) ------------------------------------------------------------------
+
+  /** A layout no window is bound to; incognito layouts are never setups. */
+  private setupLayout(setupId: string): WindowLayout | undefined {
+    const l = this.layouts.get(setupId);
+    if (!l || l.incognito || [...this.bindings.values()].includes(setupId)) return undefined;
+    return l;
+  }
+
+  /** Whether `setupId` names a saved setup right now. */
+  hasSetup(setupId: string): boolean {
+    return this.setupLayout(setupId) !== undefined;
+  }
+
+  /**
+   * Binds a saved setup to a window just opened for it, every item dormant. A layout the
+   * new window already got (an empty placeholder) is replaced; a non-empty one wins.
+   */
+  bindSetup(setupId: string, windowId: number): Promise<void> {
+    return this.exclusive(() => {
+      const s = this.setupLayout(setupId);
+      if (!s || this.closed.has(windowId)) return;
+      const current = this.bindings.get(windowId);
+      if (current !== undefined) {
+        const l = this.layouts.get(current);
+        if (l && !isEmptyLayout(l)) return;
+        this.layouts.delete(current);
+      }
+      this.layouts.set(s.id, { ...withTabIds(s, () => null), lastUsed: Date.now() });
+      this.bindings.set(windowId, s.id);
+      this.markDirty(false);
       const changed = this.pass([windowId], 0, windowId);
       changed.add(windowId);
       this.publish(changed);
+      this.publishSetups();
+    });
+  }
+
+  /**
+   * "Apply to this window": the setup is appended (see appendLayout), then deleted. False
+   * when the window can't take all of its items; deleting it then would lose the rest.
+   */
+  applySetup(setupId: string, windowId: number): Promise<boolean> {
+    return this.exclusive(() => {
+      const s = this.setupLayout(setupId);
+      if (!s || this.closed.has(windowId)) return true;
+      const room = MAX_ITEMS - flattenItems(this.layoutOf(windowId)).length;
+      if (flattenItems(s).length > room) return false;
+      this.edit(windowId, (l) => appendLayout(l, s));
+      this.layouts.delete(s.id);
+      this.markDirty(false);
+      this.publishSetups();
+      return true;
+    });
+  }
+
+  renameSetup(setupId: string, name: string): Promise<void> {
+    return this.exclusive(() => {
+      const s = this.setupLayout(setupId);
+      const trimmed = name.trim().slice(0, MAX_NAME);
+      if (!s || !trimmed) return;
+      this.layouts.set(s.id, { ...s, name: trimmed });
+      this.markDirty(false);
+      this.publishSetups();
+    });
+  }
+
+  deleteSetup(setupId: string): Promise<void> {
+    return this.exclusive(() => {
+      if (!this.setupLayout(setupId)) return;
+      this.layouts.delete(setupId);
+      this.markDirty(false);
+      this.publishSetups();
     });
   }
 
@@ -394,8 +666,11 @@ export class PinManager {
     }
     const stale = this.isStale(windowId, tabs);
     const resumed = this.resume.delete(windowId);
+    const settling = this.settlePending(windowId);
+    const pending = new Map([...this.pending].map(([id, p]) => [id, p.windowId]));
     const r = reconcile(layout, windowId, tabs, store, {
-      inFlight: own || stale || resumed || moving,
+      inFlight: own || stale || resumed || moving || settling,
+      pending,
     });
     if (r.changed) this.layouts.set(layout.id, r.layout);
     if (r.moves.length === 0) this.retries.delete(windowId);
@@ -429,7 +704,8 @@ export class PinManager {
       let layout = this.layouts.get(layoutId);
       if (!layout) continue;
       for (const item of flattenItems(layout)) {
-        if (item.tabId === null) continue;
+        // A tab our command is moving here is not a drag back to where it came from.
+        if (item.tabId === null || this.pending.has(item.tabId)) continue;
         const t = this.deps.store.get(item.tabId);
         if (!t?.pinned || t.windowId === windowId || this.closed.has(t.windowId)) continue;
         // A full target can't take it; it stays here, dormant, rather than being lost.

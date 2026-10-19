@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import type { MoveTarget, PanelMessage } from '../shared/protocol';
+import type { MoveTarget, PanelMessage, PinMessage } from '../shared/protocol';
 import type { GroupColor, GroupInfo, TabInfo } from '../shared/types';
 import { planGroupMove, planMoves } from './move-plan';
 import { deleteSession, renameSession, restoreSession, saveSession } from './sessions';
@@ -10,6 +10,22 @@ export interface CommandDeps {
   windows(scope: 'window' | 'all', windowId: number): { tabs: TabInfo[]; groups: GroupInfo[] }[];
   tab(tabId: number): TabInfo | undefined;
   restoreDiscarded(): Promise<boolean>;
+  /** The Chrome calls the pin commands make; injected so they run in unit tests. */
+  chrome: ChromeApi;
+}
+
+export interface ChromeApi {
+  tabs: {
+    query(q: { windowId: number }): Promise<{ id?: number; pinned: boolean; active: boolean }[]>;
+    update(id: number, p: { active?: boolean; pinned?: boolean; url?: string }): Promise<unknown>;
+    move(id: number, p: { windowId: number; index: number }): Promise<unknown>;
+    discard(id: number): Promise<unknown>;
+    remove(ids: number[]): Promise<void>;
+  };
+  windows: {
+    create(p: { focused: boolean }): Promise<{ id?: number } | undefined>;
+    update(id: number, p: { focused: boolean }): Promise<unknown>;
+  };
 }
 
 type Ids = [number, ...number[]];
@@ -22,7 +38,7 @@ const ids = (list: number[]): Ids | null => (list.length ? (list as Ids) : null)
  * Live order is re-queried rather than taken from the store, which may be a flush behind.
  */
 export async function runCommand(
-  msg: Exclude<PanelMessage, { type: 'subscribe' }>,
+  msg: Exclude<PanelMessage, { type: 'subscribe' } | PinMessage>,
   deps: CommandDeps,
 ): Promise<string | undefined> {
   switch (msg.type) {

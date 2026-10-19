@@ -23,7 +23,7 @@ import { actionFor } from '../../lib/keymap';
 import { FuzzyIndex } from '../../lib/search/fuzzy-index';
 import type { SearchIndex } from '../../lib/search/search-index';
 import type { Keymap, ShortcutAction } from '../../settings/schema';
-import type { PinItem, PinNode, WindowLayout } from '../../shared/layout';
+import { flattenItems, type PinItem, type PinNode, type WindowLayout } from '../../shared/layout';
 import type { PanelMessage } from '../../shared/protocol';
 import type { GroupInfo, TabInfo } from '../../shared/types';
 import { type Drag, type DropZone, type MultiDropContext, planDropMulti } from '../model/drop-plan';
@@ -39,7 +39,7 @@ import {
   windowMenu,
 } from '../model/menus';
 import { buildPanelRows, buildSearchRows, type Row, rowWindowId } from '../model/rows';
-import { pruneSelection, tabIdsBetween } from '../model/selection';
+import { movableTabIds, pruneSelection, tabIdsBetween } from '../model/selection';
 import type { TabState } from '../tab-state.svelte';
 import { tintCache } from '../tint-cache.svelte';
 import ContextMenu from './ContextMenu.svelte';
@@ -337,15 +337,17 @@ function targetTabs(tab: TabInfo): TabInfo[] {
 
 const targetsOf = (tab: TabInfo): number[] => targetTabs(tab).map((t) => t.id);
 
-/**
- * What a drag or keyboard move of `tab` carries: its targets minus tabs shown as pinned
- * rows, whose place is the layout's (moving them is Task 12's pin drag, not a tab move).
- */
+/** Tabs backing a layout item in any window (rebuilt when a layout changes). */
+const layoutTabIds = $derived.by(() => {
+  const ids = new Set<number>();
+  for (const l of tabState.layouts.values())
+    for (const item of flattenItems(l)) if (item.tabId !== null) ids.add(item.tabId);
+  return ids;
+});
+
+/** What a drag or keyboard move of `tab` carries: its targets minus pinned / layout tabs. */
 const movableTargets = (tab: TabInfo): number[] =>
-  targetsOf(tab).filter((id) => {
-    const i = tabRowIndex.get(id);
-    return i === undefined || view[i]?.kind !== 'pin';
-  });
+  movableTabIds(targetsOf(tab), tabById, layoutTabIds);
 
 // --- Rename ----------------------------------------------------------------------------
 
@@ -679,6 +681,10 @@ function moveByKey(dir: -1 | 1): void {
     what = rowName(row);
   } else {
     const ids = new Set(movableTargets(row.tab));
+    if (ids.size === 0) {
+      announcement = `${rowName(row)} is pinned and can’t be moved this way`;
+      return;
+    }
     drag = { kind: 'tabs', tabIds: [...ids] };
     isMoving = (r) => r.kind === 'tab' && ids.has(r.tab.id);
     what = ids.size > 1 ? `${ids.size} tabs` : rowName(row);
@@ -787,7 +793,8 @@ const dnd = new PointerDrag<Drag>({
     if (row.kind === 'group') return { kind: 'group', groupId: row.group.id };
     // Pinned rows, folders and tiles get their own drags in Task 12.
     if (row.kind !== 'tab') return null;
-    return { kind: 'tabs', tabIds: movableTargets(row.tab) };
+    const tabIds = movableTargets(row.tab);
+    return tabIds.length > 0 ? { kind: 'tabs', tabIds } : null;
   },
   onStart: (payload) => {
     dragPayload = payload;

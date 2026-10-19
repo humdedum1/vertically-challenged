@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WindowLayout } from '../src/shared/layout';
 import { buildPanelRows } from '../src/sidepanel/model/rows';
-import { tabIdsBetween } from '../src/sidepanel/model/selection';
+import { movableTabIds, tabIdsBetween } from '../src/sidepanel/model/selection';
 import { tab } from './helpers';
 
 const item = (id: string, tabId: number | null) =>
@@ -41,5 +41,23 @@ describe('tabIdsBetween with pinned rows', () => {
     );
     expect(rows.map((r) => r.kind)).toEqual(['folder', 'pin', 'pin', 'divider', 'tab']);
     expect(tabIdsBetween(rows, 0, rows.length - 1)).toEqual([5, 6]);
+  });
+});
+
+describe('movableTabIds', () => {
+  const tabs = new Map([
+    [1, tab(1)],
+    [2, tab(2, { pinned: true })],
+    [3, tab(3)],
+    [4, tab(4)],
+  ]);
+
+  it('keeps normal tabs in order, drops pinned tabs and tabs backing a layout item', () => {
+    // 4 is unpinned in this snapshot but still referenced by a layout item: not a tab move.
+    expect(movableTabIds([3, 2, 1, 4], tabs, new Set([4]))).toEqual([3, 1]);
+  });
+
+  it('drops ids it does not know', () => {
+    expect(movableTabIds([1, 99], tabs, new Set())).toEqual([1]);
   });
 });

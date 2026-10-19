@@ -19,6 +19,8 @@ let { rowKey, clearable, showClear, level, pos, size, focused, onclear, oncontex
 const tabsWord = $derived(clearable === 1 ? 'tab' : 'tabs');
 </script>
 
+<!-- The Clear button keeps focus on the tree (mousedown default prevented), so it can
+     disable itself after the click without dropping focus to the page. -->
 <div
   id="vc-row-{rowKey}"
   class="row"
@@ -41,6 +43,7 @@ const tabsWord = $derived(clearable === 1 ? 'tab' : 'tabs');
       tabindex="-1"
       disabled={clearable === 0}
       title={clearable === 0 ? 'No tabs to clear' : `Close ${clearable} ${tabsWord} (all but the active one)`}
+      onmousedown={(e) => e.preventDefault()}
       onclick={(e) => {
         e.stopPropagation();
         onclear();

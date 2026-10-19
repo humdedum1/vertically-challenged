@@ -29,3 +29,20 @@ export function pruneSelection(
   for (const id of selection) if (alive.has(id)) next.add(id);
   return next.size === selection.size ? selection : next;
 }
+
+/**
+ * The ids a drag or keyboard move of normal tabs may carry, in the given order. Pinned
+ * tabs and tabs backing a layout item are left out whether or not they have a row in view
+ * (a selected pin can sit in a collapsed folder or window): a tab move would unpin them,
+ * and the worker would drop their item. They only move through the pin commands.
+ */
+export function movableTabIds(
+  ids: readonly number[],
+  tabById: ReadonlyMap<number, TabInfo>,
+  layoutTabIds: ReadonlySet<number>,
+): number[] {
+  return ids.filter((id) => {
+    const t = tabById.get(id);
+    return t !== undefined && !t.pinned && !layoutTabIds.has(id);
+  });
+}

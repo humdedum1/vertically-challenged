@@ -23,15 +23,15 @@ const v1 = {
   },
 };
 
-describe('migration to v2', () => {
-  it('schema is at version 2', () => {
-    expect(SETTINGS_VERSION).toBe(2);
-    expect(DEFAULT_SETTINGS.version).toBe(2);
+describe('migration to v2/v3', () => {
+  it('schema is at version 3', () => {
+    expect(SETTINGS_VERSION).toBe(3);
+    expect(DEFAULT_SETTINGS.version).toBe(3);
   });
 
   it('v1 object keeps appearance and default-fills the new groups', () => {
     const r = migrateSettings(v1);
-    expect(r.version).toBe(2);
+    expect(r.version).toBe(3);
     expect(r.appearance).toEqual({ ...v1.appearance, accent: null });
     expect(r.tabs).toEqual(DEFAULT_SETTINGS.tabs);
     expect(r.layout).toEqual(DEFAULT_SETTINGS.layout);
@@ -42,9 +42,9 @@ describe('migration to v2', () => {
     expect(migrateSettings(v0)).toEqual(migrateSettings(v1));
   });
 
-  it('v2 round-trip is identity for a customised object', () => {
+  it('current-version round-trip is identity for a customised object', () => {
     const s: Settings = {
-      version: 2,
+      version: 3,
       appearance: { ...v1.appearance, mode: 'dark', density: 'compact', accent: '#aabbcc' },
       tabs: {
         layout: 'double',
@@ -53,6 +53,7 @@ describe('migration to v2', () => {
         showMute: false,
         showNewTabButton: false,
         showCount: false,
+        allWindows: true,
       },
       layout: {
         panels: [
@@ -68,6 +69,15 @@ describe('migration to v2', () => {
           { id: 'search', visible: true },
         ],
       },
+      suspend: {
+        auto: true,
+        minutes: 10,
+        skipPinned: false,
+        skipAudible: false,
+        whitelist: ['example.com'],
+      },
+      sessions: { restoreDiscarded: false },
+      shortcuts: { ...DEFAULT_SETTINGS.shortcuts, newTab: ['Ctrl+Alt+T'], closeTab: [] },
     };
     expect(migrateSettings(s)).toEqual(s);
     expect(migrateSettings(migrateSettings(s))).toEqual(s);
@@ -82,7 +92,7 @@ describe('migration to v2', () => {
       layout: { sections: [{ id: 'recentlyClosed', visible: false }], other: 1 },
       brandNew: {},
     });
-    expect(r.version).toBe(2);
+    expect(r.version).toBe(3);
     expect(r.appearance.accent).toBe('#112233');
     expect(r.appearance).not.toHaveProperty('extra');
     expect(r.tabs.layout).toBe('double');

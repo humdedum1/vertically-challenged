@@ -1,12 +1,15 @@
 <script lang="ts">
+import { tick, untrack } from 'svelte';
 import { type PanelId, rowHeight } from '../settings/schema';
 import { applyAppearance } from './appearance';
 import Icon from './components/Icon.svelte';
 import PanelStrip, { type PanelDef } from './components/PanelStrip.svelte';
 import SegmentCard from './components/SegmentCard.svelte';
 import TabList from './components/TabList.svelte';
+import Toasts, { type Toast } from './components/Toasts.svelte';
 import TopBar from './components/TopBar.svelte';
 import { IMPLEMENTED_PANELS, PANEL_ICONS, PANEL_LABELS } from './panel-defs';
+import RecentlyClosed from './sections/RecentlyClosed.svelte';
 import type { SettingsState } from './settings-state.svelte';
 import { TabState } from './tab-state.svelte';
 import { ThemeDraft } from './theme-draft.svelte';
@@ -55,15 +58,59 @@ const searchPos = $derived.by((): 'top' | 'bottom' | 'hidden' => {
 });
 
 let tabState = $state.raw(new TabState());
+let tabList: ReturnType<typeof TabList> | undefined = $state();
+
+// --- Notices ---------------------------------------------------------------------------
+
+let toasts = $state.raw<Toast[]>([]);
+let nextToast = 0;
+const TOAST_MS = 5000;
+
+function notify(n: { level: 'info' | 'error'; text: string }): void {
+  const id = nextToast++;
+  // Keep the stack short: a burst of notices shouldn't cover the list.
+  toasts = [...toasts, { id, ...n }].slice(-3);
+  setTimeout(() => dismiss(id), TOAST_MS);
+}
+
+function dismiss(id: number): void {
+  if (toasts.some((t) => t.id === id)) toasts = toasts.filter((t) => t.id !== id);
+}
+
+async function focusSearch(): Promise<void> {
+  if (searchPos === 'hidden') {
+    notify({ level: 'info', text: 'Search is hidden in Layout settings' });
+    return;
+  }
+  selected = 'tabs';
+  await tick();
+  tabList?.focusSearch();
+}
 
 // Retry swaps in a fresh TabState; the effect cleanup disposes the old one.
 $effect(() => {
   const s = tabState;
-  void s.start();
+  s.onNotice = notify;
+  s.onFocusSearch = () => void focusSearch();
+  void s.start(untrack(() => settings.value.tabs.allWindows));
   return () => s.dispose();
 });
 
-const count = $derived(tabState.tabs.length);
+const allWindows = $derived(settings.value.tabs.allWindows);
+$effect(() => {
+  tabState.setAllWindows(allWindows);
+});
+
+function setWhitelisted(host: string, add: boolean): void {
+  settings.update((s) => {
+    const rest = s.suspend.whitelist.filter((h) => h !== host);
+    return { ...s, suspend: { ...s.suspend, whitelist: add ? [...rest, host] : rest } };
+  });
+}
+
+const count = $derived(
+  allWindows ? tabState.windows.reduce((n, w) => n + w.tabs.length, 0) : tabState.tabs.length,
+);
 </script>
 
 <main>
@@ -78,6 +125,11 @@ const count = $derived(tabState.tabs.length);
 
   <div class="panel" role="tabpanel" id="vc-panel-{panel}" aria-labelledby="vc-tab-{panel}">
     {#if panel === 'tabs'}
+      <div class="sections">
+      {#each sections as sec (sec.id)}
+      {#if sec.id === 'recentlyClosed' && sec.visible}
+        <RecentlyClosed {tabState} />
+      {:else if sec.id === 'tabs'}
       <SegmentCard title="Open tabs" fill>
         {#snippet icon()}<Icon name="list" size={12} />{/snippet}
         {#snippet trailing()}
@@ -85,6 +137,17 @@ const count = $derived(tabState.tabs.length);
             {#if settings.value.tabs.showCount}
               <span class="count" role="img" aria-label="{count} tabs">{count}</span>
             {/if}
+            <button
+              type="button"
+              class="add"
+              class:on={allWindows}
+              aria-label="Show all windows"
+              aria-pressed={allWindows}
+              title="Show all windows"
+              onclick={() => settings.update((s) => ({ ...s, tabs: { ...s.tabs, allWindows: !s.tabs.allWindows } }))}
+            >
+              <Icon name="windows" size={14} />
+            </button>
             {#if settings.value.tabs.showNewTabButton}
               <button
                 type="button"
@@ -119,7 +182,12 @@ const count = $derived(tabState.tabs.length);
           <p class="message empty">No tabs in this window</p>
         {:else}
           <TabList
+            bind:this={tabList}
             {tabState}
+            {allWindows}
+            shortcuts={settings.value.shortcuts}
+            whitelist={settings.value.suspend.whitelist}
+            onWhitelist={setWhitelisted}
             rowHeight={rowHeight(settings.value)}
             search={searchPos}
             twoLine={settings.value.tabs.layout === 'double'}
@@ -128,17 +196,47 @@ const count = $derived(tabState.tabs.length);
           />
         {/if}
       </SegmentCard>
+      {/if}
+      {/each}
+      </div>
+    {:else if panel === 'sessions'}
+      <!-- Lazy like settings: each rarely used panel is its own chunk. -->
+      {#await import('./panels/sessions/SessionsPanel.svelte')}
+        <p class="message" role="status">Loading…</p>
+      {:then m}
+        <m.default {tabState} {settings} />
+      {:catch}
+        <p class="message" role="alert">Could not load sessions.</p>
+      {/await}
+    {:else if panel === 'bookmarks'}
+      {#await import('./panels/bookmarks/BookmarksPanel.svelte')}
+        <p class="message" role="status">Loading…</p>
+      {:then m}
+        <m.default {tabState} />
+      {:catch}
+        <p class="message" role="alert">Could not load bookmarks.</p>
+      {/await}
+    {:else if panel === 'history'}
+      {#await import('./panels/history/HistoryPanel.svelte')}
+        <p class="message" role="status">Loading…</p>
+      {:then m}
+        <m.default {tabState} />
+      {:catch}
+        <p class="message" role="alert">Could not load history.</p>
+      {/await}
     {:else if panel === 'settings'}
       <!-- Lazy: settings UI is rarely opened, so keep it out of the initial bundle. -->
       {#await import('./panels/SettingsPanel.svelte')}
         <p class="message" role="status">Loading…</p>
       {:then m}
-        <m.default {settings} {themes} {draft} />
+        <m.default {settings} {themes} {tabState} {draft} />
       {:catch}
         <p class="message" role="alert">Could not load settings.</p>
       {/await}
     {/if}
   </div>
+
+  <Toasts {toasts} ondismiss={dismiss} />
 </main>
 
 <style>
@@ -156,6 +254,14 @@ const count = $derived(tabState.tabs.length);
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+  }
+
+  .sections {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
   }
 
   .count {
@@ -188,6 +294,11 @@ const count = $derived(tabState.tabs.length);
   .add:hover {
     background: var(--state-hover);
     color: var(--mOnSurface);
+  }
+
+  .add.on {
+    background: var(--state-selected);
+    color: var(--mPrimary);
   }
 
   .add:active {

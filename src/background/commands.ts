@@ -1,7 +1,16 @@
 import { browser } from 'wxt/browser';
 import type { MoveTarget, PanelMessage } from '../shared/protocol';
-import type { GroupColor } from '../shared/types';
+import type { GroupColor, GroupInfo, TabInfo } from '../shared/types';
 import { planGroupMove, planMoves } from './move-plan';
+import { deleteSession, renameSession, restoreSession, saveSession } from './sessions';
+import { canDiscardManually } from './suspend/eligibility';
+
+export interface CommandDeps {
+  /** Store contents for windows, in strip order. */
+  windows(scope: 'window' | 'all', windowId: number): { tabs: TabInfo[]; groups: GroupInfo[] }[];
+  tab(tabId: number): TabInfo | undefined;
+  restoreDiscarded(): Promise<boolean>;
+}
 
 type Ids = [number, ...number[]];
 /** The protocol rejects empty id lists; this narrows to the tuple Chrome's typings want. */
@@ -12,10 +21,15 @@ const ids = (list: number[]): Ids | null => (list.length ? (list as Ids) : null)
  * the regular chrome.tabs / tabGroups events, so there is exactly one path into the store.
  * Live order is re-queried rather than taken from the store, which may be a flush behind.
  */
-export async function runCommand(msg: Exclude<PanelMessage, { type: 'subscribe' }>): Promise<void> {
+export async function runCommand(
+  msg: Exclude<PanelMessage, { type: 'subscribe' }>,
+  deps: CommandDeps,
+): Promise<string | undefined> {
   switch (msg.type) {
     case 'activate': {
       const tab = await browser.tabs.update(msg.tabId, { active: true });
+      // In the multi-window view the tab may live in another window; bring it forward.
+      if (tab) await browser.windows.update(tab.windowId, { focused: true }).catch(() => {});
       // Activating a tab inside a collapsed group would leave it hidden in the strip.
       if (tab && tab.groupId !== -1) {
         await browser.tabGroups.update(tab.groupId, { collapsed: false }).catch(() => {});
@@ -23,7 +37,8 @@ export async function runCommand(msg: Exclude<PanelMessage, { type: 'subscribe' 
       return;
     }
     case 'close':
-      return browser.tabs.remove(msg.tabIds);
+      await browser.tabs.remove(msg.tabIds);
+      return;
     case 'closeOthers': {
       const ids = await windowTabs(msg.tabId, (t) => !t.pinned && t.id !== msg.tabId);
       if (ids.length) await browser.tabs.remove(ids);
@@ -39,7 +54,8 @@ export async function runCommand(msg: Exclude<PanelMessage, { type: 'subscribe' 
       await browser.tabs.duplicate(msg.tabId);
       return;
     case 'setPinned':
-      return setPinned(msg.tabIds, msg.pinned);
+      await setPinned(msg.tabIds, msg.pinned);
+      return;
     case 'setMuted':
       await Promise.all(msg.tabIds.map((id) => browser.tabs.update(id, { muted: msg.muted })));
       return;
@@ -57,7 +73,8 @@ export async function runCommand(msg: Exclude<PanelMessage, { type: 'subscribe' 
       return;
     }
     case 'move':
-      return moveTabs(msg.tabIds, msg.target);
+      await moveTabs(msg.tabIds, msg.target);
+      return;
     case 'moveGroup': {
       const tabs = await browser.tabs.query({ windowId: msg.windowId });
       const order = sortedIds(tabs);
@@ -98,7 +115,47 @@ export async function runCommand(msg: Exclude<PanelMessage, { type: 'subscribe' 
       if (ids.length) await browser.tabs.remove(ids);
       return;
     }
+    case 'discard':
+      await discardTabs(msg.tabIds.map((id) => deps.tab(id)).filter((t): t is TabInfo => !!t));
+      return;
+    case 'discardOthers': {
+      const self = deps.tab(msg.tabId);
+      if (!self) return;
+      const [win] = deps.windows('window', self.windowId);
+      await discardTabs((win?.tabs ?? []).filter((t) => t.id !== msg.tabId));
+      return;
+    }
+    case 'moveToNewWindow': {
+      const [first, ...rest] = msg.tabIds;
+      if (first === undefined) return;
+      const win = await browser.windows.create({ tabId: first, focused: true });
+      if (win?.id !== undefined && rest.length) {
+        await browser.tabs.move(rest as [number, ...number[]], { windowId: win.id, index: -1 });
+      }
+      return;
+    }
+    case 'saveSession': {
+      const n = await saveSession(msg.name, deps.windows(msg.scope, msg.windowId));
+      return n
+        ? `Saved “${msg.name}” (${n} tab${n === 1 ? '' : 's'})`
+        : 'Nothing to save in this window';
+    }
+    case 'renameSession':
+      await renameSession(msg.id, msg.name);
+      return;
+    case 'deleteSession':
+      await deleteSession(msg.id);
+      return;
+    case 'restoreSession':
+      return restoreSession(msg.id, msg.target, msg.windowId, await deps.restoreDiscarded());
   }
+}
+
+/** Manual suspend: ignores the idle timer and whitelist, but Chrome can't discard active tabs. */
+async function discardTabs(tabs: readonly TabInfo[]): Promise<void> {
+  await Promise.all(
+    tabs.filter(canDiscardManually).map((t) => browser.tabs.discard(t.id).catch(() => {})),
+  );
 }
 
 /**

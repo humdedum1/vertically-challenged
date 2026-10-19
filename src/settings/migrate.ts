@@ -1,13 +1,20 @@
+import { normalizeCombo } from '../lib/keymap';
+import { normalizeHostPattern } from '../shared/host-pattern';
 import {
   type Appearance,
   DEFAULT_SETTINGS,
+  type Keymap,
   type LayoutSettings,
   LIMITS,
+  MAX_BINDINGS,
   type Ordered,
   PANEL_IDS,
   SECTION_IDS,
   SETTINGS_VERSION,
+  type SessionSettings,
   type Settings,
+  SHORTCUT_ACTIONS,
+  type SuspendSettings,
   type TabRowSettings,
   UNHIDEABLE_PANELS,
 } from './schema';
@@ -22,6 +29,8 @@ type Raw = Record<string, unknown>;
 const MIGRATIONS: readonly ((s: Raw) => Raw)[] = [
   (s) => s,
   // v1 → v2: new `tabs` and `layout` groups and `appearance.accent`; all default-filled.
+  (s) => s,
+  // v2 → v3: new `suspend`, `sessions`, `shortcuts` and `tabs.allWindows`; default-filled.
   (s) => s,
 ];
 
@@ -66,6 +75,29 @@ export function sanitizeOrder<T extends string>(
   return out;
 }
 
+/**
+ * A stored keymap only overrides actions it mentions with a valid array, so a keymap
+ * from an older build keeps the defaults for actions added later.
+ */
+function sanitizeKeymap(raw: unknown): Keymap {
+  const src = isObj(raw) ? raw : {};
+  const out = {} as Keymap;
+  for (const action of SHORTCUT_ACTIONS) {
+    const v = src[action];
+    if (!Array.isArray(v)) {
+      out[action] = [...DEFAULT_SETTINGS.shortcuts[action]];
+      continue;
+    }
+    const combos: string[] = [];
+    for (const c of v) {
+      const n = typeof c === 'string' ? normalizeCombo(c) : null;
+      if (n && !combos.includes(n) && combos.length < MAX_BINDINGS) combos.push(n);
+    }
+    out[action] = combos;
+  }
+  return out;
+}
+
 function sanitize(raw: Raw): Settings {
   const d = DEFAULT_SETTINGS;
   const a = isObj(raw.appearance) ? raw.appearance : {};
@@ -93,6 +125,26 @@ function sanitize(raw: Raw): Settings {
     showMute: bool(t.showMute, d.tabs.showMute),
     showNewTabButton: bool(t.showNewTabButton, d.tabs.showNewTabButton),
     showCount: bool(t.showCount, d.tabs.showCount),
+    allWindows: bool(t.allWindows, d.tabs.allWindows),
+  };
+
+  const su = isObj(raw.suspend) ? raw.suspend : {};
+  const whitelist: string[] = [];
+  for (const w of Array.isArray(su.whitelist) ? su.whitelist : []) {
+    const n = typeof w === 'string' ? normalizeHostPattern(w) : null;
+    if (n && !whitelist.includes(n) && whitelist.length < LIMITS.whitelist) whitelist.push(n);
+  }
+  const suspend: SuspendSettings = {
+    auto: bool(su.auto, d.suspend.auto),
+    minutes: clampInt(su.minutes, LIMITS.suspendMinutes, d.suspend.minutes),
+    skipPinned: bool(su.skipPinned, d.suspend.skipPinned),
+    skipAudible: bool(su.skipAudible, d.suspend.skipAudible),
+    whitelist,
+  };
+
+  const se = isObj(raw.sessions) ? raw.sessions : {};
+  const sessions: SessionSettings = {
+    restoreDiscarded: bool(se.restoreDiscarded, d.sessions.restoreDiscarded),
   };
 
   const l = isObj(raw.layout) ? raw.layout : {};
@@ -101,7 +153,15 @@ function sanitize(raw: Raw): Settings {
     sections: sanitizeOrder(l.sections, SECTION_IDS, ['tabs']),
   };
 
-  return { version: SETTINGS_VERSION, appearance, tabs, layout };
+  return {
+    version: SETTINGS_VERSION,
+    appearance,
+    tabs,
+    layout,
+    suspend,
+    sessions,
+    shortcuts: sanitizeKeymap(raw.shortcuts),
+  };
 }
 
 /**

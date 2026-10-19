@@ -1,5 +1,6 @@
+import { hostOf, matchesHostPattern } from '../../shared/host-pattern';
 import type { PanelMessage } from '../../shared/protocol';
-import type { GroupInfo, TabInfo } from '../../shared/types';
+import type { GroupInfo, TabInfo, WindowInfo } from '../../shared/types';
 import type { MenuItem } from '../components/menu-types';
 
 export interface TabMenuContext {
@@ -9,10 +10,27 @@ export interface TabMenuContext {
   tabs: TabInfo[];
   allTabs: readonly TabInfo[];
   groups: readonly GroupInfo[];
-  windowId: number;
   send: (msg: PanelMessage) => void;
   /** Called after "Add to new group" so the UI can open the rename field once it appears. */
   onNewGroup: (tabIds: number[]) => void;
+  /** All normal windows (for "Move to window"), and the one this panel lives in. */
+  windows: readonly WindowInfo[];
+  homeWindowId: number | null;
+  /** Current never-auto-suspend host patterns. */
+  whitelist: readonly string[];
+  onWhitelist: (host: string, add: boolean) => void;
+}
+
+/** Display order shared by the tree and the menus: home window first, then by id. */
+export function orderedWindows(
+  windows: readonly WindowInfo[],
+  homeId: number | null,
+): WindowInfo[] {
+  return [...windows].sort((a, b) => (a.id === homeId ? -1 : b.id === homeId ? 1 : a.id - b.id));
+}
+
+export function windowLabel(number: number, isHome: boolean): string {
+  return isHome ? 'This window' : `Window ${number}`;
 }
 
 const SEP: MenuItem = { type: 'separator' };
@@ -29,12 +47,27 @@ export function tabMenu(c: TabMenuContext): MenuItem[] {
   };
   const n = ids.length;
   const plural = n > 1 ? ` (${n})` : '';
+  // The active tab of a window can't be discarded.
+  const suspendable = c.tabs.filter((t) => !t.active).map((t) => t.id);
+  const host = hostOf(c.target.url);
+  const listed = host !== null && c.whitelist.includes(host);
+  const covered = host !== null && !listed && matchesHostPattern(c.target.url, c.whitelist);
+  const moveTargets = orderedWindows(c.windows, c.homeWindowId)
+    .map((w, i) => ({ w, number: i + 1 }))
+    .filter(({ w }) => w.id !== c.target.windowId && w.incognito === c.target.incognito);
+  const moveTo = (windowId: number) =>
+    c.send({
+      type: 'move',
+      tabIds: ids,
+      target: { windowId, beforeTabId: null, groupId: -1, pinned: null },
+    });
 
   const items: MenuItem[] = [
     {
       type: 'item',
       label: 'New tab below',
-      onselect: () => c.send({ type: 'newTab', windowId: c.windowId, afterTabId: c.target.id }),
+      onselect: () =>
+        c.send({ type: 'newTab', windowId: c.target.windowId, afterTabId: c.target.id }),
     },
     {
       type: 'item',
@@ -78,6 +111,48 @@ export function tabMenu(c: TabMenuContext): MenuItem[] {
     });
   }
   items.push(
+    {
+      type: 'submenu',
+      label: 'Move to window',
+      items: [
+        ...moveTargets.map<MenuItem>(({ w, number }) => ({
+          type: 'item',
+          label: windowLabel(number, w.id === c.homeWindowId),
+          onselect: () => moveTo(w.id),
+        })),
+        ...(moveTargets.length ? [SEP] : []),
+        {
+          type: 'item',
+          label: 'New window',
+          onselect: () => c.send({ type: 'moveToNewWindow', tabIds: ids }),
+        },
+      ],
+    },
+    SEP,
+    {
+      type: 'item',
+      label: `Suspend${suspendable.length > 1 ? ` (${suspendable.length})` : ''}`,
+      disabled: suspendable.length === 0,
+      onselect: () => c.send({ type: 'discard', tabIds: suspendable }),
+    },
+    {
+      type: 'item',
+      label: 'Suspend other tabs',
+      disabled: c.allTabs.length < 2,
+      onselect: () => c.send({ type: 'discardOthers', tabId: c.target.id }),
+    },
+    {
+      type: 'item',
+      label: listed
+        ? 'Auto-suspend allowed for this site'
+        : covered
+          ? 'Site is in the never-suspend list'
+          : 'Never auto-suspend this site',
+      disabled: host === null || covered,
+      onselect: () => {
+        if (host !== null) c.onWhitelist(host, !listed);
+      },
+    },
     SEP,
     {
       type: 'item',
@@ -104,7 +179,6 @@ export function tabMenu(c: TabMenuContext): MenuItem[] {
 export interface GroupMenuContext {
   group: GroupInfo;
   tabs: readonly TabInfo[];
-  windowId: number;
   send: (msg: PanelMessage) => void;
   onRename: () => void;
 }
@@ -129,7 +203,7 @@ export function groupMenu(c: GroupMenuContext): MenuItem[] {
     {
       type: 'item',
       label: 'New tab in group',
-      onselect: () => c.send({ type: 'newTab', windowId: c.windowId, afterTabId: lastId }),
+      onselect: () => c.send({ type: 'newTab', windowId: c.group.windowId, afterTabId: lastId }),
     },
     {
       type: 'item',
@@ -144,5 +218,56 @@ export function groupMenu(c: GroupMenuContext): MenuItem[] {
       danger: true,
       onselect: () => c.send({ type: 'closeGroup', groupId: c.group.id }),
     },
+  ];
+}
+
+export interface WindowMenuContext {
+  info: WindowInfo;
+  /** Every tab of the window. */
+  tabs: readonly TabInfo[];
+  send: (msg: PanelMessage) => void;
+}
+
+export function windowMenu(c: WindowMenuContext): MenuItem[] {
+  const ids = c.tabs.map((t) => t.id);
+  const target = c.tabs.find((t) => t.active) ?? c.tabs[0];
+  const closeAll = (): void => c.send({ type: 'close', tabIds: ids });
+  return [
+    {
+      type: 'item',
+      label: 'Switch to window',
+      disabled: target === undefined,
+      onselect: () => {
+        if (target) c.send({ type: 'activate', tabId: target.id });
+      },
+    },
+    {
+      type: 'item',
+      label: 'New tab in window',
+      onselect: () => c.send({ type: 'newTab', windowId: c.info.id, afterTabId: null }),
+    },
+    SEP,
+    // Closing many tabs at once can't be undone with one click, so ask first (inside a
+    // submenu, which needs no extra menu machinery).
+    ids.length > 1
+      ? {
+          type: 'submenu',
+          label: 'Close window…',
+          items: [
+            {
+              type: 'item',
+              label: `Confirm: close ${ids.length} tabs`,
+              danger: true,
+              onselect: closeAll,
+            },
+          ],
+        }
+      : {
+          type: 'item',
+          label: 'Close window',
+          danger: true,
+          disabled: ids.length === 0,
+          onselect: closeAll,
+        },
   ];
 }

@@ -20,13 +20,29 @@ export default defineConfig({
       'storage',
       // Show, create, rename, recolour, collapse and move native tab groups.
       'tabGroups',
+      // Recently closed tabs/windows and restoring them.
+      'sessions',
+      // The Bookmarks panel (read, open, search).
+      'bookmarks',
+      // The History panel (read, search, delete entries).
+      'history',
+      // Auto-suspend timer: the worker is shut down when idle, so setTimeout can't run a
+      // 30-minute timer; alarms survive and wake it.
+      'alarms',
+      // "Suspend tab", "Save window as session" etc. in Chrome's page and toolbar menus.
+      'contextMenus',
     ],
     action: { default_title: 'Vertically Challenged' },
+    // Users rebind these at chrome://extensions/shortcuts; only the panel toggle gets a
+    // default key so we don't collide with shortcuts users already rely on.
     commands: {
       'toggle-side-panel': {
         suggested_key: { default: 'Alt+Shift+V' },
         description: 'Open or close the vertical tab panel',
       },
+      'focus-search': { description: 'Open the panel and search tabs' },
+      'suspend-tab': { description: 'Suspend the current tab' },
+      'suspend-other-tabs': { description: 'Suspend all other tabs in the window' },
     },
   },
 });

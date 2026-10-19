@@ -16,6 +16,7 @@ describe('single-id messages', () => {
     expect(parsePanelMessage({ type: 'subscribe', windowId: 2 })).toEqual({
       type: 'subscribe',
       windowId: 2,
+      all: false,
     });
     for (const bad of badIds)
       expect(parsePanelMessage({ type: 'subscribe', windowId: bad })).toBeNull();

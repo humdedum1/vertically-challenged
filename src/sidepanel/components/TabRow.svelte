@@ -7,7 +7,14 @@ import { segments } from '../model/highlight';
 
 interface Props {
   tab: TabInfo;
-  level: 1 | 2;
+  /** aria-level; the indent derives from `grouped` and `nested`, not from this number. */
+  level: number;
+  /** Inside a tab group (indent + colour guide). */
+  grouped: boolean;
+  /** Under a window header in the multi-window view. */
+  nested: boolean;
+  /** "Window 2" tag for search results from other windows. */
+  windowTag?: string;
   pos: number;
   size: number;
   focused: boolean;
@@ -32,6 +39,9 @@ interface Props {
 let {
   tab,
   level,
+  grouped,
+  nested,
+  windowTag,
   pos,
   size,
   focused,
@@ -84,7 +94,8 @@ function muteClick(e: MouseEvent): void {
   class:focused
   class:selected={selectedLook}
   class:discarded={tab.discarded}
-  class:indent={level === 2}
+  class:indent={grouped}
+  class:nested
   class:pinned-end={pinnedEnd}
   class:two-line={showUrl}
   style:--gc={groupColor}
@@ -100,7 +111,7 @@ function muteClick(e: MouseEvent): void {
   {oncontextmenu}
   {onauxclick}
 >
-  {#if level === 2}<span class="guide" aria-hidden="true"></span>{/if}
+  {#if grouped}<span class="guide" aria-hidden="true"></span>{/if}
 
   <span class="icon">
     {#if tab.loading}
@@ -125,6 +136,15 @@ function muteClick(e: MouseEvent): void {
       >
     {/if}
   </span>
+
+  {#if windowTag}<span class="wtag">{windowTag}</span>{/if}
+
+  {#if tab.discarded}
+    <svg class="zzz" viewBox="0 0 16 16" width="12" height="12" role="img" aria-label="Suspended" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <title>Suspended</title>
+      <path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z" />
+    </svg>
+  {/if}
 
   {#if tab.pinned}
     <svg class="pin" viewBox="0 0 16 16" width="12" height="12" role="img" aria-label="Pinned" fill="currentColor">
@@ -176,8 +196,20 @@ function muteClick(e: MouseEvent): void {
     transition: background-color var(--dur) var(--ease);
   }
 
+  .row.nested {
+    padding-left: 28px;
+  }
+
   .row.indent {
     padding-left: 36px;
+  }
+
+  .row.nested.indent {
+    padding-left: 52px;
+  }
+
+  .row.nested .guide {
+    left: 40px;
   }
 
   /* Group colour guide, aligned under the header's colour dot. */
@@ -300,6 +332,21 @@ function muteClick(e: MouseEvent): void {
   .pin {
     flex: none;
     color: var(--mTertiary);
+  }
+
+  .zzz {
+    flex: none;
+    color: var(--mOnSurfaceVariant);
+  }
+
+  .wtag {
+    flex: none;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--mOnSurfaceVariant);
+    font-size: 10.5px;
+    line-height: 16px;
   }
 
   .spinner {

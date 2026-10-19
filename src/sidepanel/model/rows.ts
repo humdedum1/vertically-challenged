@@ -1,9 +1,12 @@
 import type { Range, SearchHit } from '../../lib/search/search-index';
-import type { GroupInfo, TabInfo } from '../../shared/types';
+import type { GroupInfo, TabInfo, WindowInfo } from '../../shared/types';
 
 interface TreePos {
-  /** aria-level: 1 for top-level items, 2 for tabs inside a group. */
-  level: 1 | 2;
+  /**
+   * aria-level: 1 for top-level items, 2 for tabs inside a group; one deeper for each
+   * when nested under a window header in the multi-window view.
+   */
+  level: number;
   /** aria-posinset / aria-setsize among siblings at that level. */
   pos: number;
   size: number;
@@ -27,26 +30,45 @@ export type GroupRow = TreePos & {
   count: number;
 };
 
-export type Row = TabRow | GroupRow;
+export type WindowRow = TreePos & {
+  kind: 'window';
+  key: string;
+  info: WindowInfo;
+  /** 1-based label number in display order ("Window 2"). */
+  number: number;
+  isHome: boolean;
+  count: number;
+  collapsed: boolean;
+};
+
+export type Row = TabRow | GroupRow | WindowRow;
+
+/** The window a row belongs to. */
+export const rowWindowId = (r: Row): number =>
+  r.kind === 'tab' ? r.tab.windowId : r.kind === 'group' ? r.group.windowId : r.info.id;
 
 /**
  * Flattens a window into the rows the virtual list renders, in tab-strip order. Group
  * headers precede their tabs; collapsed groups hide them, like Chrome's strip. Built in
  * one pass plus one pass to fill sibling counts, so it stays O(n) for 1,500 tabs.
  */
-export function buildRows(tabs: readonly TabInfo[], groups: readonly GroupInfo[]): Row[] {
+export function buildRows(
+  tabs: readonly TabInfo[],
+  groups: readonly GroupInfo[],
+  levelOffset = 0,
+): (TabRow | GroupRow)[] {
   const byId = new Map(groups.map((g) => [g.id, g]));
   const counts = new Map<number, number>();
   for (const t of tabs)
     if (t.groupId !== -1) counts.set(t.groupId, (counts.get(t.groupId) ?? 0) + 1);
 
-  const rows: Row[] = [];
+  const rows: (TabRow | GroupRow)[] = [];
   let currentGroup = -1;
   let topLevel = 0;
   let childIndex = 0;
   let header: GroupRow | null = null;
   const children: TabRow[] = [];
-  const top: Row[] = [];
+  const top: (TabRow | GroupRow)[] = [];
 
   const closeGroup = () => {
     for (const c of children) c.size = children.length;
@@ -64,7 +86,7 @@ export function buildRows(tabs: readonly TabInfo[], groups: readonly GroupInfo[]
         key: `g${group.id}`,
         group,
         count: counts.get(group.id) ?? 0,
-        level: 1,
+        level: 1 + levelOffset,
         pos: ++topLevel,
         size: 0,
       };
@@ -81,7 +103,7 @@ export function buildRows(tabs: readonly TabInfo[], groups: readonly GroupInfo[]
       key: `t${tab.id}`,
       tab,
       pinnedEnd: tab.pinned && !next?.pinned,
-      level: group ? 2 : 1,
+      level: (group ? 2 : 1) + levelOffset,
       pos: group ? ++childIndex : ++topLevel,
       size: 0,
     };
@@ -113,5 +135,34 @@ export function buildSearchRows(tabs: readonly TabInfo[], hits: readonly SearchH
     });
   }
   for (const r of rows) r.size = rows.length;
+  return rows;
+}
+
+/**
+ * Multi-window view: one header per window (home window first, as given), each followed
+ * by that window's tree one level deeper. Collapsed windows show only their header.
+ */
+export function buildWindowRows(
+  windows: readonly { info: WindowInfo; tabs: readonly TabInfo[]; groups: readonly GroupInfo[] }[],
+  homeId: number | null,
+  collapsed: ReadonlySet<number>,
+): Row[] {
+  const rows: Row[] = [];
+  windows.forEach((w, i) => {
+    const isCollapsed = collapsed.has(w.info.id);
+    rows.push({
+      kind: 'window',
+      key: `w${w.info.id}`,
+      info: w.info,
+      number: i + 1,
+      isHome: w.info.id === homeId,
+      count: w.tabs.length,
+      collapsed: isCollapsed,
+      level: 1,
+      pos: i + 1,
+      size: windows.length,
+    });
+    if (!isCollapsed) rows.push(...buildRows(w.tabs, w.groups, 1));
+  });
   return rows;
 }

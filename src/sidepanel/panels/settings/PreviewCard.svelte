@@ -70,6 +70,8 @@ let open = $state(true);
           <TabRow
             tab={t}
             {level}
+            grouped={level === 2}
+            nested={false}
             pos={1}
             size={1}
             focused={false}

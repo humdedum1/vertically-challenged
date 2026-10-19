@@ -9,12 +9,21 @@ export const PANEL_LABELS: Record<PanelId, string> = {
   settings: 'Settings',
 };
 
-/** Panels that exist in this build; M5 adds sessions / bookmarks / history here. */
-export const IMPLEMENTED_PANELS: ReadonlySet<PanelId> = new Set<PanelId>(['tabs', 'settings']);
+/** Panels that exist in this build. */
+export const IMPLEMENTED_PANELS: ReadonlySet<PanelId> = new Set<PanelId>([
+  'tabs',
+  'sessions',
+  'bookmarks',
+  'history',
+  'settings',
+]);
 
 /** Only implemented panels need an icon. */
 export const PANEL_ICONS: Partial<Record<PanelId, IconName>> = {
   tabs: 'tabs',
+  sessions: 'sessions',
+  bookmarks: 'bookmark',
+  history: 'history',
   settings: 'settings',
 };
 
@@ -24,4 +33,8 @@ export const SECTION_LABELS: Record<SectionId, string> = {
   recentlyClosed: 'Recently closed',
 };
 
-export const IMPLEMENTED_SECTIONS: ReadonlySet<SectionId> = new Set<SectionId>(['search', 'tabs']);
+export const IMPLEMENTED_SECTIONS: ReadonlySet<SectionId> = new Set<SectionId>([
+  'search',
+  'tabs',
+  'recentlyClosed',
+]);

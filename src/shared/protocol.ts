@@ -3,6 +3,7 @@ import {
   type GroupColor,
   type GroupInfo,
   type TabInfo,
+  type WindowInfo,
   type WindowPatch,
 } from './types';
 
@@ -24,7 +25,8 @@ export interface MoveTarget {
 
 /** Panel → service worker. */
 export type PanelMessage =
-  | { type: 'subscribe'; windowId: number }
+  /** `all` subscribes to every window (multi-window view); `windowId` is still the home window. */
+  | { type: 'subscribe'; windowId: number; all: boolean }
   | { type: 'activate'; tabId: number }
   | { type: 'close'; tabIds: number[] }
   | { type: 'closeOthers'; tabId: number }
@@ -44,7 +46,14 @@ export type PanelMessage =
       color?: GroupColor;
       collapsed?: boolean;
     }
-  | { type: 'closeGroup'; groupId: number };
+  | { type: 'closeGroup'; groupId: number }
+  | { type: 'discard'; tabIds: number[] }
+  | { type: 'discardOthers'; tabId: number }
+  | { type: 'moveToNewWindow'; tabIds: number[] }
+  | { type: 'saveSession'; scope: 'window' | 'all'; windowId: number; name: string }
+  | { type: 'renameSession'; id: string; name: string }
+  | { type: 'deleteSession'; id: string }
+  | { type: 'restoreSession'; id: string; target: 'newWindow' | 'currentWindow'; windowId: number };
 
 /** Service worker → panel. */
 export type WorkerMessage =
@@ -55,10 +64,21 @@ export type WorkerMessage =
       order: number[];
       groups: GroupInfo[];
     }
-  | { type: 'patch'; patch: WindowPatch };
+  | { type: 'patch'; patch: WindowPatch }
+  /** Full window list; sent on subscribe and whenever windows open, close or change focus. */
+  | { type: 'windows'; windows: WindowInfo[] }
+  /** The "focus search" global shortcut opened or targeted this panel. */
+  | { type: 'focusSearch' }
+  /** Outcome of a command the user should hear about (e.g. tabs skipped on restore). */
+  | { type: 'notice'; level: 'info' | 'error'; text: string };
 
 const MAX_IDS = 5000;
 const MAX_TITLE = 200;
+const MAX_SESSION_NAME = 100;
+const isSessionId = (v: unknown): v is string =>
+  typeof v === 'string' && /^[a-z0-9-]{1,40}$/.test(v);
+const isName = (v: unknown): v is string =>
+  typeof v === 'string' && v.trim().length > 0 && v.trim().length <= MAX_SESSION_NAME;
 
 const isId = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0;
 const isIdOrNull = (v: unknown): v is number | null => v === null || isId(v);
@@ -92,7 +112,9 @@ export function parsePanelMessage(raw: unknown): PanelMessage | null {
   const m = raw as Record<string, unknown>;
   switch (m.type) {
     case 'subscribe':
-      return isId(m.windowId) ? { type: 'subscribe', windowId: m.windowId } : null;
+      return isId(m.windowId)
+        ? { type: 'subscribe', windowId: m.windowId, all: m.all === true }
+        : null;
     case 'activate':
     case 'closeOthers':
     case 'closeBelow':
@@ -143,6 +165,27 @@ export function parsePanelMessage(raw: unknown): PanelMessage | null {
     }
     case 'closeGroup':
       return isId(m.groupId) ? { type: 'closeGroup', groupId: m.groupId } : null;
+    case 'discard':
+    case 'moveToNewWindow':
+      return isIds(m.tabIds) ? { type: m.type, tabIds: m.tabIds } : null;
+    case 'discardOthers':
+      return isId(m.tabId) ? { type: 'discardOthers', tabId: m.tabId } : null;
+    case 'saveSession':
+      return (m.scope === 'window' || m.scope === 'all') && isId(m.windowId) && isName(m.name)
+        ? { type: 'saveSession', scope: m.scope, windowId: m.windowId, name: m.name.trim() }
+        : null;
+    case 'renameSession':
+      return isSessionId(m.id) && isName(m.name)
+        ? { type: 'renameSession', id: m.id, name: m.name.trim() }
+        : null;
+    case 'deleteSession':
+      return isSessionId(m.id) ? { type: 'deleteSession', id: m.id } : null;
+    case 'restoreSession':
+      return isSessionId(m.id) &&
+        (m.target === 'newWindow' || m.target === 'currentWindow') &&
+        isId(m.windowId)
+        ? { type: 'restoreSession', id: m.id, target: m.target, windowId: m.windowId }
+        : null;
     default:
       return null;
   }

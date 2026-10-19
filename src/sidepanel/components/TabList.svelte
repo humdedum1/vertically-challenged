@@ -1,28 +1,37 @@
 <script lang="ts">
 /*
- * Keyboard map (focus stays on the tree; rows are addressed with aria-activedescendant):
+ * Keyboard map (focus stays on the tree; rows are addressed with aria-activedescendant).
+ * Fixed navigation keys:
  *   Up / Down          move focus            Home / End      first / last row
- *   Left               collapse group, or go to the parent group
- *   Right              expand group, or go to its first tab
- *   Enter              activate tab / toggle group
- *   Space              toggle selection of the focused tab (group: toggle)
- *   Shift+Up / Down    extend selection      Ctrl+A          select all visible tabs
- *   Delete             close selection (or the focused tab / group)
- *   F2                 rename the focused group
- *   Alt+Up / Down      move the focused tab, selection or group one row
- *   ContextMenu / Shift+F10   open the context menu
+ *   Left               collapse group / window, or go to the parent header
+ *   Right              expand group / window, or go to its first child
+ *   Enter              activate tab / toggle group or window
+ *   Space              toggle selection of the focused tab (group, window: toggle)
+ *   Shift+Up / Down    extend selection
  *   Escape             clear selection, then clear the search
- *   / or Ctrl+F        focus the search field (Down from it enters the results)
+ * Configurable (Settings > Shortcuts; defaults in parentheses), looked up with actionFor():
+ *   closeTab (Delete), renameGroup (F2), moveUp / moveDown (Alt+Up / Down), openMenu
+ *   (Shift+F10, ContextMenu), selectAll (Ctrl+A), focusSearch (/, Ctrl+F; also works from
+ *   outside the tree), newTab, duplicateTab, togglePin, toggleMute, suspendTab (unbound).
  */
+
 import { untrack } from 'svelte';
 import { type HoverTarget, PointerDrag } from '../../lib/drag/pointer-drag';
+import { actionFor } from '../../lib/keymap';
 import { FuzzyIndex } from '../../lib/search/fuzzy-index';
 import type { SearchIndex } from '../../lib/search/search-index';
+import type { Keymap, ShortcutAction } from '../../settings/schema';
 import type { PanelMessage } from '../../shared/protocol';
-import type { TabInfo } from '../../shared/types';
-import { type Drag, planDrop } from '../model/drop-plan';
-import { groupMenu, tabMenu } from '../model/menus';
-import { buildRows, buildSearchRows, type Row } from '../model/rows';
+import type { GroupInfo, TabInfo } from '../../shared/types';
+import {
+  type Drag,
+  type DropZone,
+  type MultiDropContext,
+  planDrop,
+  planDropMulti,
+} from '../model/drop-plan';
+import { groupMenu, tabMenu, windowLabel, windowMenu } from '../model/menus';
+import { buildRows, buildSearchRows, buildWindowRows, type Row, rowWindowId } from '../model/rows';
 import { pruneSelection, tabIdsBetween } from '../model/selection';
 import type { TabState } from '../tab-state.svelte';
 import ContextMenu from './ContextMenu.svelte';
@@ -31,6 +40,7 @@ import Icon from './Icon.svelte';
 import type { MenuItem } from './menu-types';
 import TabRow from './TabRow.svelte';
 import VirtualList from './VirtualList.svelte';
+import WindowRow from './WindowRow.svelte';
 
 interface Props {
   tabState: TabState;
@@ -42,6 +52,12 @@ interface Props {
   twoLine?: boolean;
   showClose?: boolean;
   showMute?: boolean;
+  /** Multi-window view: a header per window, search across all of them. */
+  allWindows?: boolean;
+  shortcuts: Keymap;
+  /** Never-auto-suspend host patterns, for the tab menu. */
+  whitelist: readonly string[];
+  onWhitelist: (host: string, add: boolean) => void;
 }
 
 let {
@@ -51,6 +67,10 @@ let {
   twoLine = false,
   showClose = true,
   showMute = true,
+  allWindows = false,
+  shortcuts,
+  whitelist,
+  onWhitelist,
 }: Props = $props();
 
 const send = (msg: PanelMessage): void => tabState.send(msg);
@@ -59,20 +79,79 @@ const send = (msg: PanelMessage): void => tabState.send(msg);
 
 // The only place a concrete matcher is chosen; everything else sees the interface.
 const index: SearchIndex = new FuzzyIndex();
-let fedTabs = $state.raw<TabInfo[]>([]);
+let fedTabs = $state.raw<readonly TabInfo[]>([]);
+
+// Every tab / group the view can show; in single-window mode that's just the home window.
+const allTabs = $derived(allWindows ? tabState.windows.flatMap((w) => w.tabs) : tabState.tabs);
+const allGroups = $derived(
+  allWindows ? tabState.windows.flatMap((w) => w.groups) : tabState.groups,
+);
+const tabById = $derived(new Map(allTabs.map((t) => [t.id, t])));
+const windowViewById = $derived(new Map(tabState.windows.map((w) => [w.info.id, w])));
+const windowNumber = $derived(new Map(tabState.windows.map((w, i) => [w.info.id, i + 1])));
+const tabsOfWindow = (id: number): readonly TabInfo[] =>
+  allWindows ? (windowViewById.get(id)?.tabs ?? []) : tabState.tabs;
+
 // Pre-effect so the index is fed before the derived search below reads it in the same flush.
 $effect.pre(() => {
-  index.replaceAll(tabState.tabs);
-  fedTabs = tabState.tabs;
+  index.replaceAll(allTabs);
+  fedTabs = allTabs;
+});
+
+// Collapsed windows are UI state only (Chrome has no such concept). Window ids don't survive
+// a browser restart, so entries for windows that no longer exist are pruned.
+const COLLAPSED_KEY = 'vc.collapsedWindows';
+function loadCollapsed(): ReadonlySet<number> {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]');
+    return new Set(Array.isArray(raw) ? raw.filter((x): x is number => Number.isInteger(x)) : []);
+  } catch {
+    return new Set();
+  }
+}
+let collapsedWindows = $state.raw<ReadonlySet<number>>(loadCollapsed());
+
+function setCollapsedWindows(next: ReadonlySet<number>): void {
+  collapsedWindows = next;
+  try {
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]));
+  } catch {
+    // Storage unavailable: the choice just doesn't persist.
+  }
+}
+
+function setWindowCollapsed(id: number, collapsed: boolean): void {
+  if (collapsedWindows.has(id) === collapsed) return;
+  const next = new Set(collapsedWindows);
+  if (collapsed) next.add(id);
+  else next.delete(id);
+  setCollapsedWindows(next);
+}
+
+$effect(() => {
+  const known = new Set(tabState.windowList.map((w) => w.id));
+  const current = untrack(() => collapsedWindows);
+  if (known.size === 0) return;
+  const next = new Set([...current].filter((id) => known.has(id)));
+  if (next.size !== current.size) untrack(() => setCollapsedWindows(next));
 });
 
 let query = $state('');
 const needle = $derived(query.trim());
 const searching = $derived(needle !== '');
-const treeRows = $derived(buildRows(tabState.tabs, tabState.groups));
+const treeRows: Row[] = $derived(
+  allWindows
+    ? buildWindowRows(tabState.windows, tabState.windowId, collapsedWindows)
+    : buildRows(tabState.tabs, tabState.groups),
+);
+// aria-level of tabs inside a group: one deeper under a window header.
+const nested = $derived(allWindows && !searching);
+const groupLevel = $derived(nested ? 3 : 2);
 const view: Row[] = $derived(searching ? buildSearchRows(fedTabs, index.search(needle)) : treeRows);
 const keyIndex = $derived(new Map(view.map((r, i) => [r.key, i])));
-const groupById = $derived(new Map(tabState.groups.map((g) => [g.id, g])));
+const groupById = $derived(new Map<number, GroupInfo>(allGroups.map((g) => [g.id, g])));
+const windowName = (id: number): string =>
+  windowLabel(windowNumber.get(id) ?? 0, id === tabState.windowId);
 const showUrl = $derived(twoLine || (rowHeight >= 34 && searching));
 
 // --- Focus -----------------------------------------------------------------------------
@@ -126,7 +205,7 @@ let anchorId: number | null = null;
 $effect(() => {
   const next = pruneSelection(
     untrack(() => selection),
-    tabState.tabs,
+    allTabs,
   );
   if (next !== untrack(() => selection)) selection = next;
 });
@@ -174,6 +253,14 @@ function onGroupClick(e: MouseEvent, i: number): void {
   send({ type: 'updateGroup', groupId: row.group.id, collapsed: !row.group.collapsed });
 }
 
+function onWindowClick(i: number): void {
+  const row = view[i];
+  if (row?.kind !== 'window') return;
+  setFocus(i, false);
+  tree()?.focus();
+  setWindowCollapsed(row.info.id, !row.collapsed);
+}
+
 function onGroupDblclick(i: number): void {
   const row = view[i];
   if (row?.kind !== 'group') return;
@@ -183,9 +270,12 @@ function onGroupDblclick(i: number): void {
   startRename(row.group.id);
 }
 
-function targetsOf(tab: TabInfo): number[] {
-  return selection.has(tab.id) ? [...selection] : [tab.id];
+/** What an action on `tab` applies to: the selection if it contains the tab, else the tab. */
+function targetTabs(tab: TabInfo): TabInfo[] {
+  return selection.has(tab.id) ? allTabs.filter((t) => selection.has(t.id)) : [tab];
 }
+
+const targetsOf = (tab: TabInfo): number[] => targetTabs(tab).map((t) => t.id);
 
 // --- Rename ----------------------------------------------------------------------------
 
@@ -209,8 +299,8 @@ function onRenamed(groupId: number, title: string | null): void {
 // "Add to new group": the new group id is unknown until Chrome reports it, so watch for
 // a group that now contains the first tab and wasn't there before.
 $effect(() => {
-  const tabs = tabState.tabs;
-  void tabState.groups;
+  const tabs = allTabs;
+  void allGroups;
   const p = pendingGroup;
   if (!p) return;
   if (Date.now() > p.until) {
@@ -237,6 +327,19 @@ function openMenu(i: number, x: number, y: number): void {
   const row = view[i];
   if (!row) return;
   setFocus(i, false);
+  if (row.kind === 'window') {
+    menu = {
+      x,
+      y,
+      label: 'Window actions',
+      items: windowMenu({
+        info: row.info,
+        tabs: windowViewById.get(row.info.id)?.tabs ?? [],
+        send,
+      }),
+    };
+    return;
+  }
   if (row.kind === 'group') {
     menu = {
       x,
@@ -244,32 +347,32 @@ function openMenu(i: number, x: number, y: number): void {
       label: 'Group actions',
       items: groupMenu({
         group: row.group,
-        tabs: tabState.tabs,
-        windowId: tabState.windowId ?? 0,
+        tabs: tabsOfWindow(row.group.windowId),
         send,
         onRename: () => startRename(row.group.id),
       }),
     };
     return;
   }
-  const tabs = selection.has(row.tab.id)
-    ? tabState.tabs.filter((t) => selection.has(t.id))
-    : [row.tab];
+  const winId = row.tab.windowId;
   menu = {
     x,
     y,
     label: 'Tab actions',
     items: tabMenu({
       target: row.tab,
-      tabs,
-      allTabs: tabState.tabs,
-      groups: tabState.groups,
-      windowId: tabState.windowId ?? 0,
+      tabs: targetTabs(row.tab),
+      allTabs: tabsOfWindow(winId),
+      groups: allGroups.filter((g) => g.windowId === winId),
       send,
+      windows: tabState.windowList,
+      homeWindowId: tabState.windowId,
+      whitelist,
+      onWhitelist,
       onNewGroup: (tabIds) => {
         pendingGroup = {
           tabIds,
-          known: new Set(tabState.groups.map((g) => g.id)),
+          known: new Set(allGroups.map((g) => g.id)),
           until: Date.now() + 4000,
         };
       },
@@ -301,19 +404,39 @@ function openMenuFromKeyboard(): void {
 let announcement = $state('');
 
 const rowName = (r: Row): string =>
-  r.kind === 'group' ? r.group.title || 'Unnamed group' : r.tab.title || r.tab.url || 'New Tab';
+  r.kind === 'window'
+    ? windowLabel(r.number, r.isHome)
+    : r.kind === 'group'
+      ? r.group.title || 'Unnamed group'
+      : r.tab.title || r.tab.url || 'New Tab';
+
+const multiCtx: MultiDropContext = {
+  ctxFor: (id) => {
+    const w = windowViewById.get(id);
+    return w ? { windowId: id, tabs: w.tabs } : null;
+  },
+  tab: (id) => tabById.get(id),
+  isIncognito: (id) => windowViewById.get(id)?.info.incognito ?? false,
+};
+
+function planFor(drag: Drag, index: number, zone: DropZone): PanelMessage | null {
+  return allWindows
+    ? planDropMulti(multiCtx, view, drag, index, zone)
+    : planDrop({ windowId: tabState.windowId ?? 0, tabs: tabState.tabs }, view, drag, index, zone);
+}
 
 function moveByKey(dir: -1 | 1): void {
   if (searching) return;
   const row = focusedRow;
-  if (!row) return;
+  if (!row || row.kind === 'window') return;
   let drag: Drag;
   let isMoving: (r: Row) => boolean;
   let what: string;
   if (row.kind === 'group') {
     const gid = row.group.id;
     drag = { kind: 'group', groupId: gid };
-    isMoving = (r) => (r.kind === 'group' ? r.group.id === gid : r.tab.groupId === gid);
+    isMoving = (r) =>
+      r.kind === 'group' ? r.group.id === gid : r.kind === 'tab' && r.tab.groupId === gid;
     what = rowName(row);
   } else {
     const ids = selection.has(row.tab.id) ? new Set(selection) : new Set([row.tab.id]);
@@ -330,7 +453,24 @@ function moveByKey(dir: -1 | 1): void {
   }
   let j = dir < 0 ? first - 1 : last + 1;
   while (j >= 0 && j < view.length && isMoving(view[j] as Row)) j += dir;
-  const neighbour = view[j];
+  let neighbour = view[j];
+  // A window header between two windows: step over it so one press crosses into the
+  // neighbouring window (top of the next one, bottom of the previous one).
+  let crossZone: DropZone | null = null;
+  if (neighbour?.kind === 'window' && row.kind === 'tab') {
+    const beyond = view[dir < 0 ? j - 1 : j + 1];
+    if (beyond) {
+      if (dir > 0 && beyond.kind !== 'window') {
+        j += 1;
+        neighbour = beyond;
+        crossZone = 'before';
+      } else if (dir < 0) {
+        j -= 1;
+        neighbour = beyond;
+        crossZone = 'after';
+      }
+    } else if (dir < 0) neighbour = undefined;
+  }
   if (!neighbour) {
     announcement = `${what} is already ${dir < 0 ? 'first' : 'last'}`;
     return;
@@ -338,25 +478,25 @@ function moveByKey(dir: -1 | 1): void {
   // Crossing a group edge takes one press of its own: the first press only changes
   // membership (enter as last child / leave just past the group), like moving through a
   // folder boundary, instead of jumping a row and changing membership at once.
-  let zone: 'before' | 'after' = dir < 0 ? 'before' : 'after';
-  if (drag.kind === 'tabs' && row.kind === 'tab') {
+  let zone: DropZone = crossZone ?? (dir < 0 ? 'before' : 'after');
+  if (crossZone === null && drag.kind === 'tabs' && row.kind === 'tab') {
     const from = row.tab.pinned ? -1 : row.tab.groupId;
     if (
       dir < 0 &&
       neighbour.kind === 'tab' &&
-      neighbour.level === 2 &&
+      neighbour.level === groupLevel &&
       neighbour.tab.groupId !== from
     ) {
       zone = 'after';
     } else if (
       dir > 0 &&
       from !== -1 &&
-      (neighbour.kind === 'group' || neighbour.tab.groupId !== from)
+      (neighbour.kind === 'group' || (neighbour.kind === 'tab' && neighbour.tab.groupId !== from))
     ) {
       zone = 'before';
     }
   }
-  const plan = planDrop(dropContext(), view, drag, j, zone);
+  const plan = planFor(drag, j, zone);
   if (!plan) {
     announcement = `Can’t move ${what} ${dir < 0 ? 'above' : 'below'} ${rowName(neighbour)}`;
     return;
@@ -364,8 +504,6 @@ function moveByKey(dir: -1 | 1): void {
   send(plan);
   announcement = `Moved ${what} ${dir < 0 ? 'above' : 'below'} ${rowName(neighbour)}`;
 }
-
-const dropContext = () => ({ windowId: tabState.windowId ?? 0, tabs: tabState.tabs });
 
 // --- Pointer drag and drop -------------------------------------------------------------
 
@@ -384,15 +522,12 @@ const dnd = new PointerDrag<Drag>({
   scroller: () => list?.scroller(),
   rowHeight: () => rowHeight,
   rowCount: () => view.length,
-  isGroup: (i) => view[i]?.kind === 'group',
+  isGroup: (i) => view[i]?.kind === 'group' || view[i]?.kind === 'window',
   begin: (i) => {
     const row = view[i];
-    if (!row || searching) return null;
+    if (!row || searching || row.kind === 'window') return null;
     if (row.kind === 'group') return { kind: 'group', groupId: row.group.id };
-    const ids = selection.has(row.tab.id)
-      ? tabState.tabs.filter((t) => selection.has(t.id)).map((t) => t.id)
-      : [row.tab.id];
-    return { kind: 'tabs', tabIds: ids };
+    return { kind: 'tabs', tabIds: targetsOf(row.tab) };
   },
   onStart: (payload) => {
     dragPayload = payload;
@@ -401,16 +536,13 @@ const dnd = new PointerDrag<Drag>({
     } else if (payload.tabIds.length > 1) {
       dragLabel = `${payload.tabIds.length} tabs`;
     } else {
-      const t = tabState.tabs.find((x) => x.id === payload.tabIds[0]);
+      const t = tabById.get(payload.tabIds[0] as number);
       dragLabel = t?.title || t?.url || 'New Tab';
     }
     menu = null;
   },
   onHover: (t) => {
-    drop =
-      t && dragPayload
-        ? { ...t, ok: planDrop(dropContext(), view, dragPayload, t.index, t.zone) !== null }
-        : null;
+    drop = t && dragPayload ? { ...t, ok: planFor(dragPayload, t.index, t.zone) !== null } : null;
   },
   onMove: (x, y) => {
     pointer = { x, y };
@@ -418,7 +550,7 @@ const dnd = new PointerDrag<Drag>({
   },
   onDrop: (payload, t) => {
     if (!t) return;
-    const plan = planDrop(dropContext(), view, payload, t.index, t.zone);
+    const plan = planFor(payload, t.index, t.zone);
     if (plan) send(plan);
   },
   onEnd: () => {
@@ -444,22 +576,83 @@ function onMouseDown(e: MouseEvent): void {
 
 // --- Keyboard --------------------------------------------------------------------------
 
+/** Runs a configurable shortcut; false means it doesn't apply to the focused row. */
+function runAction(action: ShortcutAction, row: Row | undefined): boolean {
+  switch (action) {
+    case 'focusSearch':
+      return false; // handled on window so it also works when the tree isn't focused
+    case 'closeTab':
+      if (row?.kind === 'tab') send({ type: 'close', tabIds: targetsOf(row.tab) });
+      else if (row?.kind === 'group') send({ type: 'closeGroup', groupId: row.group.id });
+      else return false;
+      return true;
+    case 'renameGroup':
+      if (row?.kind !== 'group') return false;
+      startRename(row.group.id);
+      return true;
+    case 'moveUp':
+    case 'moveDown':
+      moveByKey(action === 'moveUp' ? -1 : 1);
+      return true;
+    case 'openMenu':
+      openMenuFromKeyboard();
+      return true;
+    case 'selectAll':
+      select(tabIdsBetween(view, 0, view.length - 1));
+      return true;
+    case 'newTab':
+      if (row?.kind === 'tab') {
+        send({ type: 'newTab', windowId: row.tab.windowId, afterTabId: row.tab.id });
+      } else if (row?.kind === 'group') {
+        let lastId: number | null = null;
+        for (const t of tabsOfWindow(row.group.windowId))
+          if (t.groupId === row.group.id) lastId = t.id;
+        send({ type: 'newTab', windowId: row.group.windowId, afterTabId: lastId });
+      } else if (row?.kind === 'window') {
+        send({ type: 'newTab', windowId: row.info.id, afterTabId: null });
+      } else return false;
+      return true;
+    case 'duplicateTab':
+      if (row?.kind !== 'tab') return false;
+      for (const id of targetsOf(row.tab)) send({ type: 'duplicate', tabId: id });
+      return true;
+    case 'togglePin':
+      if (row?.kind !== 'tab') return false;
+      send({
+        type: 'setPinned',
+        tabIds: targetsOf(row.tab),
+        pinned: !targetTabs(row.tab).every((t) => t.pinned),
+      });
+      return true;
+    case 'toggleMute':
+      if (row?.kind !== 'tab') return false;
+      send({
+        type: 'setMuted',
+        tabIds: targetsOf(row.tab),
+        muted: !targetTabs(row.tab).every((t) => t.muted),
+      });
+      return true;
+    case 'suspendTab': {
+      if (row?.kind !== 'tab') return false;
+      const ids = targetTabs(row.tab)
+        .filter((t) => !t.active)
+        .map((t) => t.id);
+      if (ids.length === 0) announcement = 'The active tab can’t be suspended';
+      else send({ type: 'discard', tabIds: ids });
+      return true;
+    }
+  }
+}
+
 function onkeydown(e: KeyboardEvent): void {
   const row = focusedRow;
-  if (e.altKey && !e.ctrlKey && !e.metaKey) {
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      moveByKey(e.key === 'ArrowUp' ? -1 : 1);
-      e.preventDefault();
-    }
+  const action = actionFor(shortcuts, e);
+  if (action !== null && runAction(action, row)) {
+    e.preventDefault();
     return;
   }
-  if (e.ctrlKey || e.metaKey) {
-    if (e.key.toLowerCase() === 'a') {
-      select(tabIdsBetween(view, 0, view.length - 1));
-      e.preventDefault();
-    }
-    return;
-  }
+  // Fixed navigation keys never carry these modifiers.
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   switch (e.key) {
     case 'ArrowDown':
     case 'ArrowUp': {
@@ -482,47 +675,50 @@ function onkeydown(e: KeyboardEvent): void {
       break;
     case 'ArrowLeft':
       if (searching || !row) return;
-      if (row.kind === 'group' && !row.group.collapsed) {
+      if (row.kind === 'window') {
+        if (row.collapsed) return;
+        setWindowCollapsed(row.info.id, true);
+      } else if (row.kind === 'group' && !row.group.collapsed) {
         send({ type: 'updateGroup', groupId: row.group.id, collapsed: true });
-      } else if (row.kind === 'tab' && row.level === 2) {
-        const parent = keyIndex.get(`g${row.tab.groupId}`);
+      } else {
+        const parentKey =
+          row.kind === 'tab' && row.level === groupLevel && row.tab.groupId !== -1
+            ? `g${row.tab.groupId}`
+            : nested
+              ? `w${rowWindowId(row)}`
+              : undefined;
+        const parent = parentKey === undefined ? undefined : keyIndex.get(parentKey);
         if (parent !== undefined) setFocus(parent);
       }
       break;
     case 'ArrowRight':
-      if (searching || row?.kind !== 'group') return;
-      if (row.group.collapsed)
-        send({ type: 'updateGroup', groupId: row.group.id, collapsed: false });
-      else if (view[focusedIndex + 1]?.kind === 'tab') setFocus(focusedIndex + 1);
+      if (searching || !row || row.kind === 'tab') return;
+      if (row.kind === 'window' ? row.collapsed : row.group.collapsed) {
+        if (row.kind === 'window') setWindowCollapsed(row.info.id, false);
+        else send({ type: 'updateGroup', groupId: row.group.id, collapsed: false });
+      } else if (
+        view[focusedIndex + 1]?.kind !== undefined &&
+        view[focusedIndex + 1]?.kind !== 'window'
+      ) {
+        setFocus(focusedIndex + 1);
+      }
       break;
     case 'Enter':
       if (row?.kind === 'tab') {
         select([row.tab.id]);
         anchorId = row.tab.id;
         send({ type: 'activate', tabId: row.tab.id });
+      } else if (row?.kind === 'window') {
+        setWindowCollapsed(row.info.id, !row.collapsed);
       } else if (row) {
         send({ type: 'updateGroup', groupId: row.group.id, collapsed: !row.group.collapsed });
       }
       break;
     case ' ':
       if (row?.kind === 'tab') toggleSelect(row.tab.id);
+      else if (row?.kind === 'window') setWindowCollapsed(row.info.id, !row.collapsed);
       else if (row)
         send({ type: 'updateGroup', groupId: row.group.id, collapsed: !row.group.collapsed });
-      break;
-    case 'Delete':
-      if (row?.kind === 'tab') send({ type: 'close', tabIds: targetsOf(row.tab) });
-      else if (row) send({ type: 'closeGroup', groupId: row.group.id });
-      break;
-    case 'F2':
-      if (row?.kind !== 'group') return;
-      startRename(row.group.id);
-      break;
-    case 'ContextMenu':
-      openMenuFromKeyboard();
-      break;
-    case 'F10':
-      if (!e.shiftKey) return;
-      openMenuFromKeyboard();
       break;
     case 'Escape':
       if (selection.size > 0) select([]);
@@ -559,17 +755,24 @@ $effect(() => {
   if (search === 'hidden') query = '';
 });
 
+/** Focuses the search field; false if there is none (hidden in Layout settings). */
+export function focusSearch(): boolean {
+  if (!searchInput) return false;
+  searchInput.focus();
+  searchInput.select();
+  return true;
+}
+
 $effect(() => {
   const onKey = (e: KeyboardEvent) => {
+    if (actionFor(shortcuts, e) !== 'focusSearch') return;
     const t = e.target as HTMLElement | null;
     const typing =
       t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t?.isContentEditable;
-    const find = (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'f';
-    const slash = e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !typing;
-    if ((!find && !slash) || !searchInput) return;
+    // Typing in some other field must not be hijacked; the search field itself may re-select.
+    if (typing && !(t === searchInput && (e.ctrlKey || e.metaKey || e.altKey))) return;
+    if (!focusSearch()) return;
     e.preventDefault();
-    searchInput?.focus();
-    searchInput?.select();
   };
   window.addEventListener('keydown', onKey);
   return () => window.removeEventListener('keydown', onKey);
@@ -611,7 +814,7 @@ $effect(() => {
         {rowHeight}
         key={(r) => r.key}
         role="tree"
-        aria-label="Tabs in this window"
+        aria-label={allWindows ? 'Tabs in all windows' : 'Tabs in this window'}
         aria-multiselectable="true"
         tabindex={0}
         aria-activedescendant={focusedRow ? `vc-row-${focusedRow.key}` : undefined}
@@ -621,12 +824,26 @@ $effect(() => {
         onmousedown={onMouseDown}
       >
         {#snippet row(r, i)}
-          {#if r.kind === 'group'}
+          {#if r.kind === 'window'}
+            <WindowRow
+              name={windowLabel(r.number, r.isHome)}
+              count={r.count}
+              collapsed={r.collapsed}
+              incognito={r.info.incognito}
+              windowFocused={r.info.focused}
+              pos={r.pos}
+              size={r.size}
+              focused={i === focusedIndex}
+              onclick={() => onWindowClick(i)}
+              oncontextmenu={(e) => onContextMenu(e, i)}
+            />
+          {:else if r.kind === 'group'}
             <GroupRow
               group={r.group}
               count={r.count}
               pos={r.pos}
               size={r.size}
+              level={r.level}
               focused={i === focusedIndex}
               renaming={renamingId === r.group.id}
               onclick={(e) => onGroupClick(e, i)}
@@ -638,13 +855,18 @@ $effect(() => {
             <TabRow
               tab={r.tab}
               level={r.level}
+              grouped={r.level === groupLevel && groupById.has(r.tab.groupId)}
+              {nested}
+              windowTag={allWindows && searching && r.tab.windowId !== tabState.windowId
+                ? windowName(r.tab.windowId)
+                : undefined}
               pos={r.pos}
               size={r.size}
               focused={i === focusedIndex}
               selected={selection.has(r.tab.id)}
               selectedLook={selection.has(r.tab.id) && (selection.size > 1 || !r.tab.active)}
               pinnedEnd={r.pinnedEnd}
-              groupColor={r.level === 2 && groupById.has(r.tab.groupId)
+              groupColor={r.level === groupLevel && groupById.has(r.tab.groupId)
                 ? `var(--g-${groupById.get(r.tab.groupId)?.color})`
                 : undefined}
               highlight={r.highlight}
@@ -660,7 +882,7 @@ $effect(() => {
         {/snippet}
         {#snippet overlay()}
           {#if drop?.ok}
-            {#if drop.zone === 'inside'}
+            {#if drop.zone === 'inside' || view[drop.index]?.kind === 'window'}
               <div class="drop-box" style:top="{drop.index * rowHeight}px" style:height="{rowHeight}px"></div>
             {:else}
               <div class="drop-line" style:top="{(drop.index + (drop.zone === 'after' ? 1 : 0)) * rowHeight - 1}px"></div>

@@ -1,8 +1,12 @@
 import { type Browser, browser } from 'wxt/browser';
+import { migrateSettings } from '../settings/migrate';
+import { hostOf } from '../shared/host-pattern';
 import { PANEL_PORT_NAME, parsePanelMessage, type WorkerMessage } from '../shared/protocol';
-import type { GroupInfo, TabInfo } from '../shared/types';
+import type { GroupInfo, TabInfo, WindowInfo } from '../shared/types';
 import { createBatcher } from './batcher';
-import { runCommand } from './commands';
+import { type CommandDeps, runCommand } from './commands';
+import { registerContextMenus } from './context-menus';
+import { createSuspender } from './suspend/suspender';
 import { ChangeSet, TabStore } from './tab-store';
 import { toGroupInfo, toTabInfo } from './to-tab-info';
 
@@ -17,8 +21,11 @@ export function startBackground(): void {
 
   const store = new TabStore();
   let pending = new ChangeSet();
-  /** Open panels, keyed by the window each one shows. */
-  const panels = new Map<number, Set<Browser.runtime.Port>>();
+  /** Open panels: the window each one lives in, and whether it shows all windows. */
+  const subs = new Map<Browser.runtime.Port, { windowId: number; all: boolean }>();
+  const hasPanel = (windowId: number) => [...subs.values()].some((s) => s.windowId === windowId);
+  /** Set by the "focus search" shortcut when the panel isn't connected yet. */
+  const pendingFocus = new Set<number>();
 
   async function queryWindow(windowId: number): Promise<TabInfo[]> {
     try {
@@ -88,8 +95,9 @@ export function startBackground(): void {
     }
   });
 
-  function broadcast(windowId: number, msg: WorkerMessage): void {
-    for (const port of panels.get(windowId) ?? []) {
+  function broadcast(windowId: number | null, msg: WorkerMessage): void {
+    for (const [port, sub] of subs) {
+      if (windowId !== null && !sub.all && sub.windowId !== windowId) continue;
       try {
         port.postMessage(msg);
       } catch {
@@ -116,11 +124,15 @@ export function startBackground(): void {
     batcher.schedule();
   });
   browser.tabs.onRemoved.addListener((tabId) => {
+    suspender.onRemoved(tabId);
     pending.removed.add(tabId);
     pending.upserts.delete(tabId);
     batcher.schedule();
   });
   browser.tabs.onActivated.addListener(({ tabId, windowId }) => {
+    // The store is at most one flush behind, which is plenty for an idle timer.
+    const previous = store.snapshot(windowId).tabs.find((t) => t.active && t.id !== tabId);
+    suspender.onActivated(tabId, previous?.id);
     pending.activations.set(windowId, tabId);
     batcher.schedule();
   });
@@ -153,59 +165,177 @@ export function startBackground(): void {
   browser.tabGroups.onRemoved.addListener(markGroups);
   browser.tabGroups.onMoved.addListener(markGroups);
 
+  // --- Windows -------------------------------------------------------------------------
+
+  let windowList: WindowInfo[] = [];
+  async function refreshWindows(): Promise<void> {
+    const wins = await browser.windows.getAll({ windowTypes: ['normal'] });
+    const next = wins
+      .filter((w): w is typeof w & { id: number } => w.id !== undefined)
+      .map((w) => ({ id: w.id, incognito: w.incognito, focused: w.focused }))
+      .sort((a, b) => a.id - b.id);
+    if (JSON.stringify(next) === JSON.stringify(windowList)) return;
+    windowList = next;
+    broadcast(null, { type: 'windows', windows: windowList });
+  }
+  const onWindowsChanged = () => void refreshWindows().catch(() => {});
+  browser.windows.onCreated.addListener(onWindowsChanged);
+  browser.windows.onRemoved.addListener(onWindowsChanged);
+  browser.windows.onFocusChanged.addListener(onWindowsChanged);
+  const windowsReady = refreshWindows().catch(() => {});
+
+  // --- Commands ---------------------------------------------------------------------------
+
+  const settingsNow = async () =>
+    migrateSettings((await browser.storage.sync.get('settings')).settings);
+  const deps: CommandDeps = {
+    windows: (scope, windowId) =>
+      (scope === 'all' ? windowList.map((w) => w.id) : [windowId]).map((id) => store.snapshot(id)),
+    tab: (id) => store.get(id),
+    restoreDiscarded: async () => (await settingsNow()).sessions.restoreDiscarded,
+  };
+
+  const suspender = createSuspender(async () => {
+    await ready;
+    return windowList.flatMap((w) => store.snapshot(w.id).tabs);
+  });
+  suspender.register();
+
   browser.runtime.onConnect.addListener((port) => {
     if (port.name !== PANEL_PORT_NAME || port.sender?.id !== browser.runtime.id) return;
-    let windowId: number | null = null;
 
     port.onMessage.addListener(async (raw) => {
       const msg = parsePanelMessage(raw);
       if (!msg) return;
-      switch (msg.type) {
-        case 'subscribe': {
-          windowId = msg.windowId;
-          let set = panels.get(windowId);
-          if (!set) {
-            set = new Set();
-            panels.set(windowId, set);
+      if (msg.type === 'subscribe') {
+        // Re-subscribing (switching to/from all windows) just replaces the registration.
+        subs.set(port, { windowId: msg.windowId, all: msg.all });
+        await ready;
+        await windowsReady;
+        // Patches are deltas against the store, so a snapshot of the store as it is now
+        // lines up exactly with the next patch, even if events are still pending.
+        const ids = msg.all ? windowList.map((w) => w.id) : [msg.windowId];
+        if (!ids.includes(msg.windowId)) ids.unshift(msg.windowId);
+        try {
+          port.postMessage({ type: 'windows', windows: windowList } satisfies WorkerMessage);
+          for (const id of ids) {
+            port.postMessage({
+              type: 'snapshot',
+              windowId: id,
+              ...store.snapshot(id),
+            } satisfies WorkerMessage);
           }
-          set.add(port);
-          await ready;
-          // Patches are deltas against the store, so a snapshot of the store as it is now
-          // lines up exactly with the next patch, even if events are still pending.
-          const snap = store.snapshot(windowId);
-          port.postMessage({ type: 'snapshot', windowId, ...snap } satisfies WorkerMessage);
-          break;
+          if (pendingFocus.delete(msg.windowId))
+            port.postMessage({ type: 'focusSearch' } satisfies WorkerMessage);
+        } catch {
+          // Panel closed while we waited.
         }
-        default:
-          // Tabs can vanish between the click and the call; failures are expected noise,
-          // and the panel converges through events either way.
-          await runCommand(msg).catch((err: unknown) =>
-            console.debug('[vc] command failed', msg.type, err),
-          );
-          // chrome.tabGroups.onUpdated is not reliably delivered for API-driven changes
-          // (observed: no event for title/colour/collapsed updates on Chrome 145), so group
-          // commands re-read the window's groups themselves. Unchanged lists produce no patch.
-          if (windowId !== null && GROUP_COMMANDS.has(msg.type)) markGroups({ windowId });
+        return;
+      }
+      const home = subs.get(port)?.windowId ?? null;
+      try {
+        const text = await runCommand(msg, deps);
+        if (text) port.postMessage({ type: 'notice', level: 'info', text } satisfies WorkerMessage);
+      } catch (err) {
+        // Tabs can vanish between the click and the call; those failures are expected
+        // noise and the panel converges through events. Session restores are reported.
+        console.debug('[vc] command failed', msg.type, err);
+        if (
+          msg.type === 'restoreSession' ||
+          msg.type === 'saveSession' ||
+          msg.type === 'moveToNewWindow'
+        ) {
+          const text = `Couldn't complete that: ${err instanceof Error ? err.message : 'unknown error'}`;
+          try {
+            port.postMessage({ type: 'notice', level: 'error', text } satisfies WorkerMessage);
+          } catch {}
+        }
+      }
+      // chrome.tabGroups.onUpdated is not reliably delivered for API-driven changes
+      // (observed: no event for title/colour/collapsed updates on headless Chrome 145), so
+      // group commands re-read the affected windows' groups. Unchanged lists cost nothing.
+      if (GROUP_COMMANDS.has(msg.type)) {
+        if (home !== null) markGroups({ windowId: home });
+        if (msg.type === 'move') markGroups({ windowId: msg.target.windowId });
       }
     });
 
     port.onDisconnect.addListener(() => {
-      if (windowId === null) return;
-      const set = panels.get(windowId);
-      set?.delete(port);
-      if (set?.size === 0) panels.delete(windowId);
+      subs.delete(port);
     });
   });
 
-  /** Shortcut toggles the panel. sidePanel.open must run synchronously in the gesture. */
-  browser.commands.onCommand.addListener((command, tab) => {
-    if (command !== 'toggle-side-panel' || tab?.windowId === undefined) return;
-    const windowId = tab.windowId;
-    // close() exists from Chrome 141; older versions can only open.
-    if (panels.has(windowId) && typeof browser.sidePanel.close === 'function') {
-      browser.sidePanel.close({ windowId }).catch(() => {});
-    } else {
-      browser.sidePanel.open({ windowId }).catch((err: unknown) => console.warn('[vc] open', err));
+  // --- Global shortcuts and context menus -------------------------------------------------
+
+  /** sidePanel.open must run synchronously in the gesture, before any await. */
+  function openPanel(windowId: number): void {
+    browser.sidePanel.open({ windowId }).catch((err: unknown) => console.warn('[vc] open', err));
+  }
+
+  async function activeTab(windowId?: number): Promise<TabInfo | undefined> {
+    const [t] = await browser.tabs.query(
+      windowId === undefined
+        ? { active: true, lastFocusedWindow: true }
+        : { active: true, windowId },
+    );
+    return t ? (toTabInfo(t) ?? undefined) : undefined;
+  }
+
+  async function suspendFrom(tab: TabInfo | undefined, others: boolean): Promise<void> {
+    if (!tab) return;
+    if (others) await runCommand({ type: 'discardOthers', tabId: tab.id }, deps);
+    else {
+      // The active tab can't be discarded; switch away from it first, like closing would.
+      const [win] = deps.windows('window', tab.windowId);
+      const tabs = win?.tabs ?? [];
+      const i = tabs.findIndex((t) => t.id === tab.id);
+      const next = tabs[i + 1] ?? tabs[i - 1];
+      if (tab.active && next) await browser.tabs.update(next.id, { active: true });
+      await browser.tabs.discard(tab.id).catch(() => {});
     }
+  }
+
+  browser.commands.onCommand.addListener((command, tab) => {
+    const windowId = tab?.windowId;
+    switch (command) {
+      case 'toggle-side-panel':
+        if (windowId === undefined) return;
+        // close() exists from Chrome 141; older versions can only open.
+        if (hasPanel(windowId) && typeof browser.sidePanel.close === 'function') {
+          browser.sidePanel.close({ windowId }).catch(() => {});
+        } else openPanel(windowId);
+        return;
+      case 'focus-search': {
+        if (windowId === undefined) return;
+        const connected = [...subs].filter(([, s]) => s.windowId === windowId);
+        if (!connected.length) {
+          pendingFocus.add(windowId);
+          openPanel(windowId);
+        }
+        for (const [port] of connected)
+          port.postMessage({ type: 'focusSearch' } satisfies WorkerMessage);
+        return;
+      }
+      case 'suspend-tab':
+      case 'suspend-other-tabs':
+        void activeTab(windowId).then((t) => suspendFrom(t, command === 'suspend-other-tabs'));
+        return;
+    }
+  });
+
+  registerContextMenus({
+    openPanel,
+    suspend: (tab, others) => void suspendFrom(tab, others),
+    neverSuspend: async (url) => {
+      const s = await settingsNow();
+      const host = hostOf(url);
+      if (!host || s.suspend.whitelist.includes(host)) return;
+      s.suspend.whitelist = [...s.suspend.whitelist, host];
+      await browser.storage.sync.set({ settings: migrateSettings(s) });
+    },
+    saveWindow: async (windowId) => {
+      const name = `Window · ${new Date().toLocaleString()}`;
+      await runCommand({ type: 'saveSession', scope: 'window', windowId, name }, deps);
+    },
   });
 }

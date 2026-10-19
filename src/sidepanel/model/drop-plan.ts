@@ -1,6 +1,6 @@
 import type { PanelMessage } from '../../shared/protocol';
 import type { TabInfo } from '../../shared/types';
-import type { Row } from './rows';
+import { type Row, rowWindowId } from './rows';
 
 export type Drag = { kind: 'tabs'; tabIds: number[] } | { kind: 'group'; groupId: number };
 
@@ -32,7 +32,7 @@ export function planDrop(
   zone: DropZone,
 ): PanelMessage | null {
   const target = rows[index];
-  if (!target) return null;
+  if (!target || target.kind === 'window') return null;
 
   const moving = new Set(
     drag.kind === 'tabs'
@@ -110,12 +110,17 @@ export function planDrop(
     // "After the last pinned tab" stays pinned even though the next tab isn't.
   }
 
-  const ids = ctx.tabs.filter((t) => moving.has(t.id)).map((t) => t.id);
+  // Tabs dragged in from another window aren't in ctx.tabs; keep the drag's own order then.
+  const local = ctx.tabs.filter((t) => moving.has(t.id)).map((t) => t.id);
+  const crossWindow = drag.kind === 'tabs' && local.length !== moving.size;
+  const ids = crossWindow && drag.kind === 'tabs' ? [...new Set(drag.tabIds)] : local;
   const unchanged =
+    !crossWindow &&
     ids.every((id) => {
       const t = ctx.tabs.find((x) => x.id === id) as TabInfo;
       return t.pinned === pinned && (pinned || t.groupId === groupId);
-    }) && isContiguousBefore(ctx.tabs, ids, before);
+    }) &&
+    isContiguousBefore(ctx.tabs, ids, before);
   if (unchanged) return null;
 
   return {
@@ -135,4 +140,51 @@ function isContiguousBefore(
   const end = before === null ? order.length : order.indexOf(before);
   if (end < ids.length) return false;
   return ids.every((id, i) => order[end - ids.length + i] === id);
+}
+
+export interface MultiDropContext {
+  /** Context for a window, or null if it isn't loaded. */
+  ctxFor(windowId: number): DropContext | null;
+  tab(tabId: number): TabInfo | undefined;
+  isIncognito(windowId: number): boolean;
+}
+
+/**
+ * planDrop for the multi-window view. Resolves the target row's window and delegates;
+ * dropping on a window header appends to that window. Not allowed: moving tabs between
+ * incognito and normal windows (Chrome refuses) and moving whole groups across windows.
+ */
+export function planDropMulti(
+  m: MultiDropContext,
+  rows: readonly Row[],
+  drag: Drag,
+  index: number,
+  zone: DropZone,
+): PanelMessage | null {
+  const target = rows[index];
+  if (!target) return null;
+  const windowId = rowWindowId(target);
+  const ctx = m.ctxFor(windowId);
+  if (!ctx) return null;
+
+  if (drag.kind === 'group') {
+    const inTarget = ctx.tabs.some((t) => t.groupId === drag.groupId);
+    if (!inTarget) return null;
+    return target.kind === 'window' ? null : planDrop(ctx, rows, drag, index, zone);
+  }
+
+  const incognito = m.isIncognito(windowId);
+  const dragged = drag.tabIds.map((id) => m.tab(id)).filter((t): t is TabInfo => !!t);
+  if (dragged.length !== drag.tabIds.length) return null;
+  if (dragged.some((t) => m.isIncognito(t.windowId) !== incognito)) return null;
+
+  if (target.kind === 'window') {
+    if (dragged.every((t) => t.windowId === windowId)) return null;
+    return {
+      type: 'move',
+      tabIds: dragged.map((t) => t.id),
+      target: { windowId, beforeTabId: null, groupId: -1, pinned: null },
+    };
+  }
+  return planDrop(ctx, rows, drag, index, zone);
 }

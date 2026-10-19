@@ -7,6 +7,8 @@ interface Props {
   count: number;
   pos: number;
   size: number;
+  /** aria-level: 1, or 2 when nested under a window header. */
+  level?: number;
   focused: boolean;
   renaming: boolean;
   onclick: (e: MouseEvent) => void;
@@ -21,6 +23,7 @@ let {
   count,
   pos,
   size,
+  level = 1,
   focused,
   renaming,
   onclick,
@@ -64,10 +67,11 @@ function onkeydown(e: KeyboardEvent & { currentTarget: HTMLInputElement }): void
   id="vc-row-g{group.id}"
   class="row"
   class:focused
+  class:nested={level > 1}
   style:--gc="var(--g-{group.color})"
   role="treeitem"
   tabindex="-1"
-  aria-level="1"
+  aria-level={level}
   aria-posinset={pos}
   aria-setsize={size}
   aria-expanded={!group.collapsed}
@@ -110,6 +114,10 @@ function onkeydown(e: KeyboardEvent & { currentTarget: HTMLInputElement }): void
     cursor: default;
     user-select: none;
     transition: background-color var(--dur) var(--ease);
+  }
+
+  .row.nested {
+    padding-left: 20px;
   }
 
   .row:hover {

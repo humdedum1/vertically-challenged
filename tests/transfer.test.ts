@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { migrateSettings } from '../src/settings/migrate';
-import { DEFAULT_SETTINGS, type Settings } from '../src/settings/schema';
+import { DEFAULT_SETTINGS, SETTINGS_VERSION, type Settings } from '../src/settings/schema';
 import { BUILTIN_THEMES } from '../src/themes/builtin';
 import { type Palette, parseTheme, ROLES, type Theme } from '../src/themes/palette';
 import {
@@ -236,7 +236,7 @@ describe('createBackup / parseBackup', () => {
     expect(r.ok && r.value.themes.map((x) => x.name)).toEqual(['Nice', 'Theme 2']);
   });
 
-  it('runs settings through migration: a v1 settings object comes back as v2', () => {
+  it('runs settings through migration: a v1 settings object comes back at the current version', () => {
     const v1 = {
       version: 1,
       appearance: {
@@ -254,7 +254,7 @@ describe('createBackup / parseBackup', () => {
     );
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.value.settings.version).toBe(2);
+      expect(r.value.settings.version).toBe(SETTINGS_VERSION);
       expect(r.value.settings).toEqual(migrateSettings(v1));
       expect(r.value.settings.appearance.themeId).toBe('nord');
       expect(r.value.settings.tabs).toEqual(DEFAULT_SETTINGS.tabs);

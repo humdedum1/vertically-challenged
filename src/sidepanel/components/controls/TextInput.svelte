@@ -9,6 +9,8 @@ interface Props {
   invalid?: boolean;
   describedby?: string;
   mono?: boolean;
+  /** Called on Enter (e.g. to submit an add-field). */
+  onenter?: () => void;
 }
 
 let {
@@ -21,6 +23,7 @@ let {
   invalid = false,
   describedby,
   mono = false,
+  onenter,
 }: Props = $props();
 </script>
 
@@ -37,6 +40,12 @@ let {
   spellcheck="false"
   autocomplete="off"
   oninput={(e) => oninput(e.currentTarget.value)}
+  onkeydown={(e) => {
+    if (e.key === 'Enter' && onenter) {
+      e.preventDefault();
+      onenter();
+    }
+  }}
 />
 
 <style>

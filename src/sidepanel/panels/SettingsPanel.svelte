@@ -3,12 +3,15 @@ import { tick } from 'svelte';
 import type { Theme } from '../../themes/palette';
 import Icon from '../components/Icon.svelte';
 import type { SettingsState } from '../settings-state.svelte';
+import type { TabState } from '../tab-state.svelte';
 import type { ThemeDraft } from '../theme-draft.svelte';
 import type { ThemeRegistry } from '../theme-registry.svelte';
 import AppearanceCard from './settings/AppearanceCard.svelte';
 import BackupCard from './settings/BackupCard.svelte';
 import LayoutCard from './settings/LayoutCard.svelte';
 import PreviewCard from './settings/PreviewCard.svelte';
+import ShortcutsCard from './settings/ShortcutsCard.svelte';
+import SuspendCard from './settings/SuspendCard.svelte';
 import TabRowsCard from './settings/TabRowsCard.svelte';
 import ThemeEditor from './settings/ThemeEditor.svelte';
 import ThemesCard from './settings/ThemesCard.svelte';
@@ -16,11 +19,12 @@ import ThemesCard from './settings/ThemesCard.svelte';
 interface Props {
   settings: SettingsState;
   themes: ThemeRegistry;
+  tabState: TabState;
   /** Where the editor publishes its working copy so the whole panel previews it. */
   draft: ThemeDraft;
 }
 
-let { settings, themes, draft }: Props = $props();
+let { settings, themes, tabState, draft }: Props = $props();
 
 interface Editing {
   theme: Theme;
@@ -86,6 +90,8 @@ $effect(() => () => {
       <AppearanceCard {settings} {themes} />
       <TabRowsCard {settings} />
       <LayoutCard {settings} />
+      <SuspendCard {settings} {tabState} />
+      <ShortcutsCard {settings} />
       <!-- Focus fallback when the theme a flow started from no longer has a button. -->
       <span id="vc-themes-anchor" tabindex="-1"></span>
       <ThemesCard {settings} {themes} onedit={open} />

@@ -4,11 +4,10 @@ Fast, customizable vertical tabs in Chrome's Side Panel. Local-first.
 
 ## Status
 
-**Milestone 4: customization.** Everything from M1–M3, plus a settings panel with live preview, custom themes with a colour editor, and JSON import/export.
+**Milestone 5: extras.** Everything from M1–M4, plus tab suspending (manual and on an idle timer), saved sessions, Bookmarks and History panels, recently closed tabs, a multi-window view, configurable shortcuts, and Chrome context menus.
 
 Roadmap:
 
-5. **Extras.** Tab suspension, sessions, bookmarks, history, multi-window, keyboard shortcuts, context menus.
 6. **Profiling.** Benchmarks against a 1,500-tab synthetic test.
 
 ## Requirements
@@ -100,6 +99,8 @@ In the tab list (the Tabs panel):
 | Shift+F10 or the Menu key | Context menu |
 | `/` or Ctrl+F | Search; Enter opens the top result, Escape clears |
 
+Command keys (everything except arrows, Home/End, Enter, Space and Escape) can be rebound in Settings → Shortcuts.
+
 ## Themes
 
 A theme is a JSON file in the [Noctalia](https://github.com/noctalia-dev/noctalia-shell) palette format: a `dark` and a `light` object, each with the same 16 roles (`mPrimary`, `mOnPrimary`, `mSecondary`, `mOnSecondary`, `mTertiary`, `mOnTertiary`, `mError`, `mOnError`, `mSurface`, `mOnSurface`, `mSurfaceVariant`, `mOnSurfaceVariant`, `mOutline`, `mShadow`, `mHover`, `mOnHover`), each an exact `#rrggbb` value. A single flat palette is also accepted and used for both modes.
@@ -110,6 +111,13 @@ A theme is a JSON file in the [Noctalia](https://github.com/noctalia-dev/noctali
 - A unit test asserts that every text/background pair in Abyss meets WCAG AA (4.5:1) in both modes.
 
 Settings are versioned (`src/settings/schema.ts`). `migrateSettings` upgrades older data, validates every field, and reads settings written by a newer version best-effort instead of resetting them.
+
+## Suspending, sessions and windows
+
+- **Suspending** uses Chrome's native tab discarding: memory is freed and the tab reloads when you click it. Suspend from the tab's context menu, Chrome's page or toolbar menu, or a global shortcut. Auto-suspend (off by default) discards background tabs idle for a set time, skipping pinned and audible tabs and whitelisted sites. Only http(s) tabs are auto-suspended.
+- **Sessions** save the current window or all windows (tabs, pinned state, groups) to `chrome.storage.local` and restore them into a new or the current window, optionally as suspended tabs so a large session doesn't load at once.
+- **Multi-window view** (toggle in the Open tabs card) lists every window; drag tabs between windows or use "Move to window". Tabs can't move between incognito and normal windows.
+- **Shortcuts**: in-panel commands are configurable in Settings → Shortcuts. Browser-wide shortcuts (toggle panel, focus search, suspend tab, suspend other tabs) are set at `chrome://extensions/shortcuts`; only the panel toggle has a default (Alt+Shift+V).
 
 ## Customization
 
@@ -135,9 +143,14 @@ Search goes through the `SearchIndex` interface (`src/lib/search/search-index.ts
 | `sidePanel` | Render the UI in Chrome's side panel and open it from the shortcut or toolbar icon |
 | `favicon` | Load page favicons through `_favicon` without host permissions |
 | `tabGroups` | Show, create, rename, recolour, collapse and move native tab groups |
+| `sessions` | Recently closed tabs and windows, and restoring them |
+| `bookmarks` | The Bookmarks panel: read, open, search, add, delete |
+| `history` | The History panel: read, search, delete entries |
+| `alarms` | The auto-suspend timer. The worker is shut down when idle, so a timer can't run for 30 minutes; alarms survive and wake it |
+| `contextMenus` | "Suspend this tab", "Save window as session" and similar items in Chrome's page and toolbar-icon menus |
 | `storage` | Save settings in `chrome.storage.sync` (follows your Chrome profile); later, local data in `chrome.storage.local` |
 
-No host permissions are requested. `sessions`, `bookmarks`, and `history` will be added only in the milestones that use them.
+No host permissions are requested.
 
 ## Platform limits
 

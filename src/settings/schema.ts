@@ -1,7 +1,7 @@
 import { DEFAULT_THEME_ID } from '../themes/builtin';
 
 /** Bump when the stored shape changes, and add a step to MIGRATIONS in migrate.ts. */
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 
 export type ColorMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'comfortable';
@@ -34,6 +34,45 @@ export interface Appearance {
   accent: string | null;
 }
 
+/**
+ * Commands that can be bound to keys inside the panel. Tree navigation keys (arrows,
+ * Home/End, Enter, Space, Escape) follow ARIA conventions and are deliberately fixed.
+ */
+export const SHORTCUT_ACTIONS = [
+  'focusSearch',
+  'closeTab',
+  'renameGroup',
+  'moveUp',
+  'moveDown',
+  'openMenu',
+  'selectAll',
+  'newTab',
+  'duplicateTab',
+  'togglePin',
+  'toggleMute',
+  'suspendTab',
+] as const;
+export type ShortcutAction = (typeof SHORTCUT_ACTIONS)[number];
+/** Up to two combos per action, in the normalized form produced by lib/keymap. */
+export type Keymap = Record<ShortcutAction, string[]>;
+export const MAX_BINDINGS = 2;
+
+export interface SuspendSettings {
+  /** Discard idle background tabs automatically. Manual suspending works either way. */
+  auto: boolean;
+  /** Minutes a tab must be inactive before it's discarded. */
+  minutes: number;
+  skipPinned: boolean;
+  skipAudible: boolean;
+  /** Host patterns never auto-suspended: "example.com" (and subdomains) or "*.example.com". */
+  whitelist: string[];
+}
+
+export interface SessionSettings {
+  /** Restore saved sessions as discarded tabs, so a big session doesn't load everything. */
+  restoreDiscarded: boolean;
+}
+
 export interface TabRowSettings {
   layout: RowLayout;
   actions: ActionVisibility;
@@ -41,6 +80,8 @@ export interface TabRowSettings {
   showMute: boolean;
   showNewTabButton: boolean;
   showCount: boolean;
+  /** Show every window in the Tabs panel instead of only this one. */
+  allWindows: boolean;
 }
 
 export interface Ordered<T extends string> {
@@ -60,6 +101,9 @@ export interface Settings {
   appearance: Appearance;
   tabs: TabRowSettings;
   layout: LayoutSettings;
+  suspend: SuspendSettings;
+  sessions: SessionSettings;
+  shortcuts: Keymap;
 }
 
 export const DEFAULT_FONT = 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
@@ -92,16 +136,35 @@ export const DEFAULT_SETTINGS: Settings = {
     showMute: true,
     showNewTabButton: true,
     showCount: true,
+    allWindows: false,
   },
   layout: {
     panels: PANEL_IDS.map((id) => ({ id, visible: true })),
     sections: SECTION_IDS.map((id) => ({ id, visible: true })),
+  },
+  suspend: { auto: false, minutes: 30, skipPinned: true, skipAudible: true, whitelist: [] },
+  sessions: { restoreDiscarded: true },
+  shortcuts: {
+    focusSearch: ['/', 'Ctrl+F'],
+    closeTab: ['Delete'],
+    renameGroup: ['F2'],
+    moveUp: ['Alt+ArrowUp'],
+    moveDown: ['Alt+ArrowDown'],
+    openMenu: ['Shift+F10', 'ContextMenu'],
+    selectAll: ['Ctrl+A'],
+    newTab: [],
+    duplicateTab: [],
+    togglePin: [],
+    toggleMute: [],
+    suspendTab: [],
   },
 };
 
 export const LIMITS = {
   radius: { min: 0, max: 24 },
   fontSize: { min: 11, max: 16 },
+  suspendMinutes: { min: 1, max: 1440 },
+  whitelist: 200,
 } as const;
 
 /** Row heights per layout and density; the virtual list and CSS both read these. */

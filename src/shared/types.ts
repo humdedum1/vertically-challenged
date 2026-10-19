@@ -51,3 +51,10 @@ export interface WindowPatch {
   /** Full group list for the window, sent only when it changed (windows have few groups). */
   groups?: GroupInfo[];
 }
+
+/** A normal browser window (popups and devtools windows are never listed). */
+export interface WindowInfo {
+  id: number;
+  incognito: boolean;
+  focused: boolean;
+}

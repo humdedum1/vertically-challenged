@@ -6,6 +6,7 @@ import type { GroupInfo, TabInfo, WindowInfo } from '../shared/types';
 import { createBatcher } from './batcher';
 import { type CommandDeps, runCommand } from './commands';
 import { registerContextMenus } from './context-menus';
+import { PinManager } from './pins/pin-manager';
 import { createSuspender } from './suspend/suspender';
 import { ChangeSet, TabStore } from './tab-store';
 import { toGroupInfo, toTabInfo } from './to-tab-info';
@@ -90,9 +91,12 @@ export function startBackground(): void {
       ...[...changes.resync].map(async (w) => resynced.set(w, await queryWindow(w))),
       ...[...changes.groupWindows].map(async (w) => groups.set(w, await queryGroups(w))),
     ]);
-    for (const patch of store.apply(changes, resynced, groups)) {
+    const patches = store.apply(changes, resynced, groups);
+    for (const patch of patches) {
       broadcast(patch.windowId, { type: 'patch', patch });
     }
+    // Layouts follow the store; awaiting keeps the next flush from moving it underneath.
+    await pins.afterFlush(patches.map((p) => p.windowId));
   });
 
   function broadcast(windowId: number | null, msg: WorkerMessage): void {
@@ -184,6 +188,27 @@ export function startBackground(): void {
   browser.windows.onFocusChanged.addListener(onWindowsChanged);
   const windowsReady = refreshWindows().catch(() => {});
 
+  // --- Pinned layouts ---------------------------------------------------------------------
+
+  const pins = new PinManager({
+    store,
+    ready: Promise.all([ready, windowsReady]).then(() => {}),
+    tabsApi: browser.tabs,
+    storage: { local: browser.storage.local, session: browser.storage.session },
+    windows: () => windowList,
+    broadcast,
+    notice: (windowId, text) => {
+      for (const [port, sub] of subs) {
+        if (sub.windowId !== windowId) continue;
+        try {
+          port.postMessage({ type: 'notice', level: 'info', text } satisfies WorkerMessage);
+        } catch {}
+      }
+    },
+  });
+  browser.windows.onRemoved.addListener((id) => pins.onWindowRemoved(id));
+  browser.windows.onFocusChanged.addListener((id) => pins.onWindowFocused(id));
+
   // --- Commands ---------------------------------------------------------------------------
 
   const settingsNow = async () =>
@@ -212,6 +237,7 @@ export function startBackground(): void {
         subs.set(port, { windowId: msg.windowId, all: msg.all });
         await ready;
         await windowsReady;
+        await pins.loaded;
         // Patches are deltas against the store, so a snapshot of the store as it is now
         // lines up exactly with the next patch, even if events are still pending.
         const ids = msg.all ? windowList.map((w) => w.id) : [msg.windowId];
@@ -225,6 +251,14 @@ export function startBackground(): void {
               ...store.snapshot(id),
             } satisfies WorkerMessage);
           }
+          for (const id of ids) {
+            port.postMessage({
+              type: 'layout',
+              windowId: id,
+              layout: pins.layoutOf(id),
+            } satisfies WorkerMessage);
+          }
+          port.postMessage({ type: 'setups', setups: pins.setups() } satisfies WorkerMessage);
           if (pendingFocus.delete(msg.windowId))
             port.postMessage({ type: 'focusSearch' } satisfies WorkerMessage);
         } catch {

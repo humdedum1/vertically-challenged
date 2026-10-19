@@ -1,3 +1,4 @@
+import type { WindowLayout } from './layout';
 import {
   GROUP_COLORS,
   type GroupColor,
@@ -70,7 +71,21 @@ export type WorkerMessage =
   /** The "focus search" global shortcut opened or targeted this panel. */
   | { type: 'focusSearch' }
   /** Outcome of a command the user should hear about (e.g. tabs skipped on restore). */
-  | { type: 'notice'; level: 'info' | 'error'; text: string };
+  | { type: 'notice'; level: 'info' | 'error'; text: string }
+  /** A window's full layout; sent on subscribe and whenever it changes. */
+  | { type: 'layout'; windowId: number; layout: WindowLayout }
+  /** Saved setups (layouts of closed windows), most recently used first. */
+  | { type: 'setups'; setups: SetupSummary[] };
+
+/** Enough of a saved setup to list it without shipping its whole tree. */
+export interface SetupSummary {
+  id: string;
+  name: string;
+  essentials: { url: string; title: string }[];
+  itemCount: number;
+  folderCount: number;
+  lastUsed: number;
+}
 
 const MAX_IDS = 5000;
 const MAX_TITLE = 200;

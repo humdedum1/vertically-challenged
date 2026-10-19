@@ -6,7 +6,6 @@ describe('parsePanelMessage', () => {
     expect(parsePanelMessage({ type: 'subscribe', windowId: 3 })).toEqual({
       type: 'subscribe',
       windowId: 3,
-      all: false,
     });
     expect(parsePanelMessage({ type: 'activate', tabId: 7 })).toEqual({
       type: 'activate',

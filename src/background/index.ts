@@ -16,6 +16,7 @@ import { PinManager } from './pins/pin-manager';
 import { createSuspender } from './suspend/suspender';
 import { ChangeSet, TabStore } from './tab-store';
 import { toGroupInfo, toTabInfo } from './to-tab-info';
+import { visibleTo } from './visibility';
 
 /**
  * Everything is registered synchronously inside this call: MV3 only delivers the event
@@ -28,8 +29,11 @@ export function startBackground(): void {
 
   const store = new TabStore();
   let pending = new ChangeSet();
-  /** Open panels: the window each one lives in, and whether it shows all windows. */
-  const subs = new Map<Browser.runtime.Port, { windowId: number; all: boolean }>();
+  /**
+   * Open panels: the window each one lives in, and whether that window is incognito. A
+   * panel sees every window of its own kind; unknown counts as incognito (fail closed).
+   */
+  const subs = new Map<Browser.runtime.Port, { windowId: number; incognito: boolean }>();
   const hasPanel = (windowId: number) => [...subs.values()].some((s) => s.windowId === windowId);
   /** Set by the "focus search" shortcut when the panel isn't connected yet. */
   const pendingFocus = new Set<number>();
@@ -105,11 +109,29 @@ export function startBackground(): void {
     await pins.afterFlush(patches.map((p) => p.windowId));
   });
 
+  /** Whether a window is incognito: the window list first, then its tabs; unknown = yes. */
+  function windowIncognito(windowId: number): boolean {
+    const w = windowList.find((x) => x.id === windowId);
+    if (w) return w.incognito;
+    const tabs = store.snapshot(windowId).tabs;
+    return tabs.length > 0 ? tabs.some((t) => t.incognito) : true;
+  }
+
+  /**
+   * Window-scoped messages reach the panels that may see that window; `windows` is
+   * filtered per panel and everything else unscoped (null) goes to every panel.
+   */
   function broadcast(windowId: number | null, msg: WorkerMessage): void {
+    const scopeIncognito = windowId === null ? null : windowIncognito(windowId);
     for (const [port, sub] of subs) {
-      if (windowId !== null && !sub.all && sub.windowId !== windowId) continue;
+      if (scopeIncognito !== null && !visibleTo(sub.incognito, { incognito: scopeIncognito }))
+        continue;
+      const out =
+        msg.type === 'windows'
+          ? { ...msg, windows: msg.windows.filter((w) => visibleTo(sub.incognito, w)) }
+          : msg;
       try {
-        port.postMessage(msg);
+        port.postMessage(out);
       } catch {
         // Port died without onDisconnect firing yet; cleanup happens there.
       }
@@ -240,17 +262,21 @@ export function startBackground(): void {
       const msg = parsePanelMessage(raw);
       if (!msg) return;
       if (msg.type === 'subscribe') {
-        // Re-subscribing (switching to/from all windows) just replaces the registration.
-        subs.set(port, { windowId: msg.windowId, all: msg.all });
+        // Re-subscribing just replaces the registration. Until the window is known the
+        // panel counts as incognito, so nothing normal leaks to it.
+        subs.set(port, { windowId: msg.windowId, incognito: true });
         await ready;
         await windowsReady;
         await pins.loaded;
+        const incognito = windowIncognito(msg.windowId);
+        subs.set(port, { windowId: msg.windowId, incognito });
         // Patches are deltas against the store, so a snapshot of the store as it is now
         // lines up exactly with the next patch, even if events are still pending.
-        const ids = msg.all ? windowList.map((w) => w.id) : [msg.windowId];
+        const visible = windowList.filter((w) => visibleTo(incognito, w));
+        const ids = visible.map((w) => w.id);
         if (!ids.includes(msg.windowId)) ids.unshift(msg.windowId);
         try {
-          port.postMessage({ type: 'windows', windows: windowList } satisfies WorkerMessage);
+          port.postMessage({ type: 'windows', windows: visible } satisfies WorkerMessage);
           for (const id of ids) {
             port.postMessage({
               type: 'snapshot',

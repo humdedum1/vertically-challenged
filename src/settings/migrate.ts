@@ -32,6 +32,12 @@ const MIGRATIONS: readonly ((s: Raw) => Raw)[] = [
   (s) => s,
   // v2 → v3: new `suspend`, `sessions`, `shortcuts` and `tabs.allWindows`; default-filled.
   (s) => s,
+  // v3 → v4: the panel always shows every window, so `tabs.allWindows` is gone.
+  (s) => {
+    if (!isObj(s.tabs)) return s;
+    const { allWindows: _dropped, ...tabs } = s.tabs;
+    return { ...s, tabs };
+  },
 ];
 
 const isObj = (v: unknown): v is Raw => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -125,7 +131,6 @@ function sanitize(raw: Raw): Settings {
     showMute: bool(t.showMute, d.tabs.showMute),
     showNewTabButton: bool(t.showNewTabButton, d.tabs.showNewTabButton),
     showCount: bool(t.showCount, d.tabs.showCount),
-    allWindows: bool(t.allWindows, d.tabs.allWindows),
   };
 
   const su = isObj(raw.suspend) ? raw.suspend : {};

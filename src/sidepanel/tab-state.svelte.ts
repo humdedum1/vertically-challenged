@@ -1,5 +1,11 @@
 import { type Browser, browser } from 'wxt/browser';
-import { PANEL_PORT_NAME, type PanelMessage, type WorkerMessage } from '../shared/protocol';
+import type { WindowLayout } from '../shared/layout';
+import {
+  PANEL_PORT_NAME,
+  type PanelMessage,
+  type SetupSummary,
+  type WorkerMessage,
+} from '../shared/protocol';
 import type { GroupInfo, TabInfo, WindowInfo, WindowPatch } from '../shared/types';
 
 export type ConnectionStatus = 'connecting' | 'ready' | 'error';
@@ -18,19 +24,22 @@ interface Mirror {
 }
 
 /**
- * Panel-side mirror of the home window (and, in multi-window mode, every window). Tab
+ * Panel-side mirror of every window the worker shows this panel. Tab
  * arrays are $state.raw: patches replace changed TabInfo objects by reference, so a keyed
  * {#each} re-renders only the rows that changed instead of Svelte deep-proxying 1,000+
- * objects. `tabs` / `groups` always mean the home window, so single-window code is
- * unaffected by multi-window mode.
+ * objects. `tabs` / `groups` always mean the home window.
  */
 export class TabState {
   tabs = $state.raw<TabInfo[]>([]);
   groups = $state.raw<GroupInfo[]>([]);
-  /** Every subscribed window in display order (home first); just the home one unless `all`. */
+  /** Every visible window in display order (home first). */
   windows = $state.raw<WindowView[]>([]);
   /** All normal windows, regardless of subscription (for "Move to window"). */
   windowList = $state.raw<WindowInfo[]>([]);
+  /** Per-window pinned layouts (Essentials and the pinned tree), as sent by the worker. */
+  layouts = $state.raw<ReadonlyMap<number, WindowLayout>>(new Map());
+  /** Saved setups (layouts of closed windows), most recently used first. */
+  setups = $state.raw<SetupSummary[]>([]);
   status = $state<ConnectionStatus>('connecting');
   error = $state<string | null>(null);
   windowId: number | null = null;
@@ -38,14 +47,12 @@ export class TabState {
   onFocusSearch: (() => void) | null = null;
   onNotice: ((n: { level: 'info' | 'error'; text: string }) => void) | null = null;
 
-  private all = false;
   private mirrors = new Map<number, Mirror>();
   private port: Browser.runtime.Port | null = null;
   private retries = 0;
   private disposed = false;
 
-  async start(all = false): Promise<void> {
-    this.all = all;
+  async start(): Promise<void> {
     try {
       const win = await browser.windows.getCurrent();
       if (win.id === undefined) throw new Error('No window id');
@@ -54,16 +61,6 @@ export class TabState {
     } catch (err) {
       this.fail(err);
     }
-  }
-
-  /** Switches between this-window and all-windows; the worker re-sends snapshots. */
-  setAllWindows(all: boolean): void {
-    if (all === this.all) return;
-    this.all = all;
-    // Keep the home mirror so the list doesn't blank while the new snapshots arrive.
-    for (const id of [...this.mirrors.keys()]) if (id !== this.windowId) this.mirrors.delete(id);
-    this.publish();
-    this.subscribe();
   }
 
   dispose(): void {
@@ -83,7 +80,7 @@ export class TabState {
 
   private subscribe(): void {
     if (this.windowId === null) return;
-    this.send({ type: 'subscribe', windowId: this.windowId, all: this.all });
+    this.send({ type: 'subscribe', windowId: this.windowId });
   }
 
   private connect(): void {
@@ -128,11 +125,10 @@ export class TabState {
         let m = this.mirrors.get(msg.patch.windowId);
         // A window opened after we subscribed: its first patch describes it in full
         // (the store diffs against an empty window), so start a mirror from it.
-        if (!m && this.all) {
+        if (!m) {
           m = { byId: new Map(), order: [], groups: [], tabs: [] };
           this.mirrors.set(msg.patch.windowId, m);
         }
-        if (!m) return;
         this.publish(msg.patch.windowId, !applyPatch(m, msg.patch));
         return;
       }
@@ -142,7 +138,18 @@ export class TabState {
         for (const id of [...this.mirrors.keys()]) {
           if (!msg.windows.some((w) => w.id === id)) this.mirrors.delete(id);
         }
+        if ([...this.layouts.keys()].some((id) => !msg.windows.some((w) => w.id === id))) {
+          this.layouts = new Map(
+            [...this.layouts].filter(([id]) => msg.windows.some((w) => w.id === id)),
+          );
+        }
         this.publish();
+        return;
+      case 'layout':
+        this.layouts = new Map(this.layouts).set(msg.windowId, msg.layout);
+        return;
+      case 'setups':
+        this.setups = msg.setups;
         return;
       case 'focusSearch':
         this.onFocusSearch?.();
@@ -172,6 +179,10 @@ export class TabState {
       const m = this.mirrors.get(id) as Mirror;
       return { info: info(id), tabs: m.tabs, groups: m.groups };
     });
+  }
+
+  layoutOf(windowId: number): WindowLayout | undefined {
+    return this.layouts.get(windowId);
   }
 
   private fail(err: unknown): void {

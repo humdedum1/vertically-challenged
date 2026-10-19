@@ -34,18 +34,12 @@ describe('discardOthers', () => {
   });
 });
 
-describe('subscribe all', () => {
-  it('all is true only for boolean true', () => {
-    expect(parsePanelMessage({ type: 'subscribe', windowId: 1, all: true })).toEqual({
-      type: 'subscribe',
-      windowId: 1,
-      all: true,
-    });
-    for (const v of [false, undefined, 1, 'true', null])
-      expect(parsePanelMessage({ type: 'subscribe', windowId: 1, all: v })).toEqual({
+describe('subscribe legacy all', () => {
+  it('parses with or without the legacy all field and drops it', () => {
+    for (const all of [true, false, undefined, 1, 'true', null])
+      expect(parsePanelMessage({ type: 'subscribe', windowId: 1, all })).toEqual({
         type: 'subscribe',
         windowId: 1,
-        all: false,
       });
   });
 });

@@ -33,8 +33,8 @@ export interface MoveTarget {
 
 /** Panel → service worker. */
 export type PanelMessage =
-  /** `all` subscribes to every window (multi-window view); `windowId` is still the home window. */
-  | { type: 'subscribe'; windowId: number; all: boolean }
+  /** `windowId` is the panel's home window; every panel gets all windows of its incognito kind. */
+  | { type: 'subscribe'; windowId: number }
   | { type: 'activate'; tabId: number }
   | { type: 'close'; tabIds: number[] }
   | { type: 'closeOthers'; tabId: number }
@@ -343,9 +343,8 @@ export function parsePanelMessage(raw: unknown): PanelMessage | null {
   const m = raw as Record<string, unknown>;
   switch (m.type) {
     case 'subscribe':
-      return isId(m.windowId)
-        ? { type: 'subscribe', windowId: m.windowId, all: m.all === true }
-        : null;
+      // A legacy `all` field is accepted and dropped.
+      return isId(m.windowId) ? { type: 'subscribe', windowId: m.windowId } : null;
     case 'activate':
     case 'closeOthers':
     case 'closeBelow':

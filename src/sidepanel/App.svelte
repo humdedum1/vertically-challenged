@@ -1,5 +1,5 @@
 <script lang="ts">
-import { tick, untrack } from 'svelte';
+import { tick } from 'svelte';
 import { type PanelId, rowHeight } from '../settings/schema';
 import { applyAppearance } from './appearance';
 import Icon from './components/Icon.svelte';
@@ -92,13 +92,8 @@ $effect(() => {
   const s = tabState;
   s.onNotice = notify;
   s.onFocusSearch = () => void focusSearch();
-  void s.start(untrack(() => settings.value.tabs.allWindows));
+  void s.start();
   return () => s.dispose();
-});
-
-const allWindows = $derived(settings.value.tabs.allWindows);
-$effect(() => {
-  tabState.setAllWindows(allWindows);
 });
 
 function setWhitelisted(host: string, add: boolean): void {
@@ -108,9 +103,7 @@ function setWhitelisted(host: string, add: boolean): void {
   });
 }
 
-const count = $derived(
-  allWindows ? tabState.windows.reduce((n, w) => n + w.tabs.length, 0) : tabState.tabs.length,
-);
+const count = $derived(tabState.tabs.length);
 </script>
 
 <main>
@@ -137,17 +130,6 @@ const count = $derived(
             {#if settings.value.tabs.showCount}
               <span class="count" role="img" aria-label="{count} tabs">{count}</span>
             {/if}
-            <button
-              type="button"
-              class="add"
-              class:on={allWindows}
-              aria-label="Show all windows"
-              aria-pressed={allWindows}
-              title="Show all windows"
-              onclick={() => settings.update((s) => ({ ...s, tabs: { ...s.tabs, allWindows: !s.tabs.allWindows } }))}
-            >
-              <Icon name="windows" size={14} />
-            </button>
             {#if settings.value.tabs.showNewTabButton}
               <button
                 type="button"
@@ -184,7 +166,6 @@ const count = $derived(
           <TabList
             bind:this={tabList}
             {tabState}
-            {allWindows}
             shortcuts={settings.value.shortcuts}
             whitelist={settings.value.suspend.whitelist}
             onWhitelist={setWhitelisted}
@@ -294,11 +275,6 @@ const count = $derived(
   .add:hover {
     background: var(--state-hover);
     color: var(--mOnSurface);
-  }
-
-  .add.on {
-    background: var(--state-selected);
-    color: var(--mPrimary);
   }
 
   .add:active {

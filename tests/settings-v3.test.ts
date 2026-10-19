@@ -37,10 +37,10 @@ describe('v2 -> v3 migration', () => {
 
   it('keeps everything and default-fills the new groups', () => {
     const r = migrateSettings(v2);
-    expect(SETTINGS_VERSION).toBe(3);
-    expect(r.version).toBe(3);
+    expect(SETTINGS_VERSION).toBe(4);
+    expect(r.version).toBe(4);
     expect(r.appearance).toEqual(v2.appearance);
-    expect(r.tabs).toEqual({ ...v2.tabs, allWindows: false });
+    expect(r.tabs).toEqual(v2.tabs);
     expect(r.layout.panels[0]).toEqual({ id: 'history', visible: false });
     expect(r.layout.sections[0]).toEqual({ id: 'recentlyClosed', visible: false });
     expect(r.suspend).toEqual(D.suspend);
@@ -63,14 +63,6 @@ describe('v2 -> v3 migration', () => {
     const c = migrateSettings(null);
     c.shortcuts.closeTab.push('Z');
     expect(D.shortcuts.closeTab).toEqual(['Delete']);
-  });
-
-  it('tabs.allWindows is read as a boolean with a default', () => {
-    expect(migrateSettings({ version: 3, tabs: { allWindows: true } }).tabs.allWindows).toBe(true);
-    for (const bad of ['true', 1, null])
-      expect(migrateSettings({ version: 3, tabs: { allWindows: bad } }).tabs.allWindows).toBe(
-        D.tabs.allWindows,
-      );
   });
 
   it('sessions.restoreDiscarded is read as a boolean with a default', () => {

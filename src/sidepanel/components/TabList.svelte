@@ -52,8 +52,6 @@ interface Props {
   twoLine?: boolean;
   showClose?: boolean;
   showMute?: boolean;
-  /** Multi-window view: a header per window, search across all of them. */
-  allWindows?: boolean;
   shortcuts: Keymap;
   /** Never-auto-suspend host patterns, for the tab menu. */
   whitelist: readonly string[];
@@ -67,7 +65,6 @@ let {
   twoLine = false,
   showClose = true,
   showMute = true,
-  allWindows = false,
   shortcuts,
   whitelist,
   onWhitelist,
@@ -81,16 +78,13 @@ const send = (msg: PanelMessage): void => tabState.send(msg);
 const index: SearchIndex = new FuzzyIndex();
 let fedTabs = $state.raw<readonly TabInfo[]>([]);
 
-// Every tab / group the view can show; in single-window mode that's just the home window.
-const allTabs = $derived(allWindows ? tabState.windows.flatMap((w) => w.tabs) : tabState.tabs);
-const allGroups = $derived(
-  allWindows ? tabState.windows.flatMap((w) => w.groups) : tabState.groups,
-);
+// Every tab / group the view can show: all windows of this panel's kind.
+const allTabs = $derived(tabState.windows.flatMap((w) => w.tabs));
+const allGroups = $derived(tabState.windows.flatMap((w) => w.groups));
 const tabById = $derived(new Map(allTabs.map((t) => [t.id, t])));
 const windowViewById = $derived(new Map(tabState.windows.map((w) => [w.info.id, w])));
 const windowNumber = $derived(new Map(tabState.windows.map((w, i) => [w.info.id, i + 1])));
-const tabsOfWindow = (id: number): readonly TabInfo[] =>
-  allWindows ? (windowViewById.get(id)?.tabs ?? []) : tabState.tabs;
+const tabsOfWindow = (id: number): readonly TabInfo[] => windowViewById.get(id)?.tabs ?? [];
 
 // Pre-effect so the index is fed before the derived search below reads it in the same flush.
 $effect.pre(() => {
@@ -140,12 +134,10 @@ let query = $state('');
 const needle = $derived(query.trim());
 const searching = $derived(needle !== '');
 const treeRows: Row[] = $derived(
-  allWindows
-    ? buildWindowRows(tabState.windows, tabState.windowId, collapsedWindows)
-    : buildRows(tabState.tabs, tabState.groups),
+  buildWindowRows(tabState.windows, tabState.windowId, collapsedWindows),
 );
 // aria-level of tabs inside a group: one deeper under a window header.
-const nested = $derived(allWindows && !searching);
+const nested = $derived(!searching);
 const groupLevel = $derived(nested ? 3 : 2);
 const view: Row[] = $derived(searching ? buildSearchRows(fedTabs, index.search(needle)) : treeRows);
 const keyIndex = $derived(new Map(view.map((r, i) => [r.key, i])));
@@ -420,9 +412,7 @@ const multiCtx: MultiDropContext = {
 };
 
 function planFor(drag: Drag, index: number, zone: DropZone): PanelMessage | null {
-  return allWindows
-    ? planDropMulti(multiCtx, view, drag, index, zone)
-    : planDrop({ windowId: tabState.windowId ?? 0, tabs: tabState.tabs }, view, drag, index, zone);
+  return planDropMulti(multiCtx, view, drag, index, zone);
 }
 
 function moveByKey(dir: -1 | 1): void {
@@ -814,7 +804,7 @@ $effect(() => {
         {rowHeight}
         key={(r) => r.key}
         role="tree"
-        aria-label={allWindows ? 'Tabs in all windows' : 'Tabs in this window'}
+        aria-label="Tabs in all windows"
         aria-multiselectable="true"
         tabindex={0}
         aria-activedescendant={focusedRow ? `vc-row-${focusedRow.key}` : undefined}
@@ -857,7 +847,7 @@ $effect(() => {
               level={r.level}
               grouped={r.level === groupLevel && groupById.has(r.tab.groupId)}
               {nested}
-              windowTag={allWindows && searching && r.tab.windowId !== tabState.windowId
+              windowTag={searching && r.tab.windowId !== tabState.windowId
                 ? windowName(r.tab.windowId)
                 : undefined}
               pos={r.pos}

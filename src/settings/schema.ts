@@ -1,7 +1,7 @@
 import { DEFAULT_THEME_ID } from '../themes/builtin';
 
 /** Bump when the stored shape changes, and add a step to MIGRATIONS in migrate.ts. */
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 4;
 
 export type ColorMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'comfortable';
@@ -80,8 +80,6 @@ export interface TabRowSettings {
   showMute: boolean;
   showNewTabButton: boolean;
   showCount: boolean;
-  /** Show every window in the Tabs panel instead of only this one. */
-  allWindows: boolean;
 }
 
 export interface Ordered<T extends string> {
@@ -136,7 +134,6 @@ export const DEFAULT_SETTINGS: Settings = {
     showMute: true,
     showNewTabButton: true,
     showCount: true,
-    allWindows: false,
   },
   layout: {
     panels: PANEL_IDS.map((id) => ({ id, visible: true })),

@@ -39,12 +39,6 @@ function patch(p: Partial<TabRowSettings>): void {
       checked={t.showNewTabButton}
       onchange={(showNewTabButton) => patch({ showNewTabButton })}
     />
-    <Toggle
-      label="Show all windows"
-      hint="Group tabs from every window under a header"
-      checked={t.allWindows}
-      onchange={(allWindows) => patch({ allWindows })}
-    />
     <Toggle label="Tab count" checked={t.showCount} onchange={(showCount) => patch({ showCount })} />
   </div>
 </SegmentCard>

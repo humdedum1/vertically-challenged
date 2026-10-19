@@ -136,7 +136,7 @@ export class TabState {
       }
       case 'windows':
         this.windowList = msg.windows;
-        // Drop mirrors of closed windows; new windows arrive with their own snapshot.
+        // Drop mirrors of closed windows; new windows are sent a snapshot right after the list.
         for (const id of [...this.mirrors.keys()]) {
           if (!msg.windows.some((w) => w.id === id)) this.mirrors.delete(id);
         }

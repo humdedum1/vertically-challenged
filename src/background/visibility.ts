@@ -15,3 +15,18 @@ export const visibleWindows = <W extends { incognito: boolean }>(
   panelIncognito: boolean | null,
   windows: readonly W[],
 ): W[] => (panelIncognito === null ? [] : windows.filter((w) => visibleTo(panelIncognito, w)));
+
+/**
+ * For each panel, the ids of windows that appear in `next` but not in `prev` and are
+ * visible to it. Those windows need a snapshot: a panel that drops patches for windows it
+ * hasn't been told about would otherwise miss the new window's first (full) patch.
+ */
+export const snapshotPlan = (
+  prev: readonly { id: number }[],
+  next: readonly { id: number; incognito: boolean }[],
+  panels: readonly { incognito: boolean | null }[],
+): number[][] => {
+  const known = new Set(prev.map((w) => w.id));
+  const fresh = next.filter((w) => !known.has(w.id));
+  return panels.map((p) => visibleWindows(p.incognito, fresh).map((w) => w.id));
+};

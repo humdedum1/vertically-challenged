@@ -16,7 +16,7 @@ import { PinManager } from './pins/pin-manager';
 import { createSuspender } from './suspend/suspender';
 import { ChangeSet, TabStore } from './tab-store';
 import { toGroupInfo, toTabInfo } from './to-tab-info';
-import { shouldDeliver, visibleWindows } from './visibility';
+import { shouldDeliver, snapshotPlan, visibleWindows } from './visibility';
 
 /**
  * Everything is registered synchronously inside this call: MV3 only delivers the event
@@ -209,8 +209,38 @@ export function startBackground(): void {
       .map((w) => ({ id: w.id, incognito: w.incognito, focused: w.focused }))
       .sort((a, b) => a.id - b.id);
     if (JSON.stringify(next) === JSON.stringify(windowList)) return;
+    const prev = windowList;
     windowList = next;
     broadcast(null, { type: 'windows', windows: windowList });
+    // Panels drop patches for windows they haven't been told about, so a new window's
+    // first patch may be lost; its snapshot is taken from the store right now, which is
+    // what later patches are diffed against.
+    const ports = [...subs.keys()];
+    const plan = snapshotPlan(prev, next, [...subs.values()]);
+    plan.forEach((ids, i) => {
+      const port = ports[i] as Browser.runtime.Port;
+      for (const id of ids) {
+        try {
+          port.postMessage({
+            type: 'snapshot',
+            windowId: id,
+            ...store.snapshot(id),
+          } satisfies WorkerMessage);
+        } catch {}
+      }
+      if (ids.length === 0) return;
+      void pins.loaded.then(() => {
+        for (const id of ids) {
+          try {
+            port.postMessage({
+              type: 'layout',
+              windowId: id,
+              layout: pins.layoutOf(id),
+            } satisfies WorkerMessage);
+          } catch {}
+        }
+      });
+    });
   }
   const onWindowsChanged = () => void refreshWindows().catch(() => {});
   browser.windows.onCreated.addListener(onWindowsChanged);

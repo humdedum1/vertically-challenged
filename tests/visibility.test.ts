@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shouldDeliver, visibleWindows } from '../src/background/visibility';
+import { shouldDeliver, snapshotPlan, visibleWindows } from '../src/background/visibility';
 
 describe('shouldDeliver', () => {
   it('a panel whose kind is unknown receives nothing scoped', () => {
@@ -32,5 +32,23 @@ describe('visibleWindows', () => {
   });
   it('shows an unknown-kind panel nothing', () => {
     expect(visibleWindows(null, wins)).toEqual([]);
+  });
+});
+
+describe('snapshotPlan', () => {
+  const w = (id: number, incognito = false) => ({ id, incognito });
+  it('sends each panel the new windows visible to it', () => {
+    const plan = snapshotPlan(
+      [w(1)],
+      [w(1), w(2), w(3, true)],
+      [{ incognito: false }, { incognito: true }, { incognito: null }],
+    );
+    expect(plan).toEqual([[2], [3], []]);
+  });
+  it('sends nothing when no window is new', () => {
+    expect(snapshotPlan([w(1), w(2)], [w(2)], [{ incognito: false }])).toEqual([[]]);
+  });
+  it('treats a window whose kind flipped as unchanged', () => {
+    expect(snapshotPlan([w(1)], [w(1)], [{ incognito: false }])).toEqual([[]]);
   });
 });

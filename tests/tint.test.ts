@@ -36,7 +36,7 @@ describe('dominantColor', () => {
     expect(dominantColor(pixels(...repeat(256, [128, 128, 128, 255])))).toBeNull();
   });
 
-  it('picks the blue over a grey majority-free mix', () => {
+  it('ignores grey pixels when picking blue', () => {
     const img = pixels(...repeat(70, [0, 0, 255, 255]), ...repeat(30, [128, 128, 128, 255]));
     expectNear(dominantColor(img), [0, 0, 255]);
   });
@@ -49,6 +49,19 @@ describe('dominantColor', () => {
   it('ignores pixels below the alpha threshold', () => {
     const img = pixels(...repeat(10, [0, 0, 255, 127]), ...repeat(5, [255, 0, 0, 255]));
     expectNear(dominantColor(img), [255, 0, 0]);
+  });
+
+  it('treats hues either side of 0° as the same red family', () => {
+    // 359° wraps to a negative raw hue before normalising; 1° sits in the first bucket.
+    const justBelow = pixels(...repeat(20, [255, 0, 10, 255]));
+    const justAbove = pixels(...repeat(20, [255, 10, 0, 255]));
+    for (const hex of [dominantColor(justBelow), dominantColor(justAbove)]) {
+      expect(hex).not.toBeNull();
+      const n = Number.parseInt((hex as string).slice(1), 16);
+      expect((n >> 16) & 0xff).toBeGreaterThanOrEqual(240);
+      expect((n >> 8) & 0xff).toBeLessThanOrEqual(20);
+      expect(n & 0xff).toBeLessThanOrEqual(20);
+    }
   });
 
   it('always returns lowercase #rrggbb', () => {

@@ -2,7 +2,8 @@
 import Icon from './Icon.svelte';
 
 interface Props {
-  /** "This window" or "Window N". */
+  windowId: number;
+  /** Layout name, else the window's active tab title, else "Window N". */
   name: string;
   count: number;
   collapsed: boolean;
@@ -12,11 +13,16 @@ interface Props {
   pos: number;
   size: number;
   focused: boolean;
+  renaming: boolean;
   onclick: (e: MouseEvent) => void;
+  ondblclick: () => void;
   oncontextmenu: (e: MouseEvent) => void;
+  /** `name` is null when the rename was cancelled; an empty string resets to the default. */
+  onrenamed: (name: string | null) => void;
 }
 
 let {
+  windowId,
   name,
   count,
   collapsed,
@@ -25,14 +31,44 @@ let {
   pos,
   size,
   focused,
+  renaming,
   onclick,
+  ondblclick,
   oncontextmenu,
+  onrenamed,
 }: Props = $props();
+
+// Same commit-once guard as the group and folder rename fields.
+let settled = false;
+
+function focusSelect(node: HTMLInputElement) {
+  settled = false;
+  node.focus();
+  node.select();
+}
+
+function finish(input: HTMLInputElement, commit: boolean): void {
+  if (settled) return;
+  settled = true;
+  onrenamed(commit ? input.value.trim() : null);
+}
+
+function onkeydown(e: KeyboardEvent & { currentTarget: HTMLInputElement }): void {
+  e.stopPropagation();
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    finish(e.currentTarget, true);
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    finish(e.currentTarget, false);
+  }
+}
 </script>
 
 <!-- Keyboard operation is handled on the owning tree via aria-activedescendant. -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
+  id="vc-row-w{windowId}"
   class="row"
   class:focused
   role="treeitem"
@@ -48,7 +84,24 @@ let {
 >
   <span class="chevron" class:open={!collapsed}><Icon name="chevron" size={12} /></span>
   <span class="glyph" aria-hidden="true"><Icon name="windows" size={13} /></span>
-  <span class="title">{name}</span>
+  {#if renaming}
+    <input
+      class="rename"
+      type="text"
+      maxlength="100"
+      aria-label="Window name"
+      placeholder="Active tab title"
+      value={name}
+      use:focusSelect
+      {onkeydown}
+      onblur={(e) => finish(e.currentTarget, true)}
+      onclick={(e) => e.stopPropagation()}
+      ondblclick={(e) => e.stopPropagation()}
+    />
+  {:else}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <span class="title" {ondblclick}>{name}</span>
+  {/if}
   {#if windowFocused}<span class="focus-dot" title="Focused window" aria-hidden="true"></span>{/if}
   {#if incognito}<span class="badge" aria-hidden="true">Private</span>{/if}
   <span class="count" aria-hidden="true">{count}</span>
@@ -107,6 +160,19 @@ let {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+    font-weight: 600;
+  }
+
+  .rename {
+    flex: 1;
+    min-width: 0;
+    height: calc(var(--row-height) - 8px);
+    padding: 0 6px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    background: var(--surface-0);
+    color: var(--mOnSurface);
+    font: inherit;
     font-weight: 600;
   }
 

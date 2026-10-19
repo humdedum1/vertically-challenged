@@ -61,6 +61,9 @@ export type PinRow = TreePos & {
   tab: TabInfo | null;
   /** 1 at the pinned root, +1 per enclosing folder. */
   depth: number;
+  /** Enclosing folder (null at the pinned root) and the index among its children. */
+  parentId: string | null;
+  index: number;
   /** Always false in rows (Essentials render as tiles); kept so the grid and menus can share the type. */
   essential: boolean;
 };
@@ -72,6 +75,9 @@ export type FolderRow = TreePos & {
   folder: PinFolder;
   /** 1 at the pinned root, +1 per enclosing folder. */
   depth: number;
+  /** Enclosing folder (null at the pinned root) and the index among its children. */
+  parentId: string | null;
+  index: number;
   /** Items in the folder subtree. */
   count: number;
 };
@@ -90,9 +96,6 @@ export type TilesRow = TreePos & {
   windowId: number;
   tiles: { item: PinItem; tab: TabInfo | null }[];
 };
-
-/** What the legacy multi-window view (buildWindowRows, search) emits; TabList moves to Row in a later task. */
-export type ListRow = TabRow | GroupRow | WindowRow;
 
 export type Row = TabRow | GroupRow | WindowRow | PinRow | FolderRow | DividerRow | TilesRow;
 
@@ -201,37 +204,6 @@ export function buildSearchRows(tabs: readonly TabInfo[], hits: readonly SearchH
   return rows;
 }
 
-/**
- * Multi-window view: one header per window (home window first, as given), each followed
- * by that window's tree one level deeper. Collapsed windows show only their header.
- */
-export function buildWindowRows(
-  windows: readonly { info: WindowInfo; tabs: readonly TabInfo[]; groups: readonly GroupInfo[] }[],
-  homeId: number | null,
-  collapsed: ReadonlySet<number>,
-): ListRow[] {
-  const rows: ListRow[] = [];
-  windows.forEach((w, i) => {
-    const isCollapsed = collapsed.has(w.info.id);
-    rows.push({
-      kind: 'window',
-      key: `w${w.info.id}`,
-      info: w.info,
-      number: i + 1,
-      isHome: w.info.id === homeId,
-      count: w.tabs.length,
-      collapsed: isCollapsed,
-      name: windowName(w.tabs, undefined, i + 1),
-      layoutId: null,
-      level: 1,
-      pos: i + 1,
-      size: windows.length,
-    });
-    if (!isCollapsed) rows.push(...buildRows(w.tabs, w.groups, 1));
-  });
-  return rows;
-}
-
 const windowName = (tabs: readonly TabInfo[], layout: WindowLayout | undefined, number: number) =>
   layout?.name || tabs.find((t) => t.active)?.title || `Window ${number}`;
 
@@ -245,6 +217,7 @@ function pinnedTreeRows(
   byTab: ReadonlyMap<number, TabInfo>,
   offset: number,
   depth = 1,
+  parentId: string | null = null,
 ): Row[] {
   const rows: Row[] = [];
   const pinRow = (item: PinItem, d: number, pos: number, size: number): PinRow => ({
@@ -254,6 +227,8 @@ function pinnedTreeRows(
     item,
     tab: item.tabId === null ? null : (byTab.get(item.tabId) ?? null),
     depth: d,
+    parentId,
+    index: pos - 1,
     essential: false,
     level: d + offset,
     pos,
@@ -270,17 +245,19 @@ function pinnedTreeRows(
       windowId,
       folder: node,
       depth,
+      parentId,
+      index: i,
       count: countItems(node.children),
       level: depth + offset,
       pos: i + 1,
       size: nodes.length,
     });
     if (!node.collapsed) {
-      rows.push(...pinnedTreeRows(node.children, windowId, byTab, offset, depth + 1));
+      rows.push(...pinnedTreeRows(node.children, windowId, byTab, offset, depth + 1, node.id));
       return;
     }
     // A collapsed folder still shows the tab you are on, so the active tab never vanishes.
-    const active = pinnedTreeRows(node.children, windowId, byTab, offset, depth + 1).find(
+    const active = pinnedTreeRows(node.children, windowId, byTab, offset, depth + 1, node.id).find(
       (r): r is PinRow => r.kind === 'pin' && r.tab?.active === true,
     );
     if (active)
@@ -308,6 +285,9 @@ export function buildPanelRows(
   const homeLayout = windows.find((w) => w.info.id === homeId)?.layout;
   const perRow = Math.max(1, opts.tilesPerRow);
   const rows: Row[] = [];
+  // The home window has no header, so only the other windows' headers are siblings.
+  const headers = windows.filter((w) => w.info.id !== homeId).length;
+  let header = 0;
 
   windows.forEach((w, wi) => {
     const windowId = w.info.id;
@@ -329,8 +309,8 @@ export function buildPanelRows(
         name: windowName(w.tabs, layout, wi + 1),
         layoutId: layout?.id ?? null,
         level: 1,
-        pos: wi + 1,
-        size: windows.length,
+        pos: ++header,
+        size: headers,
       });
       if (collapsed) return;
     }

@@ -1,4 +1,5 @@
 import type { GroupColor } from '../../shared/types';
+import type { IconName } from './Icon.svelte';
 
 export type MenuItem =
   | {
@@ -9,6 +10,8 @@ export type MenuItem =
       danger?: boolean;
       /** CSS colour for a leading dot (group entries). */
       dot?: string;
+      /** Leading glyph (folder icon choices). */
+      icon?: IconName;
     }
   | { type: 'separator' }
   | { type: 'submenu'; label: string; items: MenuItem[] }

@@ -188,6 +188,48 @@ describe('buildPanelRows other windows', () => {
   });
 });
 
+describe('buildPanelRows window headers', () => {
+  const w = (id: number) => ({
+    info: win(id),
+    tabs: [tab(id * 10, { windowId: id })],
+    groups: [],
+    layout: layout({ id: `l${String(id).repeat(10)}` }),
+  });
+
+  it('only the other windows count as header siblings (the home window has none)', () => {
+    const rows = buildPanelRows([w(1), w(2), w(3)], 1, opts);
+    const headers = rows.filter((r) => r.kind === 'window');
+    expect(headers.map((h) => [h.key, h.pos, h.size])).toEqual([
+      ['w2', 1, 2],
+      ['w3', 2, 2],
+    ]);
+  });
+
+  it('with no home window every window is a header', () => {
+    const rows = buildPanelRows([w(1), w(2)], null, opts);
+    const headers = rows.filter((r) => r.kind === 'window');
+    expect(headers.map((h) => [h.key, h.pos, h.size])).toEqual([
+      ['w1', 1, 2],
+      ['w2', 2, 2],
+    ]);
+  });
+});
+
+describe('buildPanelRows parent and index', () => {
+  it('pin and folder rows carry their enclosing folder and sibling index', () => {
+    const rows = buildPanelRows(
+      [{ info: win(1), tabs: homeTabs(), groups: [], layout: homeLayout() }],
+      1,
+      opts,
+    );
+    const by = Object.fromEntries(rows.map((r) => [r.key, r]));
+    expect(by.fF).toMatchObject({ parentId: null, index: 0 });
+    expect(by.pa).toMatchObject({ parentId: 'F', index: 0 });
+    expect(by.pb).toMatchObject({ parentId: 'F', index: 1 });
+    expect(by.pc).toMatchObject({ parentId: null, index: 1 });
+  });
+});
+
 describe('rowWindowId for pin rows', () => {
   it('resolves new kinds', () => {
     const rows = buildPanelRows(

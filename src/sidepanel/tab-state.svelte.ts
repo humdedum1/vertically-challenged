@@ -10,6 +10,8 @@ import type { GroupInfo, TabInfo, WindowInfo, WindowPatch } from '../shared/type
 
 export type ConnectionStatus = 'connecting' | 'ready' | 'error';
 
+const LAYOUT_WAIT_MS = 500;
+
 export interface WindowView {
   info: WindowInfo;
   tabs: TabInfo[];
@@ -48,6 +50,16 @@ export class TabState {
   onNotice: ((n: { level: 'info' | 'error'; text: string }) => void) | null = null;
 
   private mirrors = new Map<number, Mirror>();
+  /**
+   * Windows whose snapshot arrived before their layout. The worker sends the layouts
+   * right behind the snapshots, but in separate messages; publishing in between would
+   * show pinned tabs as plain rows for a few frames and then reflow the whole list.
+   * Publishing waits for them, at most LAYOUT_WAIT_MS.
+   */
+  private layoutWait = new Set<number>();
+  private layoutTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The home snapshot is in; `ready` is announced once the held rows are published. */
+  private homeArrived = false;
   private port: Browser.runtime.Port | null = null;
   private retries = 0;
   private disposed = false;
@@ -65,6 +77,7 @@ export class TabState {
 
   dispose(): void {
     this.disposed = true;
+    clearTimeout(this.layoutTimer);
     this.port?.disconnect();
     this.port = null;
   }
@@ -113,12 +126,9 @@ export class TabState {
         };
         rebuild(m);
         this.mirrors.set(msg.windowId, m);
-        if (msg.windowId === this.windowId) {
-          this.retries = 0;
-          this.status = 'ready';
-          this.error = null;
-        }
-        this.publish();
+        if (msg.windowId === this.windowId) this.homeArrived = true;
+        if (!this.layouts.has(msg.windowId)) this.holdForLayout(msg.windowId);
+        this.flush();
         return;
       }
       case 'patch': {
@@ -140,15 +150,20 @@ export class TabState {
         for (const id of [...this.mirrors.keys()]) {
           if (!msg.windows.some((w) => w.id === id)) this.mirrors.delete(id);
         }
+        // A window that closed before its layout came will never get one.
+        for (const id of this.layoutWait) {
+          if (!msg.windows.some((w) => w.id === id)) this.layoutWait.delete(id);
+        }
         if ([...this.layouts.keys()].some((id) => !msg.windows.some((w) => w.id === id))) {
           this.layouts = new Map(
             [...this.layouts].filter(([id]) => msg.windows.some((w) => w.id === id)),
           );
         }
-        this.publish();
+        this.flush();
         return;
       case 'layout':
         this.layouts = new Map(this.layouts).set(msg.windowId, msg.layout);
+        if (this.layoutWait.delete(msg.windowId) && this.layoutWait.size === 0) this.flush();
         return;
       case 'setups':
         this.setups = msg.setups;
@@ -162,11 +177,37 @@ export class TabState {
     }
   }
 
+  private holdForLayout(windowId: number): void {
+    this.layoutWait.add(windowId);
+    if (this.layoutTimer !== undefined) return;
+    this.layoutTimer = setTimeout(() => {
+      // A layout that never came (worker trouble): show the tabs without it.
+      this.layoutWait.clear();
+      this.flush();
+    }, LAYOUT_WAIT_MS);
+  }
+
+  /** Publishes everything once no layout is outstanding, and announces readiness. */
+  private flush(): void {
+    if (this.layoutWait.size > 0) return;
+    clearTimeout(this.layoutTimer);
+    this.layoutTimer = undefined;
+    if (this.homeArrived) {
+      this.homeArrived = false;
+      this.retries = 0;
+      this.status = 'ready';
+      this.error = null;
+    }
+    this.publish();
+  }
+
   /**
    * Pushes mirrors into the reactive fields. `changed` limits work to one window;
    * `groupsOnly` leaves the tab array alone so group renames don't rebuild rows.
    */
   private publish(changed?: number, groupsOnly = false): void {
+    // Held until the outstanding layouts arrive; flush() then publishes everything.
+    if (this.layoutWait.size > 0) return;
     const home = this.windowId === null ? undefined : this.mirrors.get(this.windowId);
     if (changed === undefined || changed === this.windowId) {
       if (!groupsOnly) this.tabs = home?.tabs ?? [];

@@ -180,6 +180,9 @@ function onkeydown(e: KeyboardEvent): void {
           {#if item.type === 'item' && item.dot}
             <span class="dot" style:background={item.dot}></span>
           {/if}
+          {#if item.type === 'item' && item.icon}
+            <span class="glyph"><Icon name={item.icon} size={14} /></span>
+          {/if}
           <span class="text">{item.label}</span>
           {#if item.type !== 'item'}
             <span class="chev"><Icon name="chevron" size={12} /></span>
@@ -261,6 +264,12 @@ function onkeydown(e: KeyboardEvent): void {
     width: 10px;
     height: 10px;
     border-radius: 50%;
+  }
+
+  .glyph {
+    flex: none;
+    display: grid;
+    color: var(--mTertiary);
   }
 
   .sep {

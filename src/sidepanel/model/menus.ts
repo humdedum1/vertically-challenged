@@ -1,5 +1,5 @@
 import { hostOf, matchesHostPattern } from '../../shared/host-pattern';
-import type { PinItem } from '../../shared/layout';
+import { FOLDER_ICONS, MAX_FOLDER_DEPTH, type PinFolder, type PinItem } from '../../shared/layout';
 import type { PanelMessage } from '../../shared/protocol';
 import type { GroupInfo, TabInfo, WindowInfo } from '../../shared/types';
 import type { MenuItem } from '../components/menu-types';
@@ -227,6 +227,8 @@ export interface WindowMenuContext {
   /** Every tab of the window. */
   tabs: readonly TabInfo[];
   send: (msg: PanelMessage) => void;
+  /** Opens the inline name field on the header. */
+  onRename: () => void;
 }
 
 export function windowMenu(c: WindowMenuContext): MenuItem[] {
@@ -234,6 +236,7 @@ export function windowMenu(c: WindowMenuContext): MenuItem[] {
   const target = c.tabs.find((t) => t.active) ?? c.tabs[0];
   const closeAll = (): void => c.send({ type: 'close', tabIds: ids });
   return [
+    { type: 'item', label: 'Rename', onselect: c.onRename },
     {
       type: 'item',
       label: 'Switch to window',
@@ -294,7 +297,16 @@ export interface EssentialMenuContext {
   send: (msg: PanelMessage) => void;
 }
 
-export function essentialMenu(c: EssentialMenuContext): MenuItem[] {
+/**
+ * The entries Essentials and pinned rows share: both are launchers with a home URL, and
+ * closing either only suspends it.
+ */
+function launcherItems(c: {
+  item: PinItem;
+  tab: TabInfo | null;
+  windowId: number;
+  send: (msg: PanelMessage) => void;
+}): MenuItem[] {
   const { item, tab, windowId } = c;
   const itemId = item.id;
   // Mirrors pinSetHome in the worker: the live URL, else where the item was last.
@@ -329,6 +341,14 @@ export function essentialMenu(c: EssentialMenuContext): MenuItem[] {
       disabled: tab === null || tab.discarded,
       onselect: () => c.send({ type: 'pinClose', windowId, itemIds: [itemId] }),
     },
+  ];
+}
+
+export function essentialMenu(c: EssentialMenuContext): MenuItem[] {
+  const { item, tab, windowId } = c;
+  const itemId = item.id;
+  return [
+    ...launcherItems(c),
     SEP,
     {
       type: 'item',
@@ -357,4 +377,204 @@ export function essentialMenu(c: EssentialMenuContext): MenuItem[] {
       onselect: () => c.send({ type: 'pinRemove', windowId, itemId, mode: 'close' }),
     },
   ];
+}
+
+export interface PinMenuContext {
+  item: PinItem;
+  /** The live tab, or null while the item is dormant. */
+  tab: TabInfo | null;
+  windowId: number;
+  /** Where the item sits, so "New folder" can take its place. */
+  parentId: string | null;
+  index: number;
+  /** 1 at the pinned root, +1 per enclosing folder. */
+  depth: number;
+  /** "Add to Essentials" appends to the grid. */
+  essentialsCount: number;
+  send: (msg: PanelMessage) => void;
+  /** Called after "New folder" so the UI can open the name field once the folder appears. */
+  onNewFolder: () => void;
+}
+
+const NEW_FOLDER = 'New folder';
+
+export function pinMenu(c: PinMenuContext): MenuItem[] {
+  const { item, tab, windowId } = c;
+  const itemId = item.id;
+  return [
+    ...launcherItems(c),
+    SEP,
+    {
+      type: 'item',
+      label: 'Add to Essentials',
+      onselect: () =>
+        c.send({
+          type: 'pinMove',
+          windowId,
+          nodeId: itemId,
+          toWindowId: windowId,
+          dest: { zone: 'essentials', index: c.essentialsCount },
+        }),
+    },
+    {
+      type: 'item',
+      label: 'New folder',
+      // The folder takes the item's place, one level below its parent: past the depth
+      // limit (inside a depth-3 folder) there is no room for another folder.
+      disabled: c.depth > MAX_FOLDER_DEPTH,
+      onselect: () => {
+        c.onNewFolder();
+        c.send({
+          type: 'folderCreate',
+          windowId,
+          name: NEW_FOLDER,
+          dest: { zone: 'pinned', folderId: c.parentId, index: c.index },
+          itemIds: [itemId],
+        });
+      },
+    },
+    {
+      type: 'item',
+      label: 'Unpin',
+      onselect: () => c.send({ type: 'pinRemove', windowId, itemId, mode: 'unpin' }),
+    },
+    SEP,
+    {
+      type: 'item',
+      label: 'Close tab',
+      danger: true,
+      disabled: tab === null,
+      onselect: () => c.send({ type: 'pinRemove', windowId, itemId, mode: 'close' }),
+    },
+  ];
+}
+
+export interface FolderMenuContext {
+  folder: PinFolder;
+  /** 1 at the pinned root, +1 per enclosing folder. */
+  depth: number;
+  windowId: number;
+  send: (msg: PanelMessage) => void;
+  onRename: () => void;
+  onNewFolder: () => void;
+}
+
+const capitalize = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
+export function folderMenu(c: FolderMenuContext): MenuItem[] {
+  const { folder, windowId } = c;
+  const folderId = folder.id;
+  return [
+    { type: 'item', label: 'Rename', onselect: c.onRename },
+    {
+      type: 'submenu',
+      label: 'Change icon',
+      items: FOLDER_ICONS.map<MenuItem>((icon) => ({
+        type: 'item',
+        label: capitalize(icon),
+        icon,
+        onselect: () => c.send({ type: 'folderUpdate', windowId, folderId, icon }),
+      })),
+    },
+    {
+      type: 'item',
+      label: 'New subfolder',
+      disabled: c.depth >= MAX_FOLDER_DEPTH,
+      onselect: () => {
+        // Inside a collapsed folder the new one would be hidden, and so would its name field.
+        if (folder.collapsed)
+          c.send({ type: 'folderUpdate', windowId, folderId, collapsed: false });
+        c.onNewFolder();
+        c.send({
+          type: 'folderCreate',
+          windowId,
+          name: NEW_FOLDER,
+          dest: { zone: 'pinned', folderId, index: folder.children.length },
+          itemIds: [],
+        });
+      },
+    },
+    SEP,
+    {
+      type: 'item',
+      label: 'Suspend all',
+      onselect: () => c.send({ type: 'folderSuspend', windowId, folderId }),
+    },
+    SEP,
+    // Deleting can close tabs, so the choice is a step of its own (like "Close window…").
+    {
+      type: 'submenu',
+      label: 'Delete…',
+      items: [
+        {
+          type: 'item',
+          label: 'Keep tabs as pinned',
+          onselect: () => c.send({ type: 'folderDelete', windowId, folderId, keepTabs: true }),
+        },
+        {
+          type: 'item',
+          label: 'Close tabs',
+          danger: true,
+          onselect: () => c.send({ type: 'folderDelete', windowId, folderId, keepTabs: false }),
+        },
+      ],
+    },
+  ];
+}
+
+export interface DividerMenuContext {
+  windowId: number;
+  /** Root nodes of the pinned tree: "New folder" lands after them. */
+  pinnedCount: number;
+  clearable: number;
+  /** Clear is offered on the panel's own window only. */
+  showClear: boolean;
+  send: (msg: PanelMessage) => void;
+  onNewFolder: () => void;
+}
+
+export function dividerMenu(c: DividerMenuContext): MenuItem[] {
+  const items: MenuItem[] = [
+    {
+      type: 'item',
+      label: 'New folder',
+      onselect: () => {
+        c.onNewFolder();
+        c.send({
+          type: 'folderCreate',
+          windowId: c.windowId,
+          name: NEW_FOLDER,
+          dest: { zone: 'pinned', folderId: null, index: c.pinnedCount },
+          itemIds: [],
+        });
+      },
+    },
+  ];
+  if (c.showClear) {
+    items.push(SEP, {
+      type: 'item',
+      label:
+        c.clearable > 0
+          ? `Clear ${c.clearable} ${c.clearable === 1 ? 'tab' : 'tabs'}`
+          : 'Clear tabs',
+      disabled: c.clearable === 0,
+      onselect: () => c.send({ type: 'clearTabs', windowId: c.windowId }),
+    });
+  }
+  return items;
+}
+
+export interface TilesMenuContext {
+  windowId: number;
+  tiles: readonly { item: PinItem; tab: TabInfo | null }[];
+  send: (msg: PanelMessage) => void;
+}
+
+/** Keyboard route to another window's mini Essentials: one entry per tile. */
+export function tilesMenu(c: TilesMenuContext): MenuItem[] {
+  return c.tiles.map(({ item, tab }) => ({
+    type: 'item',
+    label: `Open ${tab?.title || item.title || item.homeUrl}`,
+    onselect: () => c.send({ type: 'pinOpen', windowId: c.windowId, itemId: item.id }),
+  }));
 }

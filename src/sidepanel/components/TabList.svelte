@@ -3,14 +3,16 @@
  * Keyboard map (focus stays on the tree; rows are addressed with aria-activedescendant).
  * Fixed navigation keys:
  *   Up / Down          move focus            Home / End      first / last row
- *   Left               collapse group / window, or go to the parent header
- *   Right              expand group / window, or go to its first child
- *   Enter              activate tab / toggle group or window
- *   Space              toggle selection of the focused tab (group, window: toggle)
+ *   Left               collapse group / folder / window, or go to the parent header
+ *   Right              expand group / folder / window, or go to its first child
+ *   Enter              activate tab, open pinned tab / toggle group, folder or window /
+ *                      list another window's Essentials (tiles row)
+ *   Space              toggle selection of the focused tab (group, folder, window: toggle)
  *   Shift+Up / Down    extend selection
  *   Escape             clear selection, then clear the search
  * Configurable (Settings > Shortcuts; defaults in parentheses), looked up with actionFor():
- *   closeTab (Delete), renameGroup (F2), moveUp / moveDown (Alt+Up / Down), openMenu
+ *   closeTab (Delete; suspends a pinned tab), renameGroup (F2; also folders and windows),
+ *   moveUp / moveDown (Alt+Up / Down), openMenu
  *   (Shift+F10, ContextMenu), selectAll (Ctrl+A), focusSearch (/, Ctrl+F; also works from
  *   outside the tree), newTab, duplicateTab, togglePin, toggleMute, suspendTab (unbound).
  */
@@ -21,21 +23,35 @@ import { actionFor } from '../../lib/keymap';
 import { FuzzyIndex } from '../../lib/search/fuzzy-index';
 import type { SearchIndex } from '../../lib/search/search-index';
 import type { Keymap, ShortcutAction } from '../../settings/schema';
-import type { PinItem } from '../../shared/layout';
+import type { PinItem, PinNode, WindowLayout } from '../../shared/layout';
 import type { PanelMessage } from '../../shared/protocol';
 import type { GroupInfo, TabInfo } from '../../shared/types';
 import { type Drag, type DropZone, type MultiDropContext, planDropMulti } from '../model/drop-plan';
-import { essentialMenu, groupMenu, tabMenu, windowLabel, windowMenu } from '../model/menus';
-import { buildSearchRows, buildWindowRows, type ListRow as Row, rowWindowId } from '../model/rows';
+import {
+  dividerMenu,
+  essentialMenu,
+  folderMenu,
+  groupMenu,
+  pinMenu,
+  tabMenu,
+  tilesMenu,
+  windowLabel,
+  windowMenu,
+} from '../model/menus';
+import { buildPanelRows, buildSearchRows, type Row, rowWindowId } from '../model/rows';
 import { pruneSelection, tabIdsBetween } from '../model/selection';
 import type { TabState } from '../tab-state.svelte';
 import { tintCache } from '../tint-cache.svelte';
 import ContextMenu from './ContextMenu.svelte';
+import DividerRow from './DividerRow.svelte';
 import EssentialsGrid from './EssentialsGrid.svelte';
+import FolderRow from './FolderRow.svelte';
 import GroupRow from './GroupRow.svelte';
 import Icon from './Icon.svelte';
 import type { MenuItem } from './menu-types';
+import PinRow from './PinRow.svelte';
 import TabRow from './TabRow.svelte';
+import TilesRow, { TILES_ROW_INSET } from './TilesRow.svelte';
 import VirtualList from './VirtualList.svelte';
 import WindowRow from './WindowRow.svelte';
 
@@ -89,58 +105,61 @@ $effect.pre(() => {
   fedTabs = allTabs;
 });
 
-// Collapsed windows are UI state only (Chrome has no such concept). Window ids don't survive
-// a browser restart, so entries for windows that no longer exist are pruned.
-const COLLAPSED_KEY = 'vc.collapsedWindows';
-function loadCollapsed(): ReadonlySet<number> {
-  try {
-    const raw: unknown = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]');
-    return new Set(Array.isArray(raw) ? raw.filter((x): x is number => Number.isInteger(x)) : []);
-  } catch {
-    return new Set();
-  }
-}
-let collapsedWindows = $state.raw<ReadonlySet<number>>(loadCollapsed());
-
-function setCollapsedWindows(next: ReadonlySet<number>): void {
-  collapsedWindows = next;
-  try {
-    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]));
-  } catch {
-    // Storage unavailable: the choice just doesn't persist.
-  }
+// Collapsing another window is remembered by the worker in this window's layout (per panel).
+function setWindowCollapsed(otherWindowId: number, collapsed: boolean): void {
+  const windowId = tabState.windowId;
+  if (windowId === null) return;
+  send({ type: 'setWindowCollapsed', windowId, otherWindowId, collapsed });
 }
 
-function setWindowCollapsed(id: number, collapsed: boolean): void {
-  if (collapsedWindows.has(id) === collapsed) return;
-  const next = new Set(collapsedWindows);
-  if (collapsed) next.add(id);
-  else next.delete(id);
-  setCollapsedWindows(next);
-}
+// Other windows' Essentials are chunked into fixed-height rows; how many fit depends on
+// the list width (36px minimum per tile, 4px gaps).
+let listWidth = $state(0);
+const tilesPerRow = $derived(Math.max(1, Math.floor((listWidth - TILES_ROW_INSET + 4) / (36 + 4))));
 
-$effect(() => {
-  const known = new Set(tabState.windowList.map((w) => w.id));
-  const current = untrack(() => collapsedWindows);
-  if (known.size === 0) return;
-  const next = new Set([...current].filter((id) => known.has(id)));
-  if (next.size !== current.size) untrack(() => setCollapsedWindows(next));
-});
+function observeWidth(node: HTMLElement) {
+  const ro = new ResizeObserver(([entry]) => {
+    if (entry) listWidth = entry.contentRect.width;
+  });
+  ro.observe(node);
+  return { destroy: () => ro.disconnect() };
+}
 
 let query = $state('');
 const needle = $derived(query.trim());
 const searching = $derived(needle !== '');
 const treeRows: Row[] = $derived(
-  buildWindowRows(tabState.windows, tabState.windowId, collapsedWindows),
+  buildPanelRows(
+    tabState.windows.map((w) => ({ ...w, layout: tabState.layoutOf(w.info.id) })),
+    tabState.windowId,
+    { tilesPerRow },
+  ),
 );
-// aria-level of tabs inside a group: one deeper under a window header.
-const nested = $derived(!searching);
-const groupLevel = $derived(nested ? 3 : 2);
 const view: Row[] = $derived(searching ? buildSearchRows(fedTabs, index.search(needle)) : treeRows);
 const keyIndex = $derived(new Map(view.map((r, i) => [r.key, i])));
+/** Row index of each live tab, whether it renders as a tab row or a pinned row. */
+const tabRowIndex = $derived.by(() => {
+  const m = new Map<number, number>();
+  view.forEach((r, i) => {
+    if (r.kind === 'tab') m.set(r.tab.id, i);
+    else if (r.kind === 'pin' && r.tab) m.set(r.tab.id, i);
+  });
+  return m;
+});
+/** Under another window's header (search results are flat). */
+const isNested = (r: Row): boolean => !searching && rowWindowId(r) !== tabState.windowId;
+/** A tab shown as a child of its group header (only in the tree; search is flat). */
+const isGroupedTab = (t: TabInfo): boolean =>
+  !searching && !t.pinned && t.groupId !== -1 && groupById.has(t.groupId);
 const groupById = $derived(new Map<number, GroupInfo>(allGroups.map((g) => [g.id, g])));
 const windowName = (id: number): string =>
   windowLabel(windowNumber.get(id) ?? 0, id === tabState.windowId);
+/** The name a window's header shows (layout name or active tab title). */
+const windowViewName = (id: number): string => {
+  const i = keyIndex.get(`w${id}`);
+  const r = i === undefined ? undefined : view[i];
+  return r?.kind === 'window' ? r.name : windowName(id);
+};
 const showUrl = $derived(twoLine || (rowHeight >= 34 && searching));
 
 // The home window's Essentials sit above the list as a grid; other windows' render as rows.
@@ -148,6 +167,7 @@ const homeLayout = $derived(
   tabState.windowId === null ? undefined : tabState.layoutOf(tabState.windowId),
 );
 const essentials = $derived(homeLayout?.essentials ?? []);
+const layoutOf = (windowId: number): WindowLayout | undefined => tabState.layoutOf(windowId);
 const homeTabById = $derived(new Map(tabState.tabs.map((t) => [t.id, t])));
 const showGrid = $derived(!searching && essentials.length > 0);
 let grid: ReturnType<typeof EssentialsGrid> | undefined = $state();
@@ -190,7 +210,7 @@ $effect(() => {
   if (id === activeSeen) return;
   activeSeen = id;
   untrack(() => {
-    const i = id === null || searching ? undefined : keyIndex.get(`t${id}`);
+    const i = id === null || searching ? undefined : tabRowIndex.get(id);
     if (i !== undefined) setFocus(i);
   });
 });
@@ -213,7 +233,7 @@ function select(ids: Iterable<number>): void {
 }
 
 function selectRangeTo(i: number): void {
-  const anchor = anchorId === null ? undefined : keyIndex.get(`t${anchorId}`);
+  const anchor = anchorId === null ? undefined : tabRowIndex.get(anchorId);
   select(tabIdsBetween(view, anchor ?? focusedIndex, i));
 }
 
@@ -251,21 +271,63 @@ function onGroupClick(e: MouseEvent, i: number): void {
   send({ type: 'updateGroup', groupId: row.group.id, collapsed: !row.group.collapsed });
 }
 
-function onWindowClick(i: number): void {
+function onWindowClick(e: MouseEvent, i: number): void {
   const row = view[i];
   if (row?.kind !== 'window') return;
   setFocus(i, false);
   tree()?.focus();
+  if (e.detail > 1) return;
+  preToggle = row.collapsed;
   setWindowCollapsed(row.info.id, !row.collapsed);
 }
 
-function onGroupDblclick(i: number): void {
+function onFolderClick(e: MouseEvent, i: number): void {
   const row = view[i];
-  if (row?.kind !== 'group') return;
-  // Always send (not "only if it differs"): the patch for the first click's toggle hasn't
-  // arrived yet, so local state can't tell whether the toggle already happened.
-  send({ type: 'updateGroup', groupId: row.group.id, collapsed: preToggle });
-  startRename(row.group.id);
+  if (row?.kind !== 'folder') return;
+  setFocus(i, false);
+  tree()?.focus();
+  if (e.detail > 1) return;
+  preToggle = row.folder.collapsed;
+  setFolderCollapsed(row.windowId, row.folder.id, !row.folder.collapsed);
+}
+
+function setFolderCollapsed(windowId: number, folderId: string, collapsed: boolean): void {
+  send({ type: 'folderUpdate', windowId, folderId, collapsed });
+}
+
+function onPinClick(e: MouseEvent, i: number): void {
+  const row = view[i];
+  if (row?.kind !== 'pin') return;
+  setFocus(i, false);
+  tree()?.focus();
+  const tab = row.tab;
+  // Pinned tabs join range / Ctrl selections like tab rows; a plain click opens.
+  if (tab && e.shiftKey) selectRangeTo(i);
+  else if (tab && (e.ctrlKey || e.metaKey)) toggleSelect(tab.id);
+  else openPin(row.windowId, row.item.id, tab);
+}
+
+function openPin(windowId: number, itemId: string, tab: TabInfo | null): void {
+  if (tab) {
+    select([tab.id]);
+    anchorId = tab.id;
+  } else select([]);
+  send({ type: 'pinOpen', windowId, itemId });
+}
+
+// The second click of a double-click is the start of a rename. Undo the first click's
+// toggle: always send (not "only if it differs"), because the update for that toggle
+// hasn't arrived yet, so local state can't tell whether it already happened.
+function onHeaderDblclick(i: number): void {
+  const row = view[i];
+  if (row?.kind === 'group') {
+    send({ type: 'updateGroup', groupId: row.group.id, collapsed: preToggle });
+  } else if (row?.kind === 'folder') {
+    setFolderCollapsed(row.windowId, row.folder.id, preToggle);
+  } else if (row?.kind === 'window') {
+    setWindowCollapsed(row.info.id, preToggle);
+  } else return;
+  startRename(row.key);
 }
 
 /** What an action on `tab` applies to: the selection if it contains the tab, else the tab. */
@@ -275,24 +337,87 @@ function targetTabs(tab: TabInfo): TabInfo[] {
 
 const targetsOf = (tab: TabInfo): number[] => targetTabs(tab).map((t) => t.id);
 
+/**
+ * What a drag or keyboard move of `tab` carries: its targets minus tabs shown as pinned
+ * rows, whose place is the layout's (moving them is Task 12's pin drag, not a tab move).
+ */
+const movableTargets = (tab: TabInfo): number[] =>
+  targetsOf(tab).filter((id) => {
+    const i = tabRowIndex.get(id);
+    return i === undefined || view[i]?.kind !== 'pin';
+  });
+
 // --- Rename ----------------------------------------------------------------------------
 
-let renamingId = $state<number | null>(null);
+/** Key of the group, folder or window header whose name field is open. */
+let renamingKey = $state<string | null>(null);
 let pendingGroup: { tabIds: number[]; known: Set<number>; until: number } | null = null;
+let pendingFolder: { windowId: number; known: Set<string>; until: number } | null = null;
 
-function startRename(groupId: number): void {
-  const i = keyIndex.get(`g${groupId}`);
+function startRename(key: string): void {
+  const i = keyIndex.get(key);
   if (i === undefined) return;
   setFocus(i);
-  renamingId = groupId;
+  renamingKey = key;
 }
 
 function onRenamed(groupId: number, title: string | null): void {
-  renamingId = null;
+  renamingKey = null;
   const g = groupById.get(groupId);
   if (title !== null && g && title !== g.title) send({ type: 'updateGroup', groupId, title });
   tree()?.focus();
 }
+
+function onFolderRenamed(windowId: number, folderId: string, name: string | null): void {
+  renamingKey = null;
+  const current = view.find((r) => r.kind === 'folder' && r.folder.id === folderId);
+  // A folder needs a name; clearing the field keeps the old one.
+  if (name && current?.kind === 'folder' && name !== current.folder.name) {
+    send({ type: 'folderUpdate', windowId, folderId, name });
+  }
+  tree()?.focus();
+}
+
+function onWindowRenamed(windowId: number, shown: string, name: string | null): void {
+  renamingKey = null;
+  // Empty goes back to the default (the active tab's title).
+  if (name === '') send({ type: 'renameWindow', windowId, name: null });
+  else if (name !== null && name !== shown) send({ type: 'renameWindow', windowId, name });
+  tree()?.focus();
+}
+
+const folderIdsOf = (nodes: readonly PinNode[], out = new Set<string>()): Set<string> => {
+  for (const n of nodes) {
+    if (n.kind === 'folder') {
+      out.add(n.id);
+      folderIdsOf(n.children, out);
+    }
+  }
+  return out;
+};
+
+/** "New folder": the id is minted by the worker, so watch for a folder that wasn't there. */
+function expectFolder(windowId: number): void {
+  pendingFolder = {
+    windowId,
+    known: folderIdsOf(layoutOf(windowId)?.pinned ?? []),
+    until: Date.now() + 4000,
+  };
+}
+
+$effect(() => {
+  void view;
+  const p = pendingFolder;
+  if (!p) return;
+  if (Date.now() > p.until) {
+    pendingFolder = null;
+    return;
+  }
+  const fresh = [...folderIdsOf(layoutOf(p.windowId)?.pinned ?? [])].find((id) => !p.known.has(id));
+  if (fresh === undefined || !keyIndex.has(`f${fresh}`)) return;
+  pendingFolder = null;
+  untrack(() => startRename(`f${fresh}`));
+});
 
 // "Add to new group": the new group id is unknown until Chrome reports it, so watch for
 // a group that now contains the first tab and wasn't there before.
@@ -313,7 +438,7 @@ $effect(() => {
     groupById.has(first.groupId)
   ) {
     pendingGroup = null;
-    untrack(() => startRename(first.groupId));
+    untrack(() => startRename(`g${first.groupId}`));
   }
 });
 
@@ -328,6 +453,16 @@ let menu = $state.raw<{
   fromGrid?: boolean;
 } | null>(null);
 
+function essentialItems(windowId: number, item: PinItem): MenuItem[] {
+  return essentialMenu({
+    item,
+    tab: item.tabId === null ? null : (tabById.get(item.tabId) ?? null),
+    windowId,
+    pinnedCount: layoutOf(windowId)?.pinned.length ?? 0,
+    send,
+  });
+}
+
 function openEssentialMenu(x: number, y: number, item: PinItem): void {
   const windowId = tabState.windowId;
   if (windowId === null) return;
@@ -336,14 +471,23 @@ function openEssentialMenu(x: number, y: number, item: PinItem): void {
     y,
     label: 'Essential actions',
     fromGrid: true,
-    items: essentialMenu({
-      item,
-      tab: item.tabId === null ? null : (homeTabById.get(item.tabId) ?? null),
-      windowId,
-      pinnedCount: homeLayout?.pinned.length ?? 0,
-      send,
-    }),
+    items: essentialItems(windowId, item),
   };
+}
+
+/** Right-click on a tile in another window's row, or on the row (`item` null: list them). */
+function openTilesMenu(i: number, x: number, y: number, item: PinItem | null): void {
+  const row = view[i];
+  if (row?.kind !== 'tiles') return;
+  setFocus(i, false);
+  menu = item
+    ? { x, y, label: 'Essential actions', items: essentialItems(row.windowId, item) }
+    : {
+        x,
+        y,
+        label: 'Essentials',
+        items: tilesMenu({ windowId: row.windowId, tiles: row.tiles, send }),
+      };
 }
 
 function openMenu(i: number, x: number, y: number): void {
@@ -359,6 +503,7 @@ function openMenu(i: number, x: number, y: number): void {
         info: row.info,
         tabs: windowViewById.get(row.info.id)?.tabs ?? [],
         send,
+        onRename: () => startRename(row.key),
       }),
     };
     return;
@@ -372,9 +517,64 @@ function openMenu(i: number, x: number, y: number): void {
         group: row.group,
         tabs: tabsOfWindow(row.group.windowId),
         send,
-        onRename: () => startRename(row.group.id),
+        onRename: () => startRename(row.key),
       }),
     };
+    return;
+  }
+  if (row.kind === 'pin') {
+    menu = {
+      x,
+      y,
+      label: 'Pinned tab actions',
+      items: pinMenu({
+        item: row.item,
+        tab: row.tab,
+        windowId: row.windowId,
+        parentId: row.parentId,
+        index: row.index,
+        depth: row.depth,
+        essentialsCount: layoutOf(row.windowId)?.essentials.length ?? 0,
+        send,
+        onNewFolder: () => expectFolder(row.windowId),
+      }),
+    };
+    return;
+  }
+  if (row.kind === 'folder') {
+    menu = {
+      x,
+      y,
+      label: 'Folder actions',
+      items: folderMenu({
+        folder: row.folder,
+        depth: row.depth,
+        windowId: row.windowId,
+        send,
+        onRename: () => startRename(row.key),
+        onNewFolder: () => expectFolder(row.windowId),
+      }),
+    };
+    return;
+  }
+  if (row.kind === 'divider') {
+    menu = {
+      x,
+      y,
+      label: 'Pinned tabs',
+      items: dividerMenu({
+        windowId: row.windowId,
+        pinnedCount: layoutOf(row.windowId)?.pinned.length ?? 0,
+        clearable: row.clearable,
+        showClear: row.windowId === tabState.windowId,
+        send,
+        onNewFolder: () => expectFolder(row.windowId),
+      }),
+    };
+    return;
+  }
+  if (row.kind === 'tiles') {
+    openTilesMenu(i, x, y, null);
     return;
   }
   const winId = row.tab.windowId;
@@ -428,12 +628,28 @@ function openMenuFromKeyboard(): void {
 
 let announcement = $state('');
 
-const rowName = (r: Row): string =>
-  r.kind === 'window'
-    ? windowLabel(r.number, r.isHome)
-    : r.kind === 'group'
-      ? r.group.title || 'Unnamed group'
-      : r.tab.title || r.tab.url || 'New Tab';
+function rowName(r: Row): string {
+  switch (r.kind) {
+    case 'window':
+      return r.name;
+    case 'group':
+      return r.group.title || 'Unnamed group';
+    case 'tab':
+      return r.tab.title || r.tab.url || 'New Tab';
+    case 'pin':
+      return r.tab?.title || r.item.title || r.item.homeUrl;
+    case 'folder':
+      return r.folder.name;
+    case 'divider':
+      return 'the pinned tabs';
+    case 'tiles':
+      return 'Essentials';
+  }
+}
+
+/** Rows that keyboard moves of normal tabs step over (pinned area; Task 12 adds moves into it). */
+const isPinnedArea = (r: Row | undefined): boolean =>
+  r?.kind === 'pin' || r?.kind === 'folder' || r?.kind === 'divider' || r?.kind === 'tiles';
 
 const multiCtx: MultiDropContext = {
   ctxFor: (id) => {
@@ -451,7 +667,7 @@ function planFor(drag: Drag, index: number, zone: DropZone): PanelMessage | null
 function moveByKey(dir: -1 | 1): void {
   if (searching) return;
   const row = focusedRow;
-  if (!row || row.kind === 'window') return;
+  if (row?.kind !== 'tab' && row?.kind !== 'group') return;
   let drag: Drag;
   let isMoving: (r: Row) => boolean;
   let what: string;
@@ -462,7 +678,7 @@ function moveByKey(dir: -1 | 1): void {
       r.kind === 'group' ? r.group.id === gid : r.kind === 'tab' && r.tab.groupId === gid;
     what = rowName(row);
   } else {
-    const ids = selection.has(row.tab.id) ? new Set(selection) : new Set([row.tab.id]);
+    const ids = new Set(movableTargets(row.tab));
     drag = { kind: 'tabs', tabIds: [...ids] };
     isMoving = (r) => r.kind === 'tab' && ids.has(r.tab.id);
     what = ids.size > 1 ? `${ids.size} tabs` : rowName(row);
@@ -476,26 +692,45 @@ function moveByKey(dir: -1 | 1): void {
   }
   let j = dir < 0 ? first - 1 : last + 1;
   while (j >= 0 && j < view.length && isMoving(view[j] as Row)) j += dir;
+  // A tab can't move into the pinned area by keyboard (yet): going up, step over it to
+  // this window's header, which then hands the tab to the window above.
+  let skippedPinned = false;
+  if (row.kind === 'tab' && dir < 0) {
+    while (isPinnedArea(view[j])) {
+      j--;
+      skippedPinned = true;
+    }
+  }
   let neighbour = view[j];
   // A window header between two windows: step over it so one press crosses into the
-  // neighbouring window (top of the next one, bottom of the previous one).
+  // neighbouring window (top of its normal tabs, bottom of the previous one).
   let crossZone: DropZone | null = null;
   if (neighbour?.kind === 'window' && row.kind === 'tab') {
-    const beyond = view[dir < 0 ? j - 1 : j + 1];
-    if (beyond) {
-      if (dir > 0 && beyond.kind !== 'window') {
-        j += 1;
-        neighbour = beyond;
+    if (dir > 0) {
+      let k = j + 1;
+      while (isPinnedArea(view[k])) k++;
+      const firstThere = view[k];
+      if (firstThere && firstThere.kind !== 'window') {
+        j = k;
+        neighbour = firstThere;
         crossZone = 'before';
-      } else if (dir < 0) {
+      } else {
+        // Collapsed, or no normal tabs: drop on the header, which appends.
+        crossZone = 'inside';
+      }
+    } else {
+      const beyond = view[j - 1];
+      if (beyond && !isPinnedArea(beyond)) {
         j -= 1;
         neighbour = beyond;
         crossZone = 'after';
-      }
-    } else if (dir < 0) neighbour = undefined;
+      } else neighbour = undefined;
+    }
   }
   if (!neighbour) {
-    announcement = `${what} is already ${dir < 0 ? 'first' : 'last'}`;
+    announcement = skippedPinned
+      ? `Can’t move ${what} into the pinned tabs`
+      : `${what} is already ${dir < 0 ? 'first' : 'last'}`;
     return;
   }
   // Crossing a group edge takes one press of its own: the first press only changes
@@ -507,7 +742,7 @@ function moveByKey(dir: -1 | 1): void {
     if (
       dir < 0 &&
       neighbour.kind === 'tab' &&
-      neighbour.level === groupLevel &&
+      isGroupedTab(neighbour.tab) &&
       neighbour.tab.groupId !== from
     ) {
       zone = 'after';
@@ -548,9 +783,11 @@ const dnd = new PointerDrag<Drag>({
   isGroup: (i) => view[i]?.kind === 'group' || view[i]?.kind === 'window',
   begin: (i) => {
     const row = view[i];
-    if (!row || searching || row.kind === 'window') return null;
+    if (!row || searching) return null;
     if (row.kind === 'group') return { kind: 'group', groupId: row.group.id };
-    return { kind: 'tabs', tabIds: targetsOf(row.tab) };
+    // Pinned rows, folders and tiles get their own drags in Task 12.
+    if (row.kind !== 'tab') return null;
+    return { kind: 'tabs', tabIds: movableTargets(row.tab) };
   },
   onStart: (payload) => {
     dragPayload = payload;
@@ -607,11 +844,14 @@ function runAction(action: ShortcutAction, row: Row | undefined): boolean {
     case 'closeTab':
       if (row?.kind === 'tab') send({ type: 'close', tabIds: targetsOf(row.tab) });
       else if (row?.kind === 'group') send({ type: 'closeGroup', groupId: row.group.id });
+      // Closing a pinned tab only suspends it; the row stays.
+      else if (row?.kind === 'pin' && row.tab)
+        send({ type: 'pinClose', windowId: row.windowId, itemIds: [row.item.id] });
       else return false;
       return true;
     case 'renameGroup':
-      if (row?.kind !== 'group') return false;
-      startRename(row.group.id);
+      if (row?.kind !== 'group' && row?.kind !== 'folder' && row?.kind !== 'window') return false;
+      startRename(row.key);
       return true;
     case 'moveUp':
     case 'moveDown':
@@ -640,6 +880,10 @@ function runAction(action: ShortcutAction, row: Row | undefined): boolean {
       for (const id of targetsOf(row.tab)) send({ type: 'duplicate', tabId: id });
       return true;
     case 'togglePin':
+      if (row?.kind === 'pin') {
+        send({ type: 'pinRemove', windowId: row.windowId, itemId: row.item.id, mode: 'unpin' });
+        return true;
+      }
       if (row?.kind !== 'tab') return false;
       send({
         type: 'setPinned',
@@ -648,6 +892,11 @@ function runAction(action: ShortcutAction, row: Row | undefined): boolean {
       });
       return true;
     case 'toggleMute':
+      if (row?.kind === 'pin') {
+        if (!row.tab) return false;
+        send({ type: 'setMuted', tabIds: [row.tab.id], muted: !row.tab.muted });
+        return true;
+      }
       if (row?.kind !== 'tab') return false;
       send({
         type: 'setMuted',
@@ -665,6 +914,24 @@ function runAction(action: ShortcutAction, row: Row | undefined): boolean {
       return true;
     }
   }
+}
+
+/**
+ * The header a row sits under: its group, its folder (nearest folder row above at one
+ * depth less), or its window header. Undefined for top-level rows of the home window.
+ */
+function parentIndex(i: number): number | undefined {
+  const row = view[i];
+  if (!row || searching) return undefined;
+  if (row.kind === 'tab' && isGroupedTab(row.tab)) return keyIndex.get(`g${row.tab.groupId}`);
+  if ((row.kind === 'pin' || row.kind === 'folder') && row.depth > 1) {
+    for (let k = i - 1; k >= 0; k--) {
+      const r = view[k];
+      if (r?.kind === 'folder' && r.windowId === row.windowId && r.depth === row.depth - 1)
+        return k;
+    }
+  }
+  return isNested(row) ? keyIndex.get(`w${rowWindowId(row)}`) : undefined;
 }
 
 function onkeydown(e: KeyboardEvent): void {
@@ -690,6 +957,7 @@ function onkeydown(e: KeyboardEvent): void {
       );
       if (e.shiftKey) {
         if (anchorId === null && row?.kind === 'tab') anchorId = row.tab.id;
+        else if (anchorId === null && row?.kind === 'pin' && row.tab) anchorId = row.tab.id;
         selectRangeTo(next);
       }
       setFocus(next);
@@ -703,50 +971,57 @@ function onkeydown(e: KeyboardEvent): void {
       break;
     case 'ArrowLeft':
       if (searching || !row) return;
-      if (row.kind === 'window') {
-        if (row.collapsed) return;
-        setWindowCollapsed(row.info.id, true);
-      } else if (row.kind === 'group' && !row.group.collapsed) {
+      if (row.kind === 'window' && !row.collapsed) setWindowCollapsed(row.info.id, true);
+      else if (row.kind === 'group' && !row.group.collapsed) {
         send({ type: 'updateGroup', groupId: row.group.id, collapsed: true });
-      } else {
-        const parentKey =
-          row.kind === 'tab' && row.level === groupLevel && row.tab.groupId !== -1
-            ? `g${row.tab.groupId}`
-            : nested
-              ? `w${rowWindowId(row)}`
-              : undefined;
-        const parent = parentKey === undefined ? undefined : keyIndex.get(parentKey);
+      } else if (row.kind === 'folder' && !row.folder.collapsed) {
+        setFolderCollapsed(row.windowId, row.folder.id, true);
+      } else if (row.kind !== 'window') {
+        const parent = parentIndex(focusedIndex);
         if (parent !== undefined) setFocus(parent);
       }
       break;
-    case 'ArrowRight':
-      if (searching || !row || row.kind === 'tab') return;
-      if (row.kind === 'window' ? row.collapsed : row.group.collapsed) {
+    case 'ArrowRight': {
+      if (searching || !row) return;
+      const collapsed =
+        row.kind === 'window'
+          ? row.collapsed
+          : row.kind === 'group'
+            ? row.group.collapsed
+            : row.kind === 'folder'
+              ? row.folder.collapsed
+              : null;
+      if (collapsed === null) return;
+      if (collapsed) {
         if (row.kind === 'window') setWindowCollapsed(row.info.id, false);
-        else send({ type: 'updateGroup', groupId: row.group.id, collapsed: false });
-      } else if (
-        view[focusedIndex + 1]?.kind !== undefined &&
-        view[focusedIndex + 1]?.kind !== 'window'
-      ) {
+        else if (row.kind === 'group')
+          send({ type: 'updateGroup', groupId: row.group.id, collapsed: false });
+        else if (row.kind === 'folder') setFolderCollapsed(row.windowId, row.folder.id, false);
+      } else if (parentIndex(focusedIndex + 1) === focusedIndex) {
         setFocus(focusedIndex + 1);
       }
       break;
+    }
     case 'Enter':
-      if (row?.kind === 'tab') {
-        select([row.tab.id]);
-        anchorId = row.tab.id;
-        send({ type: 'activate', tabId: row.tab.id });
-      } else if (row?.kind === 'window') {
-        setWindowCollapsed(row.info.id, !row.collapsed);
-      } else if (row) {
-        send({ type: 'updateGroup', groupId: row.group.id, collapsed: !row.group.collapsed });
-      }
-      break;
     case ' ':
-      if (row?.kind === 'tab') toggleSelect(row.tab.id);
-      else if (row?.kind === 'window') setWindowCollapsed(row.info.id, !row.collapsed);
-      else if (row)
+      if (!row) break;
+      if (row.kind === 'tab') {
+        if (e.key === ' ') toggleSelect(row.tab.id);
+        else {
+          select([row.tab.id]);
+          anchorId = row.tab.id;
+          send({ type: 'activate', tabId: row.tab.id });
+        }
+      } else if (row.kind === 'pin') {
+        if (e.key === ' ' && row.tab) toggleSelect(row.tab.id);
+        else if (e.key === 'Enter') openPin(row.windowId, row.item.id, row.tab);
+      } else if (row.kind === 'window') setWindowCollapsed(row.info.id, !row.collapsed);
+      else if (row.kind === 'group') {
         send({ type: 'updateGroup', groupId: row.group.id, collapsed: !row.group.collapsed });
+      } else if (row.kind === 'folder') {
+        setFolderCollapsed(row.windowId, row.folder.id, !row.folder.collapsed);
+      } else if (row.kind === 'tiles') openMenuFromKeyboard();
+      // The divider does nothing on Enter: Clear closes tabs, so it takes the button or menu.
       break;
     case 'Escape':
       if (selection.size > 0) select([]);
@@ -849,7 +1124,7 @@ $effect(() => {
         }}
       />
     {/if}
-    <div class="list">
+    <div class="list" use:observeWidth>
       {#if searching && view.length === 0}
         <p class="empty" role="status">No tabs match “{needle}”</p>
       {:else}
@@ -871,7 +1146,8 @@ $effect(() => {
           {#snippet row(r, i)}
             {#if r.kind === 'window'}
               <WindowRow
-                name={windowLabel(r.number, r.isHome)}
+                windowId={r.info.id}
+                name={r.name}
                 count={r.count}
                 collapsed={r.collapsed}
                 incognito={r.info.incognito}
@@ -879,8 +1155,11 @@ $effect(() => {
                 pos={r.pos}
                 size={r.size}
                 focused={i === focusedIndex}
-                onclick={() => onWindowClick(i)}
+                renaming={renamingKey === r.key}
+                onclick={(e) => onWindowClick(e, i)}
+                ondblclick={() => onHeaderDblclick(i)}
                 oncontextmenu={(e) => onContextMenu(e, i)}
+                onrenamed={(name) => onWindowRenamed(r.info.id, r.name, name)}
               />
             {:else if r.kind === 'group'}
               <GroupRow
@@ -890,18 +1169,93 @@ $effect(() => {
                 size={r.size}
                 level={r.level}
                 focused={i === focusedIndex}
-                renaming={renamingId === r.group.id}
+                renaming={renamingKey === r.key}
                 onclick={(e) => onGroupClick(e, i)}
-                ondblclick={() => onGroupDblclick(i)}
+                ondblclick={() => onHeaderDblclick(i)}
                 oncontextmenu={(e) => onContextMenu(e, i)}
                 onrenamed={(title) => onRenamed(r.group.id, title)}
               />
+            {:else if r.kind === 'pin'}
+              <PinRow
+                rowKey={r.key}
+                item={r.item}
+                tab={r.tab}
+                depth={r.depth}
+                nested={isNested(r)}
+                level={r.level}
+                pos={r.pos}
+                size={r.size}
+                focused={i === focusedIndex}
+                selected={r.tab !== null && selection.has(r.tab.id)}
+                selectedLook={r.tab !== null &&
+                  selection.has(r.tab.id) &&
+                  (selection.size > 1 || !r.tab.active)}
+                {showClose}
+                {showMute}
+                onclick={(e) => onPinClick(e, i)}
+                oncontextmenu={(e) => onContextMenu(e, i)}
+                onclose={() => send({ type: 'pinClose', windowId: r.windowId, itemIds: [r.item.id] })}
+                onhome={() => send({ type: 'pinHome', windowId: r.windowId, itemId: r.item.id })}
+                onmute={() => {
+                  if (r.tab) send({ type: 'setMuted', tabIds: [r.tab.id], muted: !r.tab.muted });
+                }}
+              />
+            {:else if r.kind === 'folder'}
+              <FolderRow
+                folder={r.folder}
+                count={r.count}
+                depth={r.depth}
+                nested={isNested(r)}
+                level={r.level}
+                pos={r.pos}
+                size={r.size}
+                focused={i === focusedIndex}
+                renaming={renamingKey === r.key}
+                onclick={(e) => onFolderClick(e, i)}
+                ondblclick={() => onHeaderDblclick(i)}
+                oncontextmenu={(e) => onContextMenu(e, i)}
+                onrenamed={(name) => onFolderRenamed(r.windowId, r.folder.id, name)}
+              />
+            {:else if r.kind === 'divider'}
+              <DividerRow
+                rowKey={r.key}
+                clearable={r.clearable}
+                showClear={r.windowId === tabState.windowId}
+                level={r.level}
+                pos={r.pos}
+                size={r.size}
+                focused={i === focusedIndex}
+                onclear={() => send({ type: 'clearTabs', windowId: r.windowId })}
+                oncontextmenu={(e) => onContextMenu(e, i)}
+              />
+            {:else if r.kind === 'tiles'}
+              <TilesRow
+                rowKey={r.key}
+                tiles={r.tiles}
+                tints={tintCache}
+                windowName={windowViewName(r.windowId)}
+                level={r.level}
+                pos={r.pos}
+                size={r.size}
+                focused={i === focusedIndex}
+                onopen={(item) => {
+                  setFocus(i, false);
+                  tree()?.focus();
+                  send({ type: 'pinOpen', windowId: r.windowId, itemId: item.id });
+                }}
+                onclose={(item) => send({ type: 'pinClose', windowId: r.windowId, itemIds: [item.id] })}
+                oncontextmenu={(e, item) => {
+                  e.preventDefault();
+                  openTilesMenu(i, e.clientX, e.clientY, item);
+                }}
+              />
             {:else}
+              {@const grouped = isGroupedTab(r.tab)}
               <TabRow
                 tab={r.tab}
                 level={r.level}
-                grouped={r.level === groupLevel && groupById.has(r.tab.groupId)}
-                {nested}
+                {grouped}
+                nested={isNested(r)}
                 windowTag={searching && r.tab.windowId !== tabState.windowId
                   ? windowName(r.tab.windowId)
                   : undefined}
@@ -911,9 +1265,7 @@ $effect(() => {
                 selected={selection.has(r.tab.id)}
                 selectedLook={selection.has(r.tab.id) && (selection.size > 1 || !r.tab.active)}
                 pinnedEnd={r.pinnedEnd}
-                groupColor={r.level === groupLevel && groupById.has(r.tab.groupId)
-                  ? `var(--g-${groupById.get(r.tab.groupId)?.color})`
-                  : undefined}
+                groupColor={grouped ? `var(--g-${groupById.get(r.tab.groupId)?.color})` : undefined}
                 highlight={r.highlight}
                 {showUrl}
                 {showClose}

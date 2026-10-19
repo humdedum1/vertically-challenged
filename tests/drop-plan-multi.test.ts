@@ -7,7 +7,7 @@ import {
   planDrop,
   planDropMulti,
 } from '../src/sidepanel/model/drop-plan';
-import { buildWindowRows, type Row } from '../src/sidepanel/model/rows';
+import { buildPanelRows, type Row } from '../src/sidepanel/model/rows';
 import { group, tab } from './helpers';
 
 interface W {
@@ -46,7 +46,12 @@ const multi: MultiDropContext = {
   isIncognito: (id) => windows.find((w) => w.info.id === id)?.info.incognito ?? false,
 };
 
-const rows: Row[] = buildWindowRows(windows, 1, new Set());
+// homeId null gives every window a header (w1 included), which the header cases below need.
+const rows: Row[] = buildPanelRows(
+  windows.map((w) => ({ ...w, layout: undefined })),
+  null,
+  { tilesPerRow: 4 },
+);
 const idx = (key: string) => {
   const i = rows.findIndex((r) => r.key === key);
   if (i < 0) throw new Error(`no row ${key}`);

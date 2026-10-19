@@ -14,6 +14,11 @@ interface Props {
   index: number;
   /** Roving tabindex: exactly one tile of the grid is in the tab order. */
   tabbable: boolean;
+  /**
+   * Another window's tile inside a list row: row-height, no hover controls, and out of
+   * the accessibility tree (the row's label lists the tiles; keys go through the row).
+   */
+  mini?: boolean;
   onopen: () => void;
   onclose: () => void;
   onhome: () => void;
@@ -28,6 +33,7 @@ let {
   tint,
   index,
   tabbable,
+  mini = false,
   onopen,
   onclose,
   onhome,
@@ -75,6 +81,11 @@ function onmousedown(e: MouseEvent): void {
   if (e.button === 1) e.preventDefault();
 }
 
+// The hover buttons are pointer-only shortcuts; keep focus where it was (on the tile).
+function keepFocus(e: MouseEvent): void {
+  e.preventDefault();
+}
+
 function homeClick(e: MouseEvent): void {
   e.stopPropagation();
   onhome();
@@ -87,16 +98,19 @@ function muteClick(e: MouseEvent): void {
 </script>
 
 <!-- Keys are handled by the grid (roving focus), so the tile only takes clicks here. -->
-<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- The role is dynamic (option in the grid, none for mini tiles), which the checker cannot follow. -->
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions, a11y_no_noninteractive_tabindex -->
 <div
   class="tile"
   class:active
   class:unloaded
+  class:mini
   style:--c={tint ?? undefined}
-  role="option"
-  tabindex={tabbable ? 0 : -1}
-  aria-selected={active}
-  aria-label={label}
+  role={mini ? undefined : 'option'}
+  tabindex={mini ? undefined : tabbable ? 0 : -1}
+  aria-selected={mini ? undefined : active}
+  aria-hidden={mini ? 'true' : undefined}
+  aria-label={mini ? undefined : label}
   title={title}
   data-index={index}
   data-item={item.id}
@@ -106,17 +120,17 @@ function muteClick(e: MouseEvent): void {
   {oncontextmenu}
   {onfocus}
 >
-  <span class="fav"><Favicon {url} size={18} /></span>
+  <span class="fav"><Favicon {url} size={mini ? 14 : 18} /></span>
 
   <!-- The hover controls repeat menu entries ("Back to home URL", "Mute"), so they stay
        out of the tab order and the accessibility tree; the tile's label carries the state. -->
-  {#if away}
-    <button class="home" type="button" tabindex="-1" aria-hidden="true" title="Back to home URL" onclick={homeClick}>
+  {#if away && !mini}
+    <button class="home" type="button" tabindex="-1" aria-hidden="true" title="Back to home URL" onmousedown={keepFocus} onclick={homeClick}>
       <Icon name="home" size={11} />
     </button>
   {/if}
 
-  {#if audio && tab}
+  {#if audio && tab && !mini}
     <button
       class="audio"
       class:muted={tab.muted}
@@ -124,6 +138,7 @@ function muteClick(e: MouseEvent): void {
       tabindex="-1"
       aria-hidden="true"
       title={tab.muted ? 'Unmute tab' : 'Mute tab'}
+      onmousedown={keepFocus}
       onclick={muteClick}
     >
       <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -201,6 +216,20 @@ function muteClick(e: MouseEvent): void {
 
   .tile.unloaded:hover {
     background: color-mix(in srgb, var(--mOnSurface) 6%, var(--mSurfaceVariant));
+  }
+
+  /* Other windows' tiles: one list row tall, so they fit the fixed-height virtual list. */
+  .tile.mini {
+    flex: 1 1 36px;
+    min-width: 0;
+    height: calc(var(--row-height) - 6px);
+    border-radius: 8px;
+  }
+
+  .tile.mini.active::after {
+    bottom: 2px;
+    width: 10px;
+    height: 2px;
   }
 
   .fav {

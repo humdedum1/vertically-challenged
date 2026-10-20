@@ -1,6 +1,13 @@
+import { browser } from 'wxt/browser';
 import { faviconUrl } from '../shared/favicon';
 import { dominantColor } from './model/tint';
-import { parseStoredTints, serializeTints, type Tints, withEntry } from './model/tint-store';
+import {
+  parseStoredTints,
+  serializeTints,
+  type Tints,
+  tintsPersist,
+  withEntry,
+} from './model/tint-store';
 
 const KEY = 'vc:tints:v1';
 
@@ -61,14 +68,30 @@ function extract(img: HTMLImageElement): Extracted {
  *
  * Persistence follows the outcome: a colour is kept; a successful load with no usable
  * colour is kept for 24 h (see tint-store); a failed load is remembered in memory only, so
- * the next panel session retries it.
+ * the next panel session retries it. Only a panel in a normal window writes (see
+ * tintsPersist); an incognito one reads the stored tints but keeps its own in memory.
  */
 export class TintCache {
   private tints = $state.raw<Tints>({});
   private loading = new Set<string>();
+  /** The panel window's incognito state, once known. */
+  private incognito: boolean | null = null;
+  /** Lookups settled before the window was known; written once it turns out normal. */
+  private unsaved = false;
 
   constructor() {
     this.tints = readStored();
+    browser.windows
+      .getCurrent()
+      .then((w) => this.setIncognito(w.incognito))
+      // Unknown stays memory-only: failing closed only costs a re-extraction next time.
+      .catch(() => {});
+  }
+
+  private setIncognito(incognito: boolean): void {
+    this.incognito = incognito;
+    if (this.unsaved && tintsPersist(incognito)) writeStored(this.tints);
+    this.unsaved = false;
   }
 
   get(url: string): string | null {
@@ -106,7 +129,8 @@ export class TintCache {
     this.loading.delete(origin);
     const next = withEntry(this.tints, origin, entry);
     this.tints = next;
-    writeStored(next);
+    if (tintsPersist(this.incognito)) writeStored(next);
+    else if (this.incognito === null) this.unsaved = true;
   }
 }
 

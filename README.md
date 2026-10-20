@@ -161,7 +161,7 @@ The panel always lists every window; the old "Show all windows" toggle is gone (
 
 - Collapse state is per panel: collapsing window B in A's panel does not change B's own panel. The worker remembers each panel's choice.
 - Drag tabs between windows, including onto another window's Essentials row or folders, or use "Move to window".
-- Incognito and normal windows are kept apart: an incognito panel lists only incognito windows and a normal panel only normal ones, tabs can't move between them, and incognito layouts live only in `chrome.storage.session`, so no incognito URL is written to disk.
+- Incognito and normal windows are kept apart: an incognito panel lists only incognito windows and a normal panel only normal ones, tabs can't move between them, incognito layouts live only in `chrome.storage.session`, and an incognito panel keeps its Essentials' site colours in memory only, so no incognito URL or site is written to disk.
 
 ## Suspending, sessions and windows
 

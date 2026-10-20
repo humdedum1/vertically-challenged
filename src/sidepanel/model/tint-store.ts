@@ -61,3 +61,13 @@ export function serializeTints(tints: Tints): string {
   );
   return JSON.stringify(Object.fromEntries(persisted));
 }
+
+/**
+ * Whether the panel may write tints to localStorage. Without an `incognito` manifest key
+ * the extension runs in spanning mode, so an incognito window's panel shares the normal
+ * profile's on-disk storage; its origins stay in memory. `null` (window not known yet)
+ * writes nothing either.
+ */
+export function tintsPersist(panelIncognito: boolean | null): boolean {
+  return panelIncognito === false;
+}

@@ -5,6 +5,7 @@ import {
   parseStoredTints,
   serializeTints,
   type Tints,
+  tintsPersist,
   withEntry,
 } from '../src/sidepanel/model/tint-store';
 
@@ -92,5 +93,15 @@ describe('withEntry', () => {
     expect(keys).toHaveLength(MAX_TINT_ENTRIES);
     expect(keys).not.toContain('https://s0.test');
     expect(tints['https://new.test']).toBe('#123456');
+  });
+});
+
+describe('tintsPersist', () => {
+  it('writes to disk only from a panel known to be in a normal window', () => {
+    expect(tintsPersist(false)).toBe(true);
+    // Incognito origins must never reach localStorage, which spanning mode shares with
+    // the normal profile; until the window is known, nothing is written either.
+    expect(tintsPersist(true)).toBe(false);
+    expect(tintsPersist(null)).toBe(false);
   });
 });

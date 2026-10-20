@@ -293,8 +293,8 @@ export function parseLayoutStore(raw: unknown): LayoutStore {
     const { windowId, layoutId } = b;
     if (typeof windowId !== 'number' || !Number.isInteger(windowId)) continue;
     if (typeof layoutId !== 'string' || !known.has(layoutId)) continue;
-    // A window can only be bound to one layout; the first binding wins.
-    if (bindings.some((x) => x.windowId === windowId)) continue;
+    // One layout per window and one window per layout; the first binding wins.
+    if (bound.has(layoutId) || bindings.some((x) => x.windowId === windowId)) continue;
     bindings.push({ windowId, layoutId });
     bound.add(layoutId);
   }

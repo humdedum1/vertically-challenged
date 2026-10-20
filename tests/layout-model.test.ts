@@ -135,6 +135,21 @@ describe('parseLayoutStore', () => {
     expect(parseLayoutStore(raw).bindings).toEqual([{ windowId: 1, layoutId: lid(1) }]);
   });
 
+  it('binds a layout to at most one window; the first binding wins', () => {
+    const raw = store(
+      [layout(1), layout(2)],
+      [
+        { windowId: 1, layoutId: lid(1) },
+        { windowId: 2, layoutId: lid(1) },
+        { windowId: 3, layoutId: lid(2) },
+      ],
+    );
+    expect(parseLayoutStore(raw).bindings).toEqual([
+      { windowId: 1, layoutId: lid(1) },
+      { windowId: 3, layoutId: lid(2) },
+    ]);
+  });
+
   it('trims layout names to 100 chars', () => {
     const raw = store([layout(1, { name: 'x'.repeat(150) })]);
     expect(parseLayoutStore(raw).layouts[0]?.name).toHaveLength(100);

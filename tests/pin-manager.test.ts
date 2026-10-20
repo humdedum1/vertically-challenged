@@ -868,3 +868,59 @@ describe('PinManager late-restored windows', () => {
     expect(flattenItems(saved).map((i) => i.tabId)).toEqual([10, 11]);
   });
 });
+
+describe('PinManager final review fixes', () => {
+  it('drops a second binding to a layout that is already bound to another window', async () => {
+    const saved = layout(1, [item('ia', 'https://a.com/', 10)]);
+    const t = setup({
+      windows: { 1: [pinned(10, 1, 'https://a.com/')], 2: [pinned(20, 2, 'https://b.com/')] },
+      local: { [LAYOUTS_KEY]: stored([saved], [{ windowId: 1, layoutId: ID(1) }]) },
+      // Corrupt: the session area holds a normal copy of the layout (ignored there), and
+      // its binding names that id for window 2.
+      session: {
+        [ALIVE_KEY]: true,
+        [INCOGNITO_LAYOUTS_KEY]: stored([saved], [{ windowId: 2, layoutId: ID(1) }]),
+      },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    expect(pins.layoutOf(1).id).toBe(ID(1));
+    expect(pins.layoutOf(2).id).not.toBe(ID(1));
+    expect(flattenItems(pins.layoutOf(1)).map((i) => i.tabId)).toEqual([10]);
+    expect(flattenItems(pins.layoutOf(2)).map((i) => i.tabId)).toEqual([20]);
+  });
+
+  it('a give-up recorded while the window showed no pinned tabs ends when they return', async () => {
+    vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const abc = () => [
+      pinned(10, 1, 'https://a.com/'),
+      pinned(11, 1, 'https://b.com/'),
+      pinned(12, 1, 'https://c.com/'),
+    ];
+    const t = setup({
+      windows: { 1: abc() },
+      session: { [ALIVE_KEY]: true },
+      move: async () => {
+        throw new Error('Tabs cannot be edited right now');
+      },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    await pins.mutate(1, (l) => ({ ...l, pinned: [...l.pinned].reverse() }));
+    await vi.advanceTimersByTimeAsync(3500);
+    // The store is briefly empty (no flush yet) when the last retry gives up.
+    t.resync(1, []);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(t.moves).toHaveLength(8);
+
+    const [a, b, c] = abc() as [TabInfo, TabInfo, TabInfo];
+    t.resync(1, [b, a, c]);
+    await pins.afterFlush([1]);
+    await settle();
+    expect(flattenItems(pins.layoutOf(1)).map((i) => i.tabId)).toEqual([11, 10, 12]);
+  });
+});

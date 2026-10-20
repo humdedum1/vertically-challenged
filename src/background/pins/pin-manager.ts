@@ -218,9 +218,16 @@ export class PinManager {
     for (const x of priv.layouts) if (x.incognito) this.layouts.set(x.id, x);
 
     if (a[ALIVE_KEY] === true) {
+      const taken = new Set<string>();
       for (const b of [...saved.bindings, ...priv.bindings]) {
-        if (this.layouts.has(b.layoutId) && !this.bindings.has(b.windowId)) {
+        // A layout bound to two windows would have reconcile hand items back and forth.
+        if (
+          this.layouts.has(b.layoutId) &&
+          !this.bindings.has(b.windowId) &&
+          !taken.has(b.layoutId)
+        ) {
           this.bindings.set(b.windowId, b.layoutId);
+          taken.add(b.layoutId);
         }
       }
       // Windows closed while the worker was gone. An empty list means the query failed,
@@ -874,16 +881,16 @@ export class PinManager {
     return flipped || late ? { ...r, changed: true } : r;
   }
 
-  /** True while Chrome still shows the order we gave up on (relative order of those tabs). */
+  /**
+   * True while Chrome still shows the order we gave up on: the same pinned tabs in the
+   * same order. Any other set of pinned tabs ends it, so a give-up recorded against a
+   * momentarily empty (or otherwise different) snapshot can't hold forever.
+   */
   private isStale(windowId: number, tabs: readonly TabInfo[]): boolean {
     const then = this.stale.get(windowId);
     if (!then) return false;
     const now = tabs.filter((t) => t.pinned).map((t) => t.id);
-    const nowSet = new Set(now);
-    const thenSet = new Set(then);
-    const a = then.filter((id) => nowSet.has(id));
-    const b = now.filter((id) => thenSet.has(id));
-    if (a.length === b.length && a.every((id, k) => id === b[k])) return true;
+    if (now.length === then.length && now.every((id, k) => id === then[k])) return true;
     this.stale.delete(windowId);
     return false;
   }

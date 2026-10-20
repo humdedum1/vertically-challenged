@@ -752,20 +752,24 @@ export class PinManager {
   }
 
   /**
-   * "Apply to this window": the setup is appended (see appendLayout), then deleted. False
-   * when the window can't take all of its items; deleting it then would lose the rest.
+   * "Apply to this window": the setup is appended (see appendLayout), then deleted.
+   * Refused, keeping the setup, when the window can't take all of its items ('full'), or
+   * when the window is incognito: its layout lives only in storage.session, so the
+   * setup would be gone with the incognito session.
    */
-  applySetup(setupId: string, windowId: number): Promise<boolean> {
+  applySetup(setupId: string, windowId: number): Promise<'full' | 'incognito' | null> {
     return this.exclusive(() => {
       const s = this.setupLayout(setupId);
-      if (!s || this.closed.has(windowId)) return true;
-      const room = MAX_ITEMS - flattenItems(this.layoutOf(windowId)).length;
-      if (flattenItems(s).length > room) return false;
+      if (!s || this.closed.has(windowId)) return null;
+      const target = this.layoutOf(windowId);
+      if (target.incognito) return 'incognito';
+      const room = MAX_ITEMS - flattenItems(target).length;
+      if (flattenItems(s).length > room) return 'full';
       this.edit(windowId, (l) => appendLayout(l, s));
       this.layouts.delete(s.id);
       this.markDirty(false);
       this.publishSetups();
-      return true;
+      return null;
     });
   }
 

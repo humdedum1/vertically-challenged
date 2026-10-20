@@ -22,6 +22,7 @@ import type { PinManager } from './pin-manager';
 
 const INCOGNITO_REFUSED = "Can't move tabs between incognito and normal windows";
 const FULL = `A window holds at most ${MAX_ITEMS} pinned tabs`;
+const SETUP_INCOGNITO = "Saved setups can't be applied to incognito windows";
 
 /** Returns the toast text, or null when there is nothing to tell the user. */
 export async function runPinCommand(
@@ -132,8 +133,10 @@ export async function runPinCommand(
       if (win?.id !== undefined) await pins.bindSetup(msg.setupId, win.id);
       return null;
     }
-    case 'setupApply':
-      return (await pins.applySetup(msg.setupId, msg.windowId)) ? null : FULL;
+    case 'setupApply': {
+      const refused = await pins.applySetup(msg.setupId, msg.windowId);
+      return refused === 'full' ? FULL : refused === 'incognito' ? SETUP_INCOGNITO : null;
+    }
     case 'setupRename':
       await pins.renameSetup(msg.setupId, msg.name);
       return null;

@@ -774,6 +774,27 @@ describe('refusals that would lose items', () => {
     expect(flattenItems(s.pins.layoutOf(1))).toHaveLength(MAX_ITEMS);
   });
 
+  it('setupApply refuses an incognito window and keeps the setup', async () => {
+    const s = sim({
+      windows: {
+        1: [pinned(1, 1, 'https://a.com/'), tab(3, { active: true })],
+        5: [tab(50, { active: true, incognito: true })],
+      },
+      incognito: [5],
+      layouts: [
+        layout(1, { pinned: [item(IT('a'), 'https://a.com/', 1)] }),
+        layout(2, { essentials: [item(IT('s'), 'https://s.com/')] }),
+      ],
+      bindings: [{ windowId: 1, layoutId: ID(1) }],
+    });
+    await s.flush();
+    expect(await s.run({ type: 'setupApply', setupId: ID(2), windowId: 5 })).toBe(
+      "Saved setups can't be applied to incognito windows",
+    );
+    expect(s.pins.setups().map((x) => x.id)).toEqual([ID(2)]);
+    expect(flattenItems(s.pins.layoutOf(5))).toEqual([]);
+  });
+
   it('pinSetHome refuses a URL the stored layout would drop', async () => {
     const s = sim({
       windows: { 1: [pinned(1, 1, 'view-source:https://a.com/'), tab(3, { active: true })] },

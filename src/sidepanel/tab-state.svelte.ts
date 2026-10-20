@@ -45,6 +45,8 @@ export class TabState {
   status = $state<ConnectionStatus>('connecting');
   error = $state<string | null>(null);
   windowId: number | null = null;
+  /** Whether this panel's own window is incognito; null until start() knows. */
+  incognito = $state<boolean | null>(null);
 
   onFocusSearch: (() => void) | null = null;
   onNotice: ((n: { level: 'info' | 'error'; text: string }) => void) | null = null;
@@ -69,6 +71,7 @@ export class TabState {
       const win = await browser.windows.getCurrent();
       if (win.id === undefined) throw new Error('No window id');
       this.windowId = win.id;
+      this.incognito = win.incognito;
       this.connect();
     } catch (err) {
       this.fail(err);

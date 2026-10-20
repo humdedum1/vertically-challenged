@@ -300,7 +300,10 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
             {:else}
               <div class="actions setup-actions" role="group" aria-label="Actions for {u.name}">
                 <Button variant="tonal" onclick={() => openSetup(u)}>Open in new window</Button>
-                <Button variant="text" disabled={tabState.windowId === null} onclick={() => applySetup(u)}>Apply to this window</Button>
+                <!-- An incognito window's layout is session-only; the worker refuses there too. -->
+                {#if tabState.incognito === false}
+                  <Button variant="text" onclick={() => applySetup(u)}>Apply to this window</Button>
+                {/if}
                 <Button variant="text" onclick={() => startRenameSetup(u)}>Rename</Button>
                 <Button variant="text" onclick={() => (confirmDeleteSetup = u.id)}>Delete</Button>
               </div>

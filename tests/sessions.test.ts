@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { WindowLayout } from '../src/shared/layout';
 import {
   captureWindow,
   isRestorableUrl,
@@ -330,5 +331,189 @@ describe('parseSessions', () => {
   it('does not keep unknown fields', () => {
     const r = parseSessions([good({ extra: 1 })]);
     expect(r[0]).not.toHaveProperty('extra');
+  });
+});
+
+describe('session layouts', () => {
+  const pin = (id: number, tabId: number | null) => ({
+    kind: 'item' as const,
+    id: `i${id}`,
+    homeUrl: `https://${id}.com/`,
+    lastUrl: `https://${id}.com/`,
+    title: `T${id}`,
+    tabId,
+  });
+  const layout = (o: Partial<WindowLayout>): WindowLayout => ({
+    id: 'l0000000001',
+    name: null,
+    essentials: [],
+    pinned: [],
+    collapsed: [],
+    incognito: false,
+    lastUsed: 0,
+    ...o,
+  });
+  const strip = [
+    tab(1, { pinned: true, url: 'https://1.com/' }),
+    tab(2, { pinned: true, url: 'https://2.com/' }),
+    tab(3, { pinned: true, url: 'https://3.com/' }),
+    tab(4, { pinned: true, url: 'https://4.com/' }),
+    tab(5, { url: 'https://5.com/' }),
+  ];
+
+  it('stores essentials and folders as indices into the captured tabs', () => {
+    const w = captureWindow(
+      [tab(9, { url: `${OWN}/p.html`, pinned: true }), ...strip],
+      [],
+      OWN,
+      layout({
+        essentials: [pin(1, 1), pin(2, 2)],
+        pinned: [
+          {
+            kind: 'folder',
+            id: 'f1',
+            name: 'Work',
+            icon: 'code',
+            collapsed: true,
+            children: [pin(3, 3), pin(7, null)],
+          },
+          pin(4, 4),
+        ],
+      }),
+    );
+    // The own-origin tab is skipped, so tab 1 is index 0.
+    expect(w.layout).toEqual({
+      essentials: [0, 1],
+      pinned: [
+        {
+          kind: 'folder',
+          name: 'Work',
+          icon: 'code',
+          collapsed: true,
+          children: [{ kind: 'item', tab: 2 }],
+        },
+        { kind: 'item', tab: 3 },
+      ],
+    });
+  });
+
+  it('leaves the layout out when nothing live is in it', () => {
+    const w = captureWindow(strip, [], OWN, layout({ essentials: [pin(1, null)] }));
+    expect(w).not.toHaveProperty('layout');
+    expect(captureWindow(strip, [], OWN)).not.toHaveProperty('layout');
+  });
+
+  it('skips layout items whose tab is not pinned', () => {
+    const w = captureWindow(strip, [], OWN, layout({ essentials: [pin(5, 5), pin(1, 1)] }));
+    expect(w.layout?.essentials).toEqual([0]);
+  });
+
+  const stored = (l: unknown, extra: unknown[] = []) => [
+    {
+      id: 's1',
+      name: 'S',
+      createdAt: 1,
+      windows: [
+        {
+          groups: [],
+          tabs: [
+            { url: 'https://a.com', title: 'A', pinned: true, group: null },
+            { url: 'https://b.com', title: 'B', pinned: true, group: null },
+            { url: 'https://c.com', title: 'C', pinned: false, group: null },
+            ...extra,
+          ],
+          layout: l,
+        },
+      ],
+    },
+  ];
+  const parsed = (l: unknown, extra: unknown[] = []) =>
+    parseSessions(stored(l, extra))[0]?.windows[0]?.layout;
+
+  it('round-trips a captured layout through parseSessions', () => {
+    const w = captureWindow(
+      strip,
+      [],
+      OWN,
+      layout({
+        essentials: [pin(1, 1)],
+        pinned: [
+          {
+            kind: 'folder',
+            id: 'f',
+            name: 'F',
+            icon: 'star',
+            collapsed: false,
+            children: [pin(2, 2)],
+          },
+        ],
+      }),
+    );
+    const s: Session = { id: 'x', name: 'n', createdAt: 5, windows: [w] };
+    expect(parseSessions(JSON.parse(JSON.stringify([s])))).toEqual([s]);
+  });
+
+  it('old sessions without a layout parse unchanged', () => {
+    const r = parseSessions(stored(undefined))[0]?.windows[0];
+    expect(r).not.toHaveProperty('layout');
+    expect(r?.tabs).toHaveLength(3);
+  });
+
+  it('drops out-of-range, repeated, non-pinned and malformed references only', () => {
+    expect(
+      parsed({
+        essentials: [0, 0, 7, -1, 1.5, '1', 2, null],
+        pinned: [
+          { kind: 'item', tab: 1 },
+          { kind: 'item', tab: 99 },
+          { kind: 'item', tab: 0 },
+          'junk',
+        ],
+      }),
+    ).toEqual({ essentials: [0], pinned: [{ kind: 'item', tab: 1 }] });
+  });
+
+  it('re-targets indices when invalid tabs before them are dropped', () => {
+    const s = stored({ essentials: [1] });
+    (s[0] as { windows: { tabs: unknown[] }[] }).windows[0]?.tabs.unshift({ url: '', title: '' });
+    // Stored index 1 was tab "a" (index 0 after the empty-URL tab is dropped).
+    expect(parseSessions(s)[0]?.windows[0]?.layout).toEqual({ essentials: [0], pinned: [] });
+  });
+
+  it('validates folders: depth, name, icon, empties', () => {
+    const f = (children: unknown[], over: Record<string, unknown> = {}) => ({
+      kind: 'folder',
+      name: 'F',
+      icon: 'star',
+      collapsed: false,
+      children,
+      ...over,
+    });
+    const extra = [1, 2, 3].map((n) => ({
+      url: `https://p${n}.com`,
+      title: '',
+      pinned: true,
+      group: null,
+    }));
+    const l = parsed(
+      {
+        essentials: [],
+        pinned: [
+          f([f([f([f([{ kind: 'item', tab: 0 }])])])]),
+          f([{ kind: 'item', tab: 1 }], { name: 'x'.repeat(300), icon: 'nope' }),
+          f([{ kind: 'item', tab: 77 }]),
+        ],
+      },
+      extra,
+    );
+    const first = l?.pinned[0];
+    // Depth 4 is too deep: its item moves up into the depth-3 folder.
+    const d3 = ((first as { children: unknown[] }).children[0] as { children: unknown[] })
+      .children[0] as { children: unknown[] };
+    expect(d3.children).toEqual([{ kind: 'item', tab: 0 }]);
+    expect(l?.pinned[1]).toMatchObject({ kind: 'folder', icon: 'folder' });
+    expect((l?.pinned[1] as unknown as { name: string })?.name).toHaveLength(100);
+    // The folder whose only item is invalid is gone.
+    expect(l?.pinned).toHaveLength(2);
   });
 });

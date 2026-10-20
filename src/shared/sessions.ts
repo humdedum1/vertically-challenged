@@ -1,3 +1,12 @@
+import {
+  FOLDER_ICONS,
+  type FolderIcon,
+  MAX_FOLDER_DEPTH,
+  MAX_ITEMS,
+  MAX_NAME,
+  type PinNode,
+  type WindowLayout,
+} from './layout';
 import { GROUP_COLORS, type GroupColor, type GroupInfo, type TabInfo } from './types';
 
 export interface SavedTab {
@@ -14,9 +23,30 @@ export interface SavedGroup {
   collapsed: boolean;
 }
 
+/** A pinned-tree node of a saved layout; `tab` indexes the SavedWindow's `tabs`. */
+export type SavedPinNode =
+  | { kind: 'item'; tab: number }
+  | {
+      kind: 'folder';
+      name: string;
+      icon: FolderIcon;
+      collapsed: boolean;
+      children: SavedPinNode[];
+    };
+
+/**
+ * Which of a window's saved tabs were Essentials and which sat in pinned folders. Only
+ * live items are saved (a session is a tab snapshot), so there are no dormant entries.
+ */
+export interface SavedLayout {
+  essentials: number[];
+  pinned: SavedPinNode[];
+}
+
 export interface SavedWindow {
   tabs: SavedTab[];
   groups: SavedGroup[];
+  layout?: SavedLayout;
 }
 
 export interface Session {
@@ -40,10 +70,13 @@ export function captureWindow(
   tabs: readonly TabInfo[],
   groups: readonly GroupInfo[],
   ownOrigin: string,
+  layout?: WindowLayout,
 ): SavedWindow {
   const groupIndex = new Map<number, number>();
   const saved: SavedGroup[] = [];
   const out: SavedTab[] = [];
+  /** Tab id → index in `out`, for the layout. */
+  const indexOf = new Map<number, number>();
   for (const t of tabs) {
     if (!t.url || t.url.startsWith(ownOrigin)) continue;
     let group: number | null = null;
@@ -59,9 +92,45 @@ export function captureWindow(
       }
       group = i ?? null;
     }
+    indexOf.set(t.id, out.length);
     out.push({ url: t.url, title: t.title, pinned: t.pinned, group });
   }
-  return { tabs: out, groups: saved };
+  const savedLayout = layout && captureLayout(layout, out, indexOf);
+  return savedLayout
+    ? { tabs: out, groups: saved, layout: savedLayout }
+    : { tabs: out, groups: saved };
+}
+
+/** The layout restricted to items whose pinned tab was captured; null when nothing is left. */
+function captureLayout(
+  layout: WindowLayout,
+  tabs: readonly SavedTab[],
+  indexOf: ReadonlyMap<number, number>,
+): SavedLayout | null {
+  const indexFor = (tabId: number | null): number | null => {
+    const i = tabId === null ? undefined : indexOf.get(tabId);
+    return i !== undefined && tabs[i]?.pinned ? i : null;
+  };
+  const walk = (nodes: PinNode[]): SavedPinNode[] => {
+    const out: SavedPinNode[] = [];
+    for (const n of nodes) {
+      if (n.kind === 'item') {
+        const tab = indexFor(n.tabId);
+        if (tab !== null) out.push({ kind: 'item', tab });
+        continue;
+      }
+      const children = walk(n.children);
+      if (children.length) {
+        out.push({ kind: 'folder', name: n.name, icon: n.icon, collapsed: n.collapsed, children });
+      }
+    }
+    return out;
+  };
+  const essentials = layout.essentials
+    .map((i) => indexFor(i.tabId))
+    .filter((i): i is number => i !== null);
+  const pinned = walk(layout.pinned);
+  return essentials.length || pinned.length ? { essentials, pinned } : null;
 }
 
 export const sessionTabCount = (s: Session): number =>
@@ -94,9 +163,14 @@ export function parseSessions(raw: unknown): Session[] {
           collapsed: g.collapsed === true,
         }));
       const tabs: SavedTab[] = [];
-      for (const t of (Array.isArray(w.tabs) ? w.tabs : []).slice(0, MAX_TABS_PER_WINDOW)) {
+      /** Stored tab index → index after invalid tabs are dropped. */
+      const remap = new Map<number, number>();
+      for (const [at, t] of (Array.isArray(w.tabs) ? w.tabs : [])
+        .slice(0, MAX_TABS_PER_WINDOW)
+        .entries()) {
         if (!isObj(t) || typeof t.url !== 'string' || !t.url || t.url.length > MAX_URL) continue;
         const g = t.group;
+        remap.set(at, tabs.length);
         tabs.push({
           url: t.url,
           title: str(t.title, 500),
@@ -107,7 +181,9 @@ export function parseSessions(raw: unknown): Session[] {
               : null,
         });
       }
-      if (tabs.length) windows.push({ tabs, groups });
+      if (!tabs.length) continue;
+      const layout = parseLayout(w.layout, tabs, remap);
+      windows.push(layout ? { tabs, groups, layout } : { tabs, groups });
     }
     if (!windows.length) continue;
     out.push({
@@ -118,6 +194,62 @@ export function parseSessions(raw: unknown): Session[] {
     });
   }
   return out;
+}
+
+/**
+ * Validates a saved layout against the window's (already parsed) tabs. Invalid parts are
+ * dropped, never the whole session: out-of-range or repeated indices, tabs that were not
+ * pinned, folders nested too deep (their contents move up) and items past the cap.
+ */
+function parseLayout(
+  raw: unknown,
+  tabs: readonly SavedTab[],
+  remap: ReadonlyMap<number, number>,
+): SavedLayout | null {
+  if (!isObj(raw)) return null;
+  const used = new Set<number>();
+  let budget = MAX_ITEMS;
+  const take = (v: unknown): number | null => {
+    if (typeof v !== 'number' || budget <= 0) return null;
+    const i = remap.get(v);
+    if (i === undefined || used.has(i) || !tabs[i]?.pinned) return null;
+    used.add(i);
+    budget--;
+    return i;
+  };
+  const essentials: number[] = [];
+  for (const v of Array.isArray(raw.essentials) ? raw.essentials : []) {
+    const i = take(v);
+    if (i !== null) essentials.push(i);
+  }
+  /** `depth` is the depth of the folder holding `list`; 0 for the root. */
+  const walk = (list: unknown, depth: number): SavedPinNode[] => {
+    const out: SavedPinNode[] = [];
+    for (const n of Array.isArray(list) ? list : []) {
+      if (!isObj(n)) continue;
+      if (n.kind === 'item') {
+        const i = take(n.tab);
+        if (i !== null) out.push({ kind: 'item', tab: i });
+      } else if (n.kind === 'folder') {
+        const children = walk(n.children, depth + 1);
+        if (depth + 1 > MAX_FOLDER_DEPTH) out.push(...children);
+        else if (children.length) {
+          out.push({
+            kind: 'folder',
+            name: str(n.name, MAX_NAME).trim() || 'Folder',
+            icon: (FOLDER_ICONS as readonly unknown[]).includes(n.icon)
+              ? (n.icon as FolderIcon)
+              : 'folder',
+            collapsed: n.collapsed === true,
+            children,
+          });
+        }
+      }
+    }
+    return out;
+  };
+  const pinned = walk(raw.pinned, 0);
+  return essentials.length || pinned.length ? { essentials, pinned } : null;
 }
 
 /**

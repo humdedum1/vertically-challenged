@@ -2,6 +2,7 @@ import { browser } from 'wxt/browser';
 import type { MoveTarget, PanelMessage, PinMessage } from '../shared/protocol';
 import type { GroupColor, GroupInfo, TabInfo } from '../shared/types';
 import { planGroupMove, planMoves } from './move-plan';
+import type { SessionLayouts } from './sessions';
 import { deleteSession, renameSession, restoreSession, saveSession } from './sessions';
 import { canDiscardManually } from './suspend/eligibility';
 
@@ -10,6 +11,8 @@ export interface CommandDeps {
   windows(scope: 'window' | 'all', windowId: number): { tabs: TabInfo[]; groups: GroupInfo[] }[];
   tab(tabId: number): TabInfo | undefined;
   restoreDiscarded(): Promise<boolean>;
+  /** Layouts to save into and rebuild from sessions; absent in tests that don't need them. */
+  layouts?: SessionLayouts & { loaded: Promise<void> };
   /** The Chrome calls the pin commands make; injected so they run in unit tests. */
   chrome: ChromeApi;
 }
@@ -151,7 +154,12 @@ export async function runCommand(
       return;
     }
     case 'saveSession': {
-      const n = await saveSession(msg.name, deps.windows(msg.scope, msg.windowId));
+      await deps.layouts?.loaded;
+      const wins = deps.windows(msg.scope, msg.windowId).map((w) => {
+        const id = w.tabs[0]?.windowId;
+        return id === undefined || !deps.layouts ? w : { ...w, layout: deps.layouts.layoutOf(id) };
+      });
+      const n = await saveSession(msg.name, wins);
       return n
         ? `Saved “${msg.name}” (${n} tab${n === 1 ? '' : 's'})`
         : 'Nothing to save in this window';
@@ -163,7 +171,14 @@ export async function runCommand(
       await deleteSession(msg.id);
       return;
     case 'restoreSession':
-      return restoreSession(msg.id, msg.target, msg.windowId, await deps.restoreDiscarded());
+      await deps.layouts?.loaded;
+      return restoreSession(
+        msg.id,
+        msg.target,
+        msg.windowId,
+        await deps.restoreDiscarded(),
+        deps.layouts,
+      );
   }
 }
 

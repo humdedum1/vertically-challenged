@@ -2,6 +2,7 @@
 import { onMount } from 'svelte';
 import { browser } from 'wxt/browser';
 import { displayUrl } from '../../../lib/search/search-index';
+import type { SetupSummary } from '../../../shared/protocol';
 import {
   isRestorableUrl,
   parseSessions,
@@ -37,6 +38,10 @@ let shown = $state.raw<ReadonlyMap<string, number>>(new Map());
 let renaming = $state<{ id: string; value: string } | null>(null);
 let confirmDelete = $state<string | null>(null);
 
+let renamingSetup = $state<{ id: string; value: string } | null>(null);
+let confirmDeleteSetup = $state<string | null>(null);
+
+const setups = $derived(tabState.setups);
 const sorted = $derived([...sessions].sort((a, b) => b.createdAt - a.createdAt));
 const canSaveAll = $derived(tabState.windowList.length > 1);
 const canSave = $derived(tabState.windowId !== null);
@@ -129,6 +134,61 @@ async function openTab(url: string): Promise<void> {
   }
 }
 
+function setupCounts(u: SetupSummary): string {
+  const pinned = u.itemCount - u.essentials.length;
+  return [
+    u.essentials.length ? pluralize(u.essentials.length, 'Essential') : '',
+    u.folderCount ? pluralize(u.folderCount, 'folder') : '',
+    pinned > 0 ? `${pinned} pinned` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function openSetup(u: SetupSummary): void {
+  tabState.send({ type: 'setupOpen', setupId: u.id });
+  status = `Opening “${u.name}” in a new window…`;
+}
+
+function applySetup(u: SetupSummary): void {
+  if (tabState.windowId === null) return;
+  tabState.send({ type: 'setupApply', setupId: u.id, windowId: tabState.windowId });
+  status = `Applying “${u.name}” to this window…`;
+}
+
+function startRenameSetup(u: SetupSummary): void {
+  confirmDeleteSetup = null;
+  renamingSetup = { id: u.id, value: u.name };
+}
+
+function commitRenameSetup(): void {
+  if (!renamingSetup) return;
+  const { id, value } = renamingSetup;
+  renamingSetup = null;
+  const next = value.trim();
+  const current = setups.find((u) => u.id === id);
+  if (next && current && next !== current.name) {
+    tabState.send({ type: 'setupRename', setupId: id, name: next });
+    status = `Renamed to “${next}”.`;
+  }
+}
+
+function onRenameSetupKey(e: KeyboardEvent): void {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    commitRenameSetup();
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    renamingSetup = null;
+  }
+}
+
+function removeSetup(u: SetupSummary): void {
+  tabState.send({ type: 'setupDelete', setupId: u.id });
+  confirmDeleteSetup = null;
+  status = `Deleted “${u.name}”.`;
+}
+
 function focusOnMount(node: HTMLInputElement): void {
   node.focus();
   node.select();
@@ -179,6 +239,76 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
           settings.update((s) => ({ ...s, sessions: { ...s.sessions, restoreDiscarded } }))}
       />
     </div>
+  </SegmentCard>
+
+  <SegmentCard title="Window setups">
+    {#snippet icon()}<Icon name="sessions" size={12} />{/snippet}
+    {#snippet trailing()}
+      {#if setups.length > 0}
+        <span class="count" role="img" aria-label="{setups.length} window setups">{setups.length}</span>
+      {/if}
+    {/snippet}
+
+    {#if setups.length === 0}
+      <p class="message">No saved window setups — closing a window that has Essentials or folders saves it here.</p>
+    {:else}
+      <ul class="list setups" aria-label="Window setups">
+        {#each setups as u (u.id)}
+          <li class="item">
+            <div class="head">
+              <div class="meta setup-meta">
+                {#if renamingSetup?.id === u.id}
+                  <input
+                    class="rename"
+                    aria-label="Rename window setup"
+                    maxlength="100"
+                    value={renamingSetup.value}
+                    oninput={(e) => {
+                      if (renamingSetup) renamingSetup.value = e.currentTarget.value;
+                    }}
+                    onkeydown={onRenameSetupKey}
+                    onblur={commitRenameSetup}
+                    use:focusOnMount
+                  />
+                {:else}
+                  <span class="name" title={u.name}>{u.name}</span>
+                {/if}
+                <span class="sub">
+                  {#if setupCounts(u)}{setupCounts(u)} ·{/if}
+                  <time
+                    datetime={new Date(u.lastUsed).toISOString()}
+                    title={new Date(u.lastUsed).toLocaleString()}
+                    >{relativeTime(u.lastUsed, now)}</time
+                  >
+                </span>
+              </div>
+            </div>
+
+            {#if u.essentials.length > 0}
+              <div class="strip setup-strip" aria-hidden="true">
+                {#each u.essentials.slice(0, STRIP) as t, i (i)}<Favicon url={t.url} size={14} />{/each}
+                {#if u.essentials.length > STRIP}<span class="more">+{u.essentials.length - STRIP}</span>{/if}
+              </div>
+            {/if}
+
+            {#if confirmDeleteSetup === u.id}
+              <div class="actions setup-actions confirm" role="group" aria-label="Confirm delete">
+                <span>Delete this setup?</span>
+                <Button variant="danger" onclick={() => removeSetup(u)}>Delete</Button>
+                <Button variant="text" onclick={() => (confirmDeleteSetup = null)}>Keep</Button>
+              </div>
+            {:else}
+              <div class="actions setup-actions" role="group" aria-label="Actions for {u.name}">
+                <Button variant="tonal" onclick={() => openSetup(u)}>Open in new window</Button>
+                <Button variant="text" disabled={tabState.windowId === null} onclick={() => applySetup(u)}>Apply to this window</Button>
+                <Button variant="text" onclick={() => startRenameSetup(u)}>Rename</Button>
+                <Button variant="text" onclick={() => (confirmDeleteSetup = u.id)}>Delete</Button>
+              </div>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
   </SegmentCard>
 
   <SegmentCard title="Saved sessions" fill>
@@ -347,6 +477,20 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
     font-size: 11px;
     text-align: center;
     font-variant-numeric: tabular-nums;
+  }
+
+  .list.setups {
+    height: auto;
+    max-height: 240px;
+  }
+
+  .setup-meta {
+    padding-left: 4px;
+  }
+
+  .item .setup-strip,
+  .item .setup-actions {
+    padding-left: 4px;
   }
 
   .message {

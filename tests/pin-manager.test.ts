@@ -547,3 +547,102 @@ describe('PinManager fix round 1', () => {
     expect(flattenItems(pins.layoutOf(2))).toHaveLength(MAX_ITEMS);
   });
 });
+
+describe('PinManager restoreLayout', () => {
+  const rItem = (tabId: number, url: string) => ({
+    kind: 'item' as const,
+    tabId,
+    url,
+    title: `T${tabId}`,
+  });
+
+  it('binds restored tabs to fresh items, appended after the existing layout', async () => {
+    const existing = layout(1, [item('ia', 'https://a.com/', 10)]);
+    const t = setup({
+      windows: { 1: [pinned(10, 1, 'https://a.com/')] },
+      local: { [LAYOUTS_KEY]: stored([existing], [{ windowId: 1, layoutId: ID(1) }]) },
+      session: { [ALIVE_KEY]: true },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    await pins.restoreLayout(async () => {
+      // Chrome has the tabs by the time the flush below reaches the manager.
+      t.resync(1, [
+        pinned(10, 1, 'https://a.com/'),
+        pinned(20, 1, 'https://e.com/'),
+        pinned(21, 1, 'https://f.com/'),
+        pinned(22, 1, 'https://g.com/'),
+      ]);
+      return {
+        windowId: 1,
+        essentials: [rItem(20, 'https://e.com/')],
+        pinned: [
+          {
+            kind: 'folder',
+            name: 'Work',
+            icon: 'code',
+            collapsed: true,
+            children: [rItem(21, 'https://f.com/'), rItem(99, 'https://gone.com/')],
+          },
+          rItem(22, 'https://g.com/'),
+        ],
+      };
+    });
+    await pins.afterFlush([1]);
+    await settle();
+
+    const l = pins.layoutOf(1);
+    expect(l.essentials.map((i) => [i.tabId, i.homeUrl])).toEqual([[20, 'https://e.com/']]);
+    expect(l.pinned.map((n) => n.kind)).toEqual(['item', 'folder', 'item']);
+    const f = l.pinned[1];
+    expect(f?.kind === 'folder' && [f.name, f.icon, f.collapsed]).toEqual(['Work', 'code', true]);
+    // Each restored tab has exactly one item: none was adopted as a plain extra.
+    expect(
+      flattenItems(l)
+        .map((i) => i.tabId)
+        .sort(),
+    ).toEqual([10, 20, 21, 22, 99].sort());
+  });
+
+  it('stops creating items at MAX_ITEMS; the rest stay plain tabs', async () => {
+    const full = layout(
+      1,
+      Array.from({ length: MAX_ITEMS - 1 }, (_, i) => item(`i${i}`, `https://x${i}.com/`)),
+    );
+    const t = setup({
+      windows: { 1: [pinned(20, 1, 'https://e.com/'), pinned(21, 1, 'https://f.com/')] },
+      local: { [LAYOUTS_KEY]: stored([full], [{ windowId: 1, layoutId: ID(1) }]) },
+      session: { [ALIVE_KEY]: true },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    await pins.restoreLayout(async () => ({
+      windowId: 1,
+      essentials: [rItem(20, 'https://e.com/')],
+      pinned: [rItem(21, 'https://f.com/')],
+    }));
+    await settle();
+    const items = flattenItems(pins.layoutOf(1));
+    expect(items.length).toBeLessThanOrEqual(MAX_ITEMS);
+    expect(items.some((i) => i.tabId === 20)).toBe(true);
+    expect(items.some((i) => i.tabId === 21)).toBe(false);
+  });
+
+  it('does nothing when the run reports no layout or the window closed', async () => {
+    const t = setup({ windows: { 1: [] }, session: { [ALIVE_KEY]: true } });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await pins.restoreLayout(async () => null);
+    pins.onWindowRemoved(1);
+    await pins.restoreLayout(async () => ({
+      windowId: 1,
+      essentials: [rItem(5, 'https://a.com/')],
+      pinned: [],
+    }));
+    expect(flattenItems(pins.layoutOf(2))).toEqual([]);
+  });
+});

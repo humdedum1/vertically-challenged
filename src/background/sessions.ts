@@ -1,14 +1,23 @@
 import { browser } from 'wxt/browser';
+import type { WindowLayout } from '../shared/layout';
 import {
   captureWindow,
   isRestorableUrl,
   MAX_SESSIONS,
   parseSessions,
+  type SavedPinNode,
   type SavedWindow,
   SESSIONS_KEY,
   type Session,
 } from '../shared/sessions';
 import type { GroupInfo, TabInfo } from '../shared/types';
+import type { RestoredLayout, RestoredNode } from './pins/pin-manager';
+
+/** The slice of PinManager sessions use; optional so sessions work without layouts. */
+export interface SessionLayouts {
+  layoutOf(windowId: number): WindowLayout;
+  restoreLayout(run: () => Promise<RestoredLayout | null>): Promise<void>;
+}
 
 /** Writes are queued so concurrent saves/renames can't lose each other's changes. */
 let queue: Promise<unknown> = Promise.resolve();
@@ -30,11 +39,11 @@ const newId = (): string => crypto.randomUUID().replace(/-/g, '').slice(0, 16);
 
 export async function saveSession(
   name: string,
-  windows: { tabs: readonly TabInfo[]; groups: readonly GroupInfo[] }[],
+  windows: { tabs: readonly TabInfo[]; groups: readonly GroupInfo[]; layout?: WindowLayout }[],
 ): Promise<number> {
   const own = browser.runtime.getURL('/');
   const saved = windows
-    .map((w) => captureWindow(w.tabs, w.groups, own))
+    .map((w) => captureWindow(w.tabs, w.groups, own, w.layout))
     .filter((w) => w.tabs.length > 0);
   const count = saved.reduce((n, w) => n + w.tabs.length, 0);
   if (count === 0) return 0;
@@ -69,37 +78,94 @@ function whenCommitted(tabId: number, timeoutMs = 8000): Promise<void> {
   });
 }
 
+interface Created {
+  id: number;
+  /** Index into the saved window's `tabs`. */
+  at: number;
+  group: number | null;
+  active: boolean;
+}
+
+/** The layout of a restored window, with saved tab indices swapped for the new tab ids. */
+function restoredLayout(
+  w: SavedWindow,
+  windowId: number,
+  created: Created[],
+): RestoredLayout | null {
+  if (!w.layout) return null;
+  const byAt = new Map(created.map((c) => [c.at, c.id]));
+  const item = (at: number): Extract<RestoredNode, { kind: 'item' }> | null => {
+    const id = byAt.get(at);
+    const t = w.tabs[at];
+    return id === undefined || !t ? null : { kind: 'item', tabId: id, url: t.url, title: t.title };
+  };
+  const walk = (nodes: SavedPinNode[]): RestoredNode[] => {
+    const out: RestoredNode[] = [];
+    for (const n of nodes) {
+      if (n.kind === 'item') {
+        const i = item(n.tab);
+        if (i) out.push(i);
+      } else {
+        const children = walk(n.children);
+        if (children.length) out.push({ ...n, children });
+      }
+    }
+    return out;
+  };
+  return {
+    windowId,
+    essentials: w.layout.essentials.map(item).filter((i) => i !== null),
+    pinned: walk(w.layout.pinned),
+  };
+}
+
 async function restoreWindow(
   w: SavedWindow,
   targetWindowId: number | null,
   discard: boolean,
+  layouts?: SessionLayouts,
 ): Promise<{ opened: number; skipped: number }> {
-  const tabs = w.tabs.filter((t) => isRestorableUrl(t.url));
+  const tabs = w.tabs.map((t, at) => ({ ...t, at })).filter((t) => isRestorableUrl(t.url));
   const skipped = w.tabs.length - tabs.length;
   if (!tabs.length) return { opened: 0, skipped };
 
-  const created: { id: number; group: number | null; active: boolean }[] = [];
+  const created: Created[] = [];
   let windowId = targetWindowId;
-  let rest = tabs;
-  if (windowId === null) {
-    const first = tabs[0] as (typeof tabs)[number];
-    const win = await browser.windows.create({ url: first.url, focused: true });
-    const firstTab = win?.tabs?.[0];
-    if (!win?.id || firstTab?.id === undefined) return { opened: 0, skipped: w.tabs.length };
-    windowId = win.id;
-    if (first.pinned) await browser.tabs.update(firstTab.id, { pinned: true });
-    created.push({ id: firstTab.id, group: first.group, active: true });
-    rest = tabs.slice(1);
-  }
-  for (const t of rest) {
-    const tab = await browser.tabs.create({
-      windowId,
-      url: t.url,
-      pinned: t.pinned,
-      active: false,
+  const openTabs = async (): Promise<number | null> => {
+    let rest = tabs;
+    if (windowId === null) {
+      const first = tabs[0] as (typeof tabs)[number];
+      const win = await browser.windows.create({ url: first.url, focused: true });
+      const firstTab = win?.tabs?.[0];
+      if (!win?.id || firstTab?.id === undefined) return null;
+      windowId = win.id;
+      if (first.pinned) await browser.tabs.update(firstTab.id, { pinned: true });
+      created.push({ id: firstTab.id, at: first.at, group: first.group, active: true });
+      rest = tabs.slice(1);
+    }
+    for (const t of rest) {
+      const tab = await browser.tabs.create({
+        windowId,
+        url: t.url,
+        pinned: t.pinned,
+        active: false,
+      });
+      if (tab.id !== undefined)
+        created.push({ id: tab.id, at: t.at, group: t.group, active: false });
+    }
+    return windowId;
+  };
+  if (w.layout && layouts) {
+    // Binding happens inside the layout queue so the new pinned tabs are never adopted
+    // as plain items first.
+    await layouts.restoreLayout(async () => {
+      const id = await openTabs();
+      return id === null ? null : restoredLayout(w, id, created);
     });
-    if (tab.id !== undefined) created.push({ id: tab.id, group: t.group, active: false });
+  } else {
+    await openTabs();
   }
+  if (windowId === null) return { opened: 0, skipped: w.tabs.length };
 
   for (const [i, g] of w.groups.entries()) {
     const ids = created.filter((c) => c.group === i).map((c) => c.id);
@@ -133,6 +199,7 @@ export async function restoreSession(
   target: 'newWindow' | 'currentWindow',
   currentWindowId: number,
   discard: boolean,
+  layouts?: SessionLayouts,
 ): Promise<string> {
   const session = (await readAll()).find((s) => s.id === id);
   if (!session) return 'That session no longer exists';
@@ -141,7 +208,7 @@ export async function restoreSession(
   for (const [i, w] of session.windows.entries()) {
     // "Current window" applies to the first saved window; any others open in new windows.
     const into = target === 'currentWindow' && i === 0 ? currentWindowId : null;
-    const r = await restoreWindow(w, into, discard);
+    const r = await restoreWindow(w, into, discard, layouts);
     opened += r.opened;
     skipped += r.skipped;
   }

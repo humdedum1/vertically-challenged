@@ -390,3 +390,45 @@ export function buildPanelRows(
   const seen = new Set<string>();
   return rows.filter((r) => !seen.has(r.key) && seen.add(r.key));
 }
+
+/** Equal by reference, or arrays whose items are equal objects field by field (tiles). */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  return a.every((x, i) => x === b[i] || sameFields(x, b[i]));
+}
+
+function sameFields(a: unknown, b: unknown): boolean {
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  const ra = a as Record<string, unknown>;
+  const rb = b as Record<string, unknown>;
+  return ka.every((k) => ra[k] === rb[k]);
+}
+
+function sameRow(a: Row, b: Row): boolean {
+  const ra = a as unknown as Record<string, unknown>;
+  const rb = b as unknown as Record<string, unknown>;
+  const ka = Object.keys(ra);
+  return ka.length === Object.keys(rb).length && ka.every((k) => sameValue(ra[k], rb[k]));
+}
+
+/**
+ * `next` with every row whose content didn't change replaced by the object from `prev`,
+ * or `prev` itself when no row changed. Rows are rebuilt from scratch on each patch; with
+ * the old objects kept, the keyed list only re-renders the rows that really changed (a
+ * title update re-renders one row instead of every visible one).
+ */
+export function reuseRows(prev: readonly Row[], next: Row[]): Row[] {
+  if (prev.length === 0) return next;
+  const old = new Map(prev.map((r) => [r.key, r]));
+  let unchanged = prev.length === next.length;
+  for (let i = 0; i < next.length; i++) {
+    const n = next[i] as Row;
+    const o = old.get(n.key);
+    if (o && o.kind === n.kind && sameRow(o, n)) next[i] = o;
+    if (next[i] !== prev[i]) unchanged = false;
+  }
+  return unchanged ? (prev as Row[]) : next;
+}

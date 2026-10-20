@@ -49,7 +49,10 @@ function onscroll(e: Event & { currentTarget: HTMLDivElement }): void {
   <div class="spacer" role="presentation" style:height="{range.totalHeight}px">
     <div class="window" role="presentation" style:transform="translateY({range.offset}px)">
       {#each visible as item, i (key(item))}
-        {@render row(item, range.start + i)}
+        <!-- A derived, so rows that stay on screen while scrolling don't re-render: their
+             absolute index is unchanged even though range.start and i both moved. -->
+        {@const index = range.start + i}
+        {@render row(item, index)}
       {/each}
     </div>
     {@render overlay?.()}

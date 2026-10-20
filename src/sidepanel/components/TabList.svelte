@@ -52,6 +52,7 @@ import {
   buildSearchRows,
   type PinRow as PinRowT,
   type Row,
+  reuseRows,
   rowWindowId,
 } from '../model/rows';
 import { movableTabIds, pruneSelection, tabIdsBetween } from '../model/selection';
@@ -108,17 +109,22 @@ let fedTabs = $state.raw<readonly TabInfo[]>([]);
 
 // Every tab / group the view can show: all windows of this panel's kind.
 const allTabs = $derived(tabState.windows.flatMap((w) => w.tabs));
-const allGroups = $derived(tabState.windows.flatMap((w) => w.groups));
+// Kept as the same array until a window's group list changes (tab patches leave the
+// lists alone), so group lookups in every row don't re-run on each title update.
+let groupLists: readonly (readonly GroupInfo[])[] = [];
+let groupsFlat: GroupInfo[] = [];
+const allGroups = $derived.by(() => {
+  const lists = tabState.windows.map((w) => w.groups);
+  if (lists.length !== groupLists.length || lists.some((g, i) => g !== groupLists[i])) {
+    groupLists = lists;
+    groupsFlat = lists.flat();
+  }
+  return groupsFlat;
+});
 const tabById = $derived(new Map(allTabs.map((t) => [t.id, t])));
 const windowViewById = $derived(new Map(tabState.windows.map((w) => [w.info.id, w])));
 const windowNumber = $derived(new Map(tabState.windows.map((w, i) => [w.info.id, i + 1])));
 const tabsOfWindow = (id: number): readonly TabInfo[] => windowViewById.get(id)?.tabs ?? [];
-
-// Pre-effect so the index is fed before the derived search below reads it in the same flush.
-$effect.pre(() => {
-  index.replaceAll(allTabs);
-  fedTabs = allTabs;
-});
 
 // Collapsing another window is remembered by the worker in this window's layout (per panel).
 function setWindowCollapsed(otherWindowId: number, collapsed: boolean): void {
@@ -143,12 +149,25 @@ function observeWidth(node: HTMLElement) {
 let query = $state('');
 const needle = $derived(query.trim());
 const searching = $derived(needle !== '');
-const treeRows: Row[] = $derived(
-  buildPanelRows(
-    tabState.windows.map((w) => ({ ...w, layout: tabState.layoutOf(w.info.id) })),
-    tabState.windowId,
-    { tilesPerRow },
-  ),
+// Pre-effect so the index is fed before the derived search below reads it in the same flush.
+// Only while searching: outside search nothing reads the index, and patches arrive often.
+$effect.pre(() => {
+  if (!searching) return;
+  index.replaceAll(allTabs);
+  fedTabs = allTabs;
+});
+// The previous rows, so unchanged ones keep their objects (see reuseRows).
+let lastTree: Row[] = [];
+const treeRows: Row[] = $derived.by(
+  () =>
+    (lastTree = reuseRows(
+      lastTree,
+      buildPanelRows(
+        tabState.windows.map((w) => ({ ...w, layout: tabState.layoutOf(w.info.id) })),
+        tabState.windowId,
+        { tilesPerRow },
+      ),
+    )),
 );
 const view: Row[] = $derived(searching ? buildSearchRows(fedTabs, index.search(needle)) : treeRows);
 const keyIndex = $derived(new Map(view.map((r, i) => [r.key, i])));

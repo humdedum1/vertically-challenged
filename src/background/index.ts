@@ -250,6 +250,16 @@ export function startBackground(): void {
 
   // --- Pinned layouts ---------------------------------------------------------------------
 
+  /** A toast for the window's panel, if one is open; otherwise it is dropped. */
+  const noticeTo = (windowId: number, text: string) => {
+    for (const [port, sub] of subs) {
+      if (sub.windowId !== windowId) continue;
+      try {
+        port.postMessage({ type: 'notice', level: 'info', text } satisfies WorkerMessage);
+      } catch {}
+    }
+  };
+
   const pins = new PinManager({
     store,
     ready: Promise.all([ready, windowsReady]).then(() => {}),
@@ -257,14 +267,7 @@ export function startBackground(): void {
     storage: { local: browser.storage.local, session: browser.storage.session },
     windows: () => windowList,
     broadcast,
-    notice: (windowId, text) => {
-      for (const [port, sub] of subs) {
-        if (sub.windowId !== windowId) continue;
-        try {
-          port.postMessage({ type: 'notice', level: 'info', text } satisfies WorkerMessage);
-        } catch {}
-      }
-    },
+    notice: noticeTo,
   });
   browser.windows.onRemoved.addListener((id) => pins.onWindowRemoved(id));
   browser.windows.onFocusChanged.addListener((id) => pins.onWindowFocused(id));
@@ -439,7 +442,9 @@ export function startBackground(): void {
     },
     saveWindow: async (windowId) => {
       const name = `Window · ${new Date().toLocaleString()}`;
-      await runCommand({ type: 'saveSession', scope: 'window', windowId, name }, deps);
+      // E.g. an incognito window can't be saved; without a panel there is nowhere to say so.
+      const text = await runCommand({ type: 'saveSession', scope: 'window', windowId, name }, deps);
+      if (text) noticeTo(windowId, text);
     },
   });
 }

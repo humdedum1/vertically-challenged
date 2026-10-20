@@ -385,5 +385,8 @@ export function buildPanelRows(
       r.size = own.length;
     });
   });
-  return rows;
+  // Windows' layouts and tab lists arrive as separate messages, so for a moment a moved item
+  // or tab can be in two windows at once. Row keys must be unique (keyed each blocks throw).
+  const seen = new Set<string>();
+  return rows.filter((r) => !seen.has(r.key) && seen.add(r.key));
 }

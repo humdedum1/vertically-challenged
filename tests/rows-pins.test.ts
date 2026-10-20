@@ -260,3 +260,30 @@ describe('buildPanelRows performance', () => {
     expect(rows).toHaveLength(1502);
   });
 });
+
+describe('buildPanelRows transient duplicates', () => {
+  it('keeps row keys unique while a pinned item is in two windows at once', () => {
+    // pinMove sends the target window's layout before the source's has caught up.
+    const both = item('x', 7);
+    const rows = buildPanelRows(
+      [
+        {
+          info: win(1),
+          tabs: [tab(7, { windowId: 1, pinned: true }), tab(10, { windowId: 1 })],
+          groups: [],
+          layout: layout({ pinned: [both] }),
+        },
+        {
+          info: win(2),
+          tabs: [tab(7, { windowId: 2, pinned: true })],
+          groups: [],
+          layout: layout({ id: 'lbbbbbbbbbb', pinned: [both] }),
+        },
+      ],
+      1,
+      opts,
+    );
+    expect(new Set(keys(rows)).size).toBe(rows.length);
+    expect(keys(rows).filter((k) => k === 'px')).toHaveLength(1);
+  });
+});

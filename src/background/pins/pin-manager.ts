@@ -91,6 +91,11 @@ export const ALIVE_KEY = 'vc:alive';
  * read Chrome's half-moved order as a user drag and adopt it.
  */
 export const MOVING_KEY = 'vc:moving';
+/**
+ * The late-restore grace period (see LATE_RESTORE_MS), so a worker that is suspended and
+ * woken during it carries on matching late windows. Holds layout and window ids only.
+ */
+export const LATE_KEY = 'vc:late';
 const PERSIST_DELAY_MS = 250;
 const LAST_USED_THROTTLE_MS = 60_000;
 /** How long Chrome gets to report a batch of moves before it is re-planned. */
@@ -107,6 +112,13 @@ const PENDING_TIMEOUT_MS = 5000;
  * the saved layouts instead of being adopted as plain pinned tabs.
  */
 export const LATE_RESTORE_MS = 60_000;
+/**
+ * A late window's pinned tabs often arrive a few at a time; matching on the first one
+ * alone could pick the wrong setup (any setup with that site qualifies). The window waits
+ * until no pinned tab has arrived for this long, and at most LATE_SETTLE_MAX_MS.
+ */
+const LATE_SETTLE_MS = 1500;
+const LATE_SETTLE_MAX_MS = 6000;
 
 interface Settled {
   windowId: number;
@@ -144,6 +156,13 @@ export class PinManager {
   private readonly lateCandidates = new Set<string>();
   /** Windows bound by restart matching, whose dormant items may still find a late tab. */
   private readonly restartMatched = new Set<number>();
+  /** Late windows waiting for their pinned tabs to settle, with when each was first seen. */
+  private readonly lateWaiting = new Map<number, { since: number; pinned: string }>();
+  /** Late windows already matched (or found unmatched); they are reconciled normally. */
+  private readonly lateDone = new Set<number>();
+  private lateTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The grace period changed and LATE_KEY needs writing. */
+  private lateDirty = false;
   /** Set when the stored layouts couldn't be read: writing would replace them. */
   private noPersist = false;
   /** `vc:alive` is written with the first layouts write after restart matching. */
@@ -192,6 +211,7 @@ export class PinManager {
       session.get(INCOGNITO_LAYOUTS_KEY),
       session.get(ALIVE_KEY),
       session.get(MOVING_KEY),
+      session.get(LATE_KEY),
     ]);
   }
 
@@ -210,7 +230,7 @@ export class PinManager {
         return;
       }
     }
-    const [l = {}, s = {}, a = {}, mv = {}] = raw;
+    const [l = {}, s = {}, a = {}, mv = {}, lt = {}] = raw;
     const saved = parseLayoutStore(l[LAYOUTS_KEY]);
     const priv = parseLayoutStore(s[INCOGNITO_LAYOUTS_KEY]);
     // Each area only ever holds its own kind; anything else is ignored.
@@ -242,6 +262,7 @@ export class PinManager {
           if (typeof w === 'number' && this.bindings.has(w)) this.resume.add(w);
       }
       this.lastMoving = JSON.stringify(Array.isArray(moving) ? moving : []);
+      this.resumeLate(lt[LATE_KEY]);
     } else {
       for (const [id, x] of this.layouts) {
         if (x.incognito) this.layouts.delete(id);
@@ -292,6 +313,7 @@ export class PinManager {
     for (const l of this.layouts.values()) {
       if (this.setupLayout(l.id)) this.lateCandidates.add(l.id);
     }
+    this.lateDirty = true;
     this.aliveDue = true;
     this.markDirty(false);
     this.markDirty(true);
@@ -314,7 +336,9 @@ export class PinManager {
     this.bindings.set(windowId, x.id);
     this.lateCandidates.delete(x.id);
     this.restartMatched.add(windowId);
+    this.lateDirty = true;
     this.markDirty(false);
+    this.markDirty(true);
   }
 
   private inLateRestore(): boolean {
@@ -323,27 +347,109 @@ export class PinManager {
     this.lateUntil = 0;
     this.lateCandidates.clear();
     this.restartMatched.clear();
+    this.lateDone.clear();
+    // Windows still waiting stay queued: resolveLate reconciles them without matching.
+    this.lateDirty = true;
+    this.markDirty(true);
     return false;
   }
 
+  /** Picks up a grace period saved by the previous worker, if it hasn't ended. */
+  private resumeLate(raw: unknown): void {
+    if (typeof raw !== 'object' || raw === null) return;
+    const { until, candidates, matched } = raw as Record<string, unknown>;
+    if (typeof until !== 'number' || until <= (this.deps.now?.() ?? Date.now())) return;
+    this.lateUntil = until;
+    if (Array.isArray(candidates)) {
+      for (const id of candidates)
+        if (typeof id === 'string' && this.setupLayout(id)) this.lateCandidates.add(id);
+    }
+    if (Array.isArray(matched)) {
+      for (const w of matched)
+        if (typeof w === 'number' && this.bindings.has(w)) this.restartMatched.add(w);
+    }
+  }
+
   /**
-   * A window that shows its first pinned tabs during the grace period (unbound, or bound
-   * to an empty placeholder) is matched against the setups restart matching left over.
+   * A window that shows pinned tabs during the grace period while it has no layout of
+   * its own (unbound, or an empty placeholder) may be a late restore. Not when our own
+   * command is pinning its tabs: that is the user, not Chrome restoring.
    */
-  private lateMatch(windowId: number, tabs: readonly TabInfo[]): boolean {
+  private lateEligible(windowId: number, tabs: readonly TabInfo[]): boolean {
+    if (this.lateDone.has(windowId) || this.lateCandidates.size === 0) return false;
     const id = this.bindings.get(windowId);
     const l = id === undefined ? undefined : this.layouts.get(id);
     if (l && !isEmptyLayout(l)) return false;
-    const pinnedTabs = tabs.filter((t) => t.pinned);
-    if (pinnedTabs.length === 0) return false;
+    const pinned = tabs.filter((t) => t.pinned);
+    return pinned.length > 0 && !pinned.some((t) => this.pending.has(t.id));
+  }
+
+  /**
+   * Holds the window until its pinned tabs stop changing (see LATE_SETTLE_MS). Returns
+   * false once it has waited long enough; the caller then matches right away.
+   */
+  private holdLate(windowId: number, tabs: readonly TabInfo[]): boolean {
+    const now = this.deps.now?.() ?? Date.now();
+    const pinned = tabs
+      .filter((t) => t.pinned)
+      .map((t) => t.id)
+      .join(',');
+    const w = this.lateWaiting.get(windowId);
+    if (w && now - w.since >= LATE_SETTLE_MAX_MS) return false;
+    if (!w || w.pinned !== pinned) {
+      this.lateWaiting.set(windowId, { since: w?.since ?? now, pinned });
+      if (this.lateTimer !== null) clearTimeout(this.lateTimer);
+      this.lateTimer = setTimeout(() => {
+        this.lateTimer = null;
+        void this.exclusive(() => this.resolveLate());
+      }, LATE_SETTLE_MS);
+    }
+    return true;
+  }
+
+  /** Matches every waiting late window at once, so the best pairs win, not the first. */
+  private resolveLate(): void {
+    const ids = [...this.lateWaiting.keys()].filter((w) => !this.closed.has(w));
+    this.lateWaiting.clear();
+    if (ids.length === 0) return;
+    for (const w of ids) this.lateDone.add(w);
+    if (this.inLateRestore()) {
+      const candidates = [...this.lateCandidates]
+        .map((c) => this.setupLayout(c))
+        .filter((c): c is WindowLayout => c !== undefined);
+      const windows = ids.flatMap((windowId) => {
+        const tabs = this.deps.store.snapshot(windowId).tabs;
+        const id = this.bindings.get(windowId);
+        const l = id === undefined ? undefined : this.layouts.get(id);
+        if (l && !isEmptyLayout(l)) return [];
+        const pinned = tabs.filter((t) => t.pinned);
+        if (pinned.length === 0) return [];
+        return [
+          {
+            windowId,
+            incognito: this.incognitoOf(windowId) ?? true,
+            pinned: pinned.map((t) => ({ id: t.id, url: t.url, title: t.title })),
+          },
+        ];
+      });
+      const matches = matchLayouts(candidates, windows);
+      for (const [windowId, m] of matches) this.bindMatch(windowId, m);
+      if (matches.size > 0) this.publishSetups();
+    }
+    this.publish(this.pass(ids, 0, null));
+  }
+
+  /** resolveLate for one window that has waited LATE_SETTLE_MAX_MS. */
+  private matchOneLate(windowId: number, tabs: readonly TabInfo[]): boolean {
     const candidates = [...this.lateCandidates]
       .map((c) => this.setupLayout(c))
       .filter((c): c is WindowLayout => c !== undefined);
+    const pinned = tabs.filter((t) => t.pinned);
     const m = matchLayouts(candidates, [
       {
         windowId,
         incognito: this.incognitoOf(windowId) ?? true,
-        pinned: pinnedTabs.map((t) => ({ id: t.id, url: t.url, title: t.title })),
+        pinned: pinned.map((t) => ({ id: t.id, url: t.url, title: t.title })),
       },
     ]).get(windowId);
     if (!m) return false;
@@ -428,6 +534,40 @@ export class PinManager {
     const ids = [...new Set(windowIds)];
     const seq = ++this.seq;
     return this.exclusive(() => this.publish(this.pass(ids, seq, null)));
+  }
+
+  /**
+   * Chrome can swap a tab for a new id in place (discarding it, prerender swaps). Items,
+   * pending commands and given-up orders follow the new id, so the item keeps its tab
+   * instead of turning dormant next to a second item minted for the "new" tab. Queued, so
+   * it lands before the flush that shows the new id.
+   */
+  onReplaced(added: number, removed: number): void {
+    void this.exclusive(() => {
+      const changed = new Set<number>();
+      for (const [w, id] of this.bindings) {
+        const l = this.layouts.get(id);
+        if (!l || !flattenItems(l).some((i) => i.tabId === removed)) continue;
+        this.layouts.set(
+          id,
+          withTabIds(l, (i) => (i.tabId === removed ? added : i.tabId)),
+        );
+        changed.add(w);
+      }
+      const p = this.pending.get(removed);
+      if (p) {
+        this.pending.delete(removed);
+        this.pending.set(added, p);
+      }
+      for (const [w, order] of this.stale) {
+        if (order.includes(removed))
+          this.stale.set(
+            w,
+            order.map((id) => (id === removed ? added : id)),
+          );
+      }
+      this.publish(changed);
+    });
   }
 
   onWindowRemoved(windowId: number): void {
@@ -852,7 +992,13 @@ export class PinManager {
     // Bindings made here are changes even when reconcile below finds nothing to do.
     let late = false;
     if (this.inLateRestore()) {
-      late = this.lateMatch(windowId, tabs);
+      // Left alone (no layout yet, nothing adopted) until resolveLate matches it.
+      if (this.lateEligible(windowId, tabs) && this.holdLate(windowId, tabs)) return null;
+      if (this.lateWaiting.delete(windowId)) {
+        // Waited its maximum: matched on its own, now.
+        this.lateDone.add(windowId);
+        late = this.matchOneLate(windowId, tabs);
+      }
       late = this.pairDormant(windowId, tabs) || late;
     }
     // A window without pinned tabs needs no layout until a panel asks for one.
@@ -867,12 +1013,13 @@ export class PinManager {
       this.markDirty(false);
       this.markDirty(true);
     }
-    const stale = this.isStale(windowId, tabs);
+    const staleness = this.staleness(windowId, tabs);
+    const stale = staleness === 'hold';
     const resumed = this.resume.delete(windowId);
     const settling = this.settlePending(windowId);
     const pending = new Map([...this.pending].map(([id, p]) => [id, p.windowId]));
     const r = reconcile(layout, windowId, tabs, store, {
-      inFlight: own || stale || resumed || moving || settling,
+      inFlight: own || staleness !== 'none' || resumed || moving || settling,
       pending,
     });
     if (r.changed) this.layouts.set(layout.id, r.layout);
@@ -883,17 +1030,28 @@ export class PinManager {
   }
 
   /**
-   * True while Chrome still shows the order we gave up on: the same pinned tabs in the
-   * same order. Any other set of pinned tabs ends it, so a give-up recorded against a
-   * momentarily empty (or otherwise different) snapshot can't hold forever.
+   * Where a window stands after we gave up on its moves (see `stale`):
+   * - 'hold': Chrome still shows the order we gave up on; it is not a user reorder.
+   * - 'retry': tabs were pinned or unpinned, but the ones still there keep the order we
+   *   gave up on. Still not a user reorder, so it isn't adopted, and the changed set is
+   *   a fresh chance for the moves.
+   * - 'none': nothing given up, or the user did reorder (or the give-up was recorded
+   *   against an empty or unrelated snapshot), so normal reconciling resumes.
    */
-  private isStale(windowId: number, tabs: readonly TabInfo[]): boolean {
+  private staleness(windowId: number, tabs: readonly TabInfo[]): 'hold' | 'retry' | 'none' {
     const then = this.stale.get(windowId);
-    if (!then) return false;
+    if (!then) return 'none';
     const now = tabs.filter((t) => t.pinned).map((t) => t.id);
-    if (now.length === then.length && now.every((id, k) => id === then[k])) return true;
+    if (now.length === then.length && now.every((id, k) => id === then[k])) return 'hold';
     this.stale.delete(windowId);
-    return false;
+    const nowSet = new Set(now);
+    const thenSet = new Set(then);
+    const kept = then.filter((id) => nowSet.has(id));
+    const keptNow = now.filter((id) => thenSet.has(id));
+    const sameOrder = kept.length > 0 && kept.every((id, k) => id === keptNow[k]);
+    if (!sameOrder) return 'none';
+    this.retries.delete(windowId);
+    return 'retry';
   }
 
   /**
@@ -1095,15 +1253,24 @@ export class PinManager {
     this.dirty = { local: false, session: false };
     const alive = this.aliveDue;
     this.aliveDue = false;
+    const late = this.lateDirty
+      ? {
+          until: this.lateUntil,
+          candidates: [...this.lateCandidates],
+          matched: [...this.restartMatched],
+        }
+      : null;
+    this.lateDirty = false;
     const data = { local: this.storeFor(false), session: this.storeFor(true) };
     this.writes = this.writes
       .then(async () => {
         if (local) await this.deps.storage.local.set({ [LAYOUTS_KEY]: data.local });
         // After the local write, so a wake never trusts bindings that weren't saved.
-        if (session || alive) {
+        if (session || alive || late) {
           await this.deps.storage.session.set({
             [INCOGNITO_LAYOUTS_KEY]: data.session,
             ...(alive ? { [ALIVE_KEY]: true } : {}),
+            ...(late ? { [LATE_KEY]: late } : {}),
           });
         }
       })

@@ -815,6 +815,106 @@ describe('PinManager late-restored windows', () => {
     expect(pins.setups().map((s) => s.id)).toEqual([ID(2)]);
   });
 
+  it('waits for a late window’s pinned tabs to settle before matching it', async () => {
+    // Both setups have the mail tab; the newer one would win on that tab alone.
+    const mailWork = layout(
+      1,
+      [item('m1', 'https://mail.com/'), item('x', 'https://x.com/'), item('y', 'https://y.com/')],
+      { lastUsed: 10 },
+    );
+    const mailHome = layout(
+      2,
+      [item('m2', 'https://mail.com/'), item('b', 'https://b.com/'), item('c', 'https://c.com/')],
+      { lastUsed: 5 },
+    );
+    const t = setup({
+      windows: { 7: [tab(1, { windowId: 7 })] },
+      local: { [LAYOUTS_KEY]: stored([mailWork, mailHome]) },
+    });
+    let clock = 1_000_000;
+    t.deps.now = () => clock;
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    // Chrome restores window 8 one pinned tab at a time.
+    t.setWindows([
+      { id: 7, incognito: false, focused: false },
+      { id: 8, incognito: false, focused: true },
+    ]);
+    t.resync(8, [pinned(20, 8, 'https://mail.com/')]);
+    await pins.afterFlush([8]);
+    await vi.advanceTimersByTimeAsync(500);
+    clock += 500;
+    t.resync(8, [
+      pinned(20, 8, 'https://mail.com/'),
+      pinned(21, 8, 'https://b.com/'),
+      pinned(22, 8, 'https://c.com/'),
+    ]);
+    await pins.afterFlush([8]);
+    await settle();
+
+    const l = pins.layoutOf(8);
+    expect(l.id).toBe(ID(2));
+    expect(flattenItems(l).map((i) => [i.id, i.tabId])).toEqual([
+      ['m2', 20],
+      ['b', 21],
+      ['c', 22],
+    ]);
+    expect(pins.setups().map((x) => x.id)).toEqual([ID(1)]);
+  });
+
+  it('a window still waiting when the grace period ends is adopted, not left out', async () => {
+    const { t, pins, advance } = await coldStart();
+    advance(59_500);
+    t.setWindows([
+      { id: 7, incognito: false, focused: false },
+      { id: 8, incognito: false, focused: true },
+    ]);
+    t.resync(8, [pinned(20, 8, 'https://zzz.com/')]);
+    await pins.afterFlush([8]);
+    advance(2_000);
+    await settle();
+    expect(flattenItems(pins.layoutOf(8)).map((i) => i.tabId)).toEqual([20]);
+    expect(pins.setups().map((x) => x.id)).toEqual([ID(2)]);
+  });
+
+  it('keeps the grace period across a worker restart', async () => {
+    const { t, advance } = await coldStart();
+    advance(20_000);
+    // The worker is suspended and wakes again in the same browser session.
+    const again = new PinManager(t.deps);
+    await again.loaded;
+    await settle();
+    advance(10_000);
+    t.setWindows([
+      { id: 7, incognito: false, focused: false },
+      { id: 8, incognito: false, focused: true },
+    ]);
+    t.resync(8, [pinned(20, 8, 'https://c.com/'), pinned(21, 8, 'https://d.com/')]);
+    await again.afterFlush([8]);
+    await settle();
+    expect(again.layoutOf(8).id).toBe(ID(2));
+    expect(again.setups()).toEqual([]);
+  });
+
+  it('a worker restart after the grace period does not revive it', async () => {
+    const { t, advance } = await coldStart();
+    advance(61_000);
+    const again = new PinManager(t.deps);
+    await again.loaded;
+    await settle();
+    t.setWindows([
+      { id: 7, incognito: false, focused: false },
+      { id: 8, incognito: false, focused: true },
+    ]);
+    t.resync(8, [pinned(20, 8, 'https://c.com/'), pinned(21, 8, 'https://d.com/')]);
+    await again.afterFlush([8]);
+    await settle();
+    expect(again.layoutOf(8).id).not.toBe(ID(2));
+    expect(again.setups().map((x) => x.id)).toEqual([ID(2)]);
+  });
+
   it('binds a matched window’s dormant item to its tab arriving late', async () => {
     const t = setup({
       windows: { 7: [pinned(10, 7, 'https://a.com/')] },
@@ -866,6 +966,96 @@ describe('PinManager late-restored windows', () => {
     ]);
     const saved = (t.local.data.get(LAYOUTS_KEY) as LayoutStore).layouts[0] as WindowLayout;
     expect(flattenItems(saved).map((i) => i.tabId)).toEqual([10, 11]);
+  });
+});
+
+describe('PinManager after giving up on moves', () => {
+  const order = (pins: PinManager, w: number) => flattenItems(pins.layoutOf(w)).map((i) => i.tabId);
+  const abc = () => [
+    pinned(10, 1, 'https://a.com/'),
+    pinned(11, 1, 'https://b.com/'),
+    pinned(12, 1, 'https://c.com/'),
+  ];
+  /** Chrome refuses every move; the layout is reversed, so the manager gives up. */
+  async function gaveUp() {
+    vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const t = setup({
+      windows: { 1: abc() },
+      session: { [ALIVE_KEY]: true },
+      move: async () => {
+        throw new Error('Tabs cannot be edited right now');
+      },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    await pins.mutate(1, (l) => ({ ...l, pinned: [...l.pinned].reverse() }));
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(t.moves).toHaveLength(8);
+    return { t, pins };
+  }
+
+  it('pinning another tab keeps the layout order and tries the moves again', async () => {
+    const { t, pins } = await gaveUp();
+    // Chrome's old order is untouched; a newly pinned tab joins at the end.
+    t.resync(1, [...abc(), pinned(13, 1, 'https://d.com/')]);
+    await pins.afterFlush([1]);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(order(pins, 1)).toEqual([12, 11, 10, 13]);
+    // A fresh attempt at putting Chrome in layout order (still refused here).
+    expect(t.moves.length).toBeGreaterThan(8);
+  });
+
+  it('unpinning a tab keeps the layout order of the rest', async () => {
+    const { t, pins } = await gaveUp();
+    const [a, , c] = abc() as [TabInfo, TabInfo, TabInfo];
+    t.resync(1, [a, c, tab(11, { windowId: 1 })]);
+    await pins.afterFlush([1]);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(order(pins, 1)).toEqual([12, 10]);
+  });
+
+  it('a real reorder in Chrome together with a new pinned tab is still adopted', async () => {
+    const { t, pins } = await gaveUp();
+    const [a, b, c] = abc() as [TabInfo, TabInfo, TabInfo];
+    t.resync(1, [b, a, c, pinned(13, 1, 'https://d.com/')]);
+    await pins.afterFlush([1]);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(order(pins, 1)).toEqual([11, 10, 12, 13]);
+  });
+});
+
+describe('PinManager when Chrome replaces a tab id', () => {
+  // Chrome can give a tab a new id when it discards it (tabs.onReplaced).
+  it('keeps the Essential on the same item, with the new id', async () => {
+    const saved = layout(1, [item('ib', 'https://b.com/', 11)], {
+      essentials: [item('ia', 'https://a.com/', 10)],
+    });
+    const t = setup({
+      windows: { 1: [pinned(10, 1, 'https://a.com/'), pinned(11, 1, 'https://b.com/'), tab(12)] },
+      local: { [LAYOUTS_KEY]: stored([saved], [{ windowId: 1, layoutId: ID(1) }]) },
+      session: { [ALIVE_KEY]: true },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    pins.onReplaced(20, 10);
+    t.resync(1, [
+      pinned(20, 1, 'https://a.com/', { discarded: true }),
+      pinned(11, 1, 'https://b.com/'),
+      tab(12),
+    ]);
+    await pins.afterFlush([1]);
+    await settle();
+
+    const l = pins.layoutOf(1);
+    expect(l.essentials.map((i) => [i.id, i.tabId])).toEqual([['ia', 20]]);
+    expect(flattenItems(l).map((i) => [i.id, i.tabId])).toEqual([
+      ['ia', 20],
+      ['ib', 11],
+    ]);
+    expect(t.moves).toEqual([]);
   });
 });
 

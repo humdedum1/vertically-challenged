@@ -206,14 +206,16 @@ export function startBackground(): void {
   browser.tabs.onMoved.addListener((tabId, { windowId, fromIndex, toIndex }) =>
     logOp({ kind: 'move', windowId, tabId, from: fromIndex, to: toIndex }),
   );
-  browser.tabs.onAttached.addListener((tabId, { newWindowId, newPosition }) =>
-    logOp({ kind: 'attach', windowId: newWindowId, tabId, position: newPosition }),
-  );
+  // The new window is queried rather than given the tab's last known state: Chrome
+  // changes a tab on the way (a pinned tab moved by the API arrives unpinned) and reports
+  // that against the old window, before the detach.
+  browser.tabs.onAttached.addListener((_id, { newWindowId }) => markResync(newWindowId));
   browser.tabs.onDetached.addListener((tabId, { oldWindowId, oldPosition }) =>
     logOp({ kind: 'detach', windowId: oldWindowId, tabId, position: oldPosition }),
   );
   browser.tabs.onReplaced.addListener((added, removed) => {
-    // Prerender/instant swaps replace the tab id in place.
+    // Discards and prerender/instant swaps replace the tab id in place.
+    pins.onReplaced(added, removed);
     pending.removed.add(removed);
     browser.tabs.get(added).then(
       (t) => markResync(t.windowId),

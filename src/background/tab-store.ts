@@ -8,8 +8,7 @@ export type TabOp =
   | { kind: 'create'; windowId: number; tab: TabInfo; index: number }
   | { kind: 'move'; windowId: number; tabId: number; from: number; to: number }
   | { kind: 'remove'; windowId: number; tabId: number }
-  | { kind: 'detach'; windowId: number; tabId: number; position: number }
-  | { kind: 'attach'; windowId: number; tabId: number; position: number };
+  | { kind: 'detach'; windowId: number; tabId: number; position: number };
 
 /**
  * Raw chrome.tabs events accumulated between flushes. Kept separate from the store so the
@@ -209,19 +208,14 @@ export class TabStore {
           if (order[op.position] !== op.tabId) return null;
           order.splice(op.position, 1);
           break;
-        case 'attach':
-          if (!this.tabs.has(op.tabId) || order.includes(op.tabId)) return null;
-          if (op.position > order.length) return null;
-          order.splice(op.position, 0, op.tabId);
-          break;
       }
     }
     return order;
   }
 
   /**
-   * Applies the ops of every window that isn't resynced, in event order (so a tab that
-   * moves between windows ends up owned by the last window it was attached to).
+   * Applies the ops of every window that isn't resynced, in event order. A tab detached
+   * here stays in the map (in no window's order) until the window it went to is queried.
    */
   private replay(changes: ChangeSet, resynced: ReadonlyMap<number, unknown>, out: PatchBuilder) {
     const skip = new Set<number>(resynced.keys());
@@ -251,14 +245,6 @@ export class TabStore {
         case 'detach':
           out.remove(op.windowId, op.tabId);
           break;
-        case 'attach': {
-          const prev = this.tabs.get(op.tabId);
-          if (!prev) break;
-          const next = { ...prev, windowId: op.windowId };
-          this.tabs.set(op.tabId, next);
-          out.upsert(next);
-          break;
-        }
         case 'move':
           break;
       }
@@ -292,8 +278,8 @@ export class TabStore {
       out.groups(windowId, groups);
     }
 
-    // Before the resynced windows: a tab attached here and queried there must end up
-    // owned by the query's window, and replay never deletes a tab another window holds.
+    // Before the resynced windows: a tab detached here and queried in its new window must
+    // end up owned by that window, and replay never deletes a tab another window holds.
     this.replay(changes, resynced, out);
 
     for (const id of changes.removed) {

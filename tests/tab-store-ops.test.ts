@@ -9,12 +9,22 @@ function load(store: TabStore, entries: [number, TabInfo[]][]) {
   return store.apply(cs, new Map(entries));
 }
 
-/** Applies ops the way the worker's flush does: unreplayable windows get the truth instead. */
-function flush(store: TabStore, ops: TabOp[], truth?: Map<number, TabInfo[]>) {
+/**
+ * Applies ops the way the worker's flush does: `resync` windows (a tab was attached
+ * there) and unreplayable ones are given the truth instead.
+ */
+function flush(
+  store: TabStore,
+  ops: TabOp[],
+  truth?: Map<number, TabInfo[]>,
+  resync: Iterable<number> = [],
+) {
   const cs = new ChangeSet();
   cs.ops.push(...ops);
   for (const op of ops) if (op.kind === 'remove') cs.removed.add(op.tabId);
+  for (const w of resync) cs.resync.add(w);
   const bad = store.unreplayable(cs);
+  for (const w of cs.resync) bad.add(w);
   const resynced = new Map<number, TabInfo[]>();
   for (const w of bad) resynced.set(w, truth?.get(w) ?? []);
   for (const w of resynced.keys()) cs.resync.add(w);
@@ -82,16 +92,18 @@ describe('TabStore local ops', () => {
     expect(patchFor(patches, 1)).toEqual({ windowId: 1, removed: [1], order: [] });
   });
 
-  it('moves a tab between windows with detach and attach', () => {
+  it('moves a tab between windows: detached here, queried there', () => {
     const store = new TabStore();
     load(store, [
       [1, [tab(1), tab(2)]],
       [2, [tab(3, { windowId: 2 })]],
     ]);
-    const { patches } = flush(store, [
-      { kind: 'detach', windowId: 1, tabId: 2, position: 1 },
-      { kind: 'attach', windowId: 2, tabId: 2, position: 0 },
-    ]);
+    const { patches } = flush(
+      store,
+      [{ kind: 'detach', windowId: 1, tabId: 2, position: 1 }],
+      new Map([[2, [tab(2, { windowId: 2 }), tab(3, { windowId: 2 })]]]),
+      [2],
+    );
     expect(ids(store, 1)).toEqual([1]);
     expect(ids(store, 2)).toEqual([2, 3]);
     expect(store.get(2)?.windowId).toBe(2);
@@ -103,21 +115,26 @@ describe('TabStore local ops', () => {
     });
   });
 
-  it('a tab that goes out and back ends up owned by the last window', () => {
+  it('a pinned tab that Chrome unpins on the way arrives unpinned', () => {
+    // Chrome reports the unpin against the old window, then detaches and attaches.
     const store = new TabStore();
     load(store, [
-      [1, [tab(1), tab(2)]],
+      [1, [tab(1), tab(2, { pinned: true })]],
       [2, [tab(3, { windowId: 2 })]],
     ]);
-    flush(store, [
-      { kind: 'detach', windowId: 1, tabId: 2, position: 1 },
-      { kind: 'attach', windowId: 2, tabId: 2, position: 1 },
-      { kind: 'detach', windowId: 2, tabId: 2, position: 1 },
-      { kind: 'attach', windowId: 1, tabId: 2, position: 0 },
-    ]);
-    expect(ids(store, 1)).toEqual([2, 1]);
-    expect(ids(store, 2)).toEqual([3]);
-    expect(store.get(2)?.windowId).toBe(1);
+    const cs = new ChangeSet();
+    cs.upserts.set(2, tab(2, { pinned: false }));
+    cs.resync.add(1);
+    cs.resync.add(2);
+    store.apply(
+      cs,
+      new Map([
+        [1, [tab(1)]],
+        [2, [tab(2, { windowId: 2 }), tab(3, { windowId: 2 })]],
+      ]),
+    );
+    expect(store.get(2)).toEqual(tab(2, { windowId: 2 }));
+    expect(ids(store, 1)).toEqual([1]);
   });
 
   it('flags a move whose index does not match the store', () => {
@@ -133,13 +150,6 @@ describe('TabStore local ops', () => {
     const store = new TabStore();
     load(store, [[1, [tab(1), tab(2)]]]);
     const { bad } = flush(store, [{ kind: 'create', windowId: 1, tab: tab(2), index: 1 }]);
-    expect([...bad]).toEqual([1]);
-  });
-
-  it('flags an attach of a tab the store does not know', () => {
-    const store = new TabStore();
-    load(store, [[1, [tab(1)]]]);
-    const { bad } = flush(store, [{ kind: 'attach', windowId: 1, tabId: 8, position: 0 }]);
     expect([...bad]).toEqual([1]);
   });
 
@@ -210,6 +220,11 @@ describe('TabStore local ops', () => {
       let next = 100;
       for (let batch = 0; batch < 5; batch++) {
         const ops: TabOp[] = [];
+        // A window a tab was attached to is queried; its later events aren't logged.
+        const queried = new Set<number>();
+        const log = (op: TabOp) => {
+          if (!queried.has(op.windowId)) ops.push(op);
+        };
         for (let k = 0; k < 1 + rand(8); k++) {
           const w = 1 + rand(2);
           const list = chrome.get(w) as number[];
@@ -220,31 +235,35 @@ describe('TabStore local ops', () => {
             list.splice(index, 0, id);
             const t = tab(id, { windowId: w });
             info.set(id, t);
-            ops.push({ kind: 'create', windowId: w, tab: t, index });
+            log({ kind: 'create', windowId: w, tab: t, index });
           } else if (choice === 1) {
             const from = rand(list.length);
             const to = rand(list.length);
             if (from === to) continue;
             const [id] = list.splice(from, 1) as [number];
             list.splice(to, 0, id);
-            ops.push({ kind: 'move', windowId: w, tabId: id, from, to });
+            log({ kind: 'move', windowId: w, tabId: id, from, to });
           } else if (choice === 2) {
             const [id] = list.splice(rand(list.length), 1) as [number];
-            ops.push({ kind: 'remove', windowId: w, tabId: id });
+            log({ kind: 'remove', windowId: w, tabId: id });
           } else {
             const other = w === 1 ? 2 : 1;
             const target = chrome.get(other) as number[];
             const position = rand(list.length);
             const [id] = list.splice(position, 1) as [number];
-            ops.push({ kind: 'detach', windowId: w, tabId: id, position });
+            log({ kind: 'detach', windowId: w, tabId: id, position });
             const at = rand(target.length + 1);
             target.splice(at, 0, id);
             info.set(id, { ...(info.get(id) as TabInfo), windowId: other });
-            ops.push({ kind: 'attach', windowId: other, tabId: id, position: at });
+            queried.add(other);
           }
         }
-        const { bad } = flush(store, ops);
-        expect(bad.size).toBe(0);
+        const truth = new Map(
+          [...chrome].map(([w, list]) => [w, list.map((id) => info.get(id) as TabInfo)]),
+        );
+        const { bad } = flush(store, ops, truth, queried);
+        // Only the queried windows; every logged op replays.
+        expect([...bad].every((w) => queried.has(w))).toBe(true);
         for (const [w, list] of chrome) {
           expect(ids(store, w)).toEqual(list);
           for (const id of list) expect(store.get(id)?.windowId).toBe(w);

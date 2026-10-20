@@ -4,7 +4,7 @@ Fast, customizable vertical tabs in Chrome's Side Panel. Local-first.
 
 ## Status
 
-**Milestone 5: extras.** Everything from M1–M4, plus tab suspending (manual and on an idle timer), saved sessions, Bookmarks and History panels, recently closed tabs, a multi-window view, configurable shortcuts, and Chrome context menus.
+**Milestone 5: extras, plus the Zen-style pinned system.** Everything from M1–M4, plus tab suspending (manual and on an idle timer), saved sessions, Bookmarks and History panels, recently closed tabs, configurable shortcuts, and Chrome context menus. On top of that: an Essentials grid, pinned tabs and folders, a Clear divider, saved window setups, and a panel that always shows every window.
 
 Roadmap:
 
@@ -74,7 +74,7 @@ Directory map:
 | Path | Contents |
 | --- | --- |
 | `src/entrypoints/` | WXT entrypoints: `background.ts` starts the service worker; `sidepanel/` holds the panel page |
-| `src/background/` | Service worker: tab store, change batching, `chrome.tabs` event wiring |
+| `src/background/` | Service worker: tab store, change batching, `chrome.tabs` event wiring; `pins/` holds layout reconciliation, restart matching and the layout commands |
 | `src/sidepanel/` | Side panel state (`tab-state.svelte.ts`) and Svelte components (`components/`) |
 | `src/shared/` | Code shared by both sides: message protocol, types, favicon URLs |
 | `src/lib/` | Pure helpers, such as virtual list math |
@@ -99,6 +99,19 @@ In the tab list (the Tabs panel):
 | Shift+F10 or the Menu key | Context menu |
 | `/` or Ctrl+F | Search; Enter opens the top result, Escape clears |
 
+In the Essentials grid (one tab stop; the arrow keys rove between tiles):
+
+| Key | Action |
+| --- | --- |
+| Left / Right, Home / End | Previous or next tile; first or last tile |
+| Up / Down | The tile above or below (rows are measured, so a stretched last row works). Down from the last row goes to the list; Up from the first list row comes back |
+| Enter or Space | Open the tile (activate it, or re-create a dormant one) |
+| Alt+Left / Alt+Right | Move the tile one place |
+| Delete | Suspend the tile's tab; the tile stays |
+| Shift+F10 or the Menu key | Context menu |
+
+In the list, pinned tabs and folders also respond to Alt+Up / Alt+Down, which moves the pin or folder one place; a pin at the edge of its folder leaves it, and a folder row's Left / Right collapse or expand it. Screen readers hear where the item went ("out of Work").
+
 Command keys (everything except arrows, Home/End, Enter, Space and Escape) can be rebound in Settings → Shortcuts.
 
 ## Themes
@@ -112,11 +125,48 @@ A theme is a JSON file in the [Noctalia](https://github.com/noctalia-dev/noctali
 
 Settings are versioned (`src/settings/schema.ts`). `migrateSettings` upgrades older data, validates every field, and reads settings written by a newer version best-effort instead of resetting them.
 
+## Essentials
+
+The grid at the top of the panel is each window's Zen-style Essentials: small tinted tiles for the sites you always want one click away.
+
+- Every Essential is a real Chrome pinned tab. The tile shows the favicon with the title as a tooltip, and a tint taken from the favicon's dominant colour (the theme's primary colour as a fallback). The active tile tints more strongly, glows and gets a bar along its bottom edge. A dormant tile (the tab is suspended or closed) goes neutral with a dimmed greyscale favicon. An audio badge shows when the tab plays or is muted.
+- Tiles are at least 64 px wide and 48 px tall, with 12 px corners. Rows wrap and every row fills the width: with 4 + 1 tiles the lone one stretches across the row, with 4 + 2 each takes half. More columns appear as the panel widens. There is no limit on the count.
+- Each Essential remembers a home URL. If the tab has navigated away, a hover button and a menu item go back to it ("Set this page as home" changes it).
+- Closing from the panel (the Delete key, or the tile's menu) suspends the tab and keeps the tile. If the tab is really closed (Ctrl+W, a crash), the tile stays dormant and clicking it re-creates the tab at the right place.
+- "Remove from Essentials" turns the tile into a normal pinned tab; a second action closes it.
+- Drag a tab or pinned row into the grid to make it an Essential, reorder tiles by dragging, or drag a tile out to the pinned list or the normal list to demote it. Essentials belong to a window: a new window starts with none.
+
+## Pinned tabs and folders
+
+Below the grid are the window's pinned tabs. They behave like Essentials (home URL, close suspends, dormant entries persist) but show as rows.
+
+- **Folders** live only in the pinned area. A folder has a name and an icon; click it to expand or collapse. A collapsed folder still shows the tab you are on. Folders nest up to three levels. Drag tabs in and out and drag folders to reorder or nest them. The menu renames, changes the icon, suspends everything in it or deletes it (keeping the tabs as plain pinned tabs, or closing them).
+- Folders exist only in the extension; Chrome's tab strip shows their tabs as ordinary pinned tabs.
+- Chrome's pinned order always equals the panel's order: Essentials in grid order, then the pinned tree depth-first. The worker keeps them in step, and a reorder you make in Chrome's tab strip is adopted by the panel. Pinning a tab in Chrome adds a plain pinned entry; unpinning removes it.
+- Limits: 500 entries per window; folders three deep.
+
+## Clear
+
+A line below the pinned area marks where normal tabs start. Its **Clear** button closes every normal tab in the window, including tabs in Chrome tab groups, except the active one. Pinned tabs and Essentials are never touched. A toast points to Recently closed instead of offering an undo.
+
+## Window setups
+
+When a window that has Essentials, pinned tabs or folders closes, its layout is kept as a window setup. The same happens when Chrome starts without restoring a window. Setups are listed in the Sessions panel under **Window setups**, with the tiles and counts for each. Each can be opened in a new window (all entries dormant), applied to the current window (its Essentials and folders are added after what is already there), renamed or deleted. At most 50 are kept; when a new one would go past that, the one unused longest is removed and a toast says which. Saved sessions also record Essentials and folders, so restoring one rebuilds the layout.
+
+After a Chrome restart, tab and window ids change, so the worker re-attaches saved layouts to restored windows by comparing the windows' pinned URLs with the layouts' entries; a window needs at least half its pinned tabs to match. A restored pinned tab that matches nothing becomes a new plain pinned entry. This pass runs once at startup: a window opened later gets its pinned tabs adopted as plain entries.
+
+## All windows, always
+
+The panel always lists every window; the old "Show all windows" toggle is gone (settings from earlier versions are migrated). Your own window comes first: Essentials grid, pinned tabs and folders, the Clear divider, then normal tabs. Every other window is a collapsible group below it with a header (its name, or its active tab's title, and the tab count), a smaller row of its Essentials, its pinned tabs and folders, then its normal tabs. Click any tab to focus that window and tab; rename a window from its header's menu.
+
+- Collapse state is per panel: collapsing window B in A's panel does not change B's own panel. The worker remembers each panel's choice.
+- Drag tabs between windows, including onto another window's Essentials row or folders, or use "Move to window".
+- Incognito and normal windows are kept apart: an incognito panel lists only incognito windows and a normal panel only normal ones, tabs can't move between them, and incognito layouts live only in `chrome.storage.session`, so no incognito URL is written to disk.
+
 ## Suspending, sessions and windows
 
 - **Suspending** uses Chrome's native tab discarding: memory is freed and the tab reloads when you click it. Suspend from the tab's context menu, Chrome's page or toolbar menu, or a global shortcut. Auto-suspend (off by default) discards background tabs idle for a set time, skipping pinned and audible tabs and whitelisted sites. Only http(s) tabs are auto-suspended.
 - **Sessions** save the current window or all windows (tabs, pinned state, groups) to `chrome.storage.local` and restore them into a new or the current window, optionally as suspended tabs so a large session doesn't load at once.
-- **Multi-window view** (toggle in the Open tabs card) lists every window; drag tabs between windows or use "Move to window". Tabs can't move between incognito and normal windows.
 - **Shortcuts**: in-panel commands are configurable in Settings → Shortcuts. Browser-wide shortcuts (toggle panel, focus search, suspend tab, suspend other tabs) are set at `chrome://extensions/shortcuts`; only the panel toggle has a default (Alt+Shift+V).
 
 ## Customization
@@ -148,7 +198,7 @@ Search goes through the `SearchIndex` interface (`src/lib/search/search-index.ts
 | `history` | The History panel: read, search, delete entries |
 | `alarms` | The auto-suspend timer. The worker is shut down when idle, so a timer can't run for 30 minutes; alarms survive and wake it |
 | `contextMenus` | "Suspend this tab", "Save window as session" and similar items in Chrome's page and toolbar-icon menus |
-| `storage` | Save settings in `chrome.storage.sync` (follows your Chrome profile); later, local data in `chrome.storage.local` |
+| `storage` | Settings in `chrome.storage.sync` (follows your Chrome profile); saved sessions, pinned layouts and window setups in `chrome.storage.local`; incognito layouts and worker bookkeeping in `chrome.storage.session` |
 
 No host permissions are requested.
 

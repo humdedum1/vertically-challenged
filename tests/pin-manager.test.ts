@@ -752,3 +752,119 @@ describe('PinManager worker wake (round trip through storage)', () => {
     ]);
   });
 });
+
+describe('PinManager late-restored windows', () => {
+  const work = () =>
+    layout(1, [item('ia', 'https://a.com/'), item('ib', 'https://b.com/')], { lastUsed: 5 });
+  const play = () =>
+    layout(2, [item('id', 'https://d.com/')], {
+      essentials: [item('ic', 'https://c.com/')],
+      lastUsed: 4,
+    });
+
+  /** Cold start with window 7 restored first; `clock` drives the grace period. */
+  async function coldStart() {
+    const t = setup({
+      windows: { 7: [pinned(10, 7, 'https://a.com/'), pinned(11, 7, 'https://b.com/')] },
+      local: { [LAYOUTS_KEY]: stored([work(), play()]) },
+    });
+    let clock = 1_000_000;
+    t.deps.now = () => clock;
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    expect(pins.layoutOf(7).id).toBe(ID(1));
+    expect(pins.setups().map((s) => s.id)).toEqual([ID(2)]);
+    /** Chrome restores window 8 now. */
+    const restore8 = async () => {
+      t.setWindows([
+        { id: 7, incognito: false, focused: false },
+        { id: 8, incognito: false, focused: true },
+      ]);
+      t.resync(8, [pinned(20, 8, 'https://c.com/'), pinned(21, 8, 'https://d.com/'), tab(22)]);
+      await pins.afterFlush([8]);
+      await settle();
+    };
+    return { t, pins, restore8, advance: (ms: number) => (clock += ms) };
+  }
+
+  it('re-attaches the setup to a window restored within the grace period', async () => {
+    const { pins, restore8, advance } = await coldStart();
+    advance(30_000);
+    await restore8();
+
+    const l = pins.layoutOf(8);
+    expect(l.id).toBe(ID(2));
+    expect(l.essentials.map((i) => [i.id, i.tabId])).toEqual([['ic', 20]]);
+    expect(flattenItems(l).map((i) => [i.id, i.tabId])).toEqual([
+      ['ic', 20],
+      ['id', 21],
+    ]);
+    expect(pins.setups()).toEqual([]);
+  });
+
+  it('adopts a window restored after the grace period as plain pinned tabs', async () => {
+    const { pins, restore8, advance } = await coldStart();
+    advance(61_000);
+    await restore8();
+
+    const l = pins.layoutOf(8);
+    expect(l.id).not.toBe(ID(2));
+    expect(l.essentials).toEqual([]);
+    expect(flattenItems(l).map((i) => i.tabId)).toEqual([20, 21]);
+    expect(pins.setups().map((s) => s.id)).toEqual([ID(2)]);
+  });
+
+  it('binds a matched window’s dormant item to its tab arriving late', async () => {
+    const t = setup({
+      windows: { 7: [pinned(10, 7, 'https://a.com/')] },
+      local: { [LAYOUTS_KEY]: stored([work()]) },
+    });
+    let clock = 1_000_000;
+    t.deps.now = () => clock;
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    expect(flattenItems(pins.layoutOf(7)).map((i) => [i.id, i.tabId])).toEqual([
+      ['ia', 10],
+      ['ib', null],
+    ]);
+
+    clock += 10_000;
+    // Same site, different page: paired by origin.
+    t.resync(7, [pinned(10, 7, 'https://a.com/'), pinned(11, 7, 'https://b.com/later')]);
+    await pins.afterFlush([7]);
+    await settle();
+
+    expect(flattenItems(pins.layoutOf(7)).map((i) => [i.id, i.tabId])).toEqual([
+      ['ia', 10],
+      ['ib', 11],
+    ]);
+  });
+
+  it('publishes and saves a late pairing even when nothing else changed', async () => {
+    const t = setup({
+      windows: { 7: [pinned(10, 7, 'https://a.com/')] },
+      local: { [LAYOUTS_KEY]: stored([work()]) },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    t.sent.length = 0;
+
+    t.resync(7, [
+      pinned(10, 7, 'https://a.com/'),
+      pinned(11, 7, 'https://b.com/', { title: 'ib' }),
+    ]);
+    await pins.afterFlush([7]);
+    await settle();
+
+    const sent = t.sent.filter(({ msg }) => msg.type === 'layout');
+    const last = sent.at(-1)?.msg;
+    expect(last?.type === 'layout' && flattenItems(last.layout).map((i) => i.tabId)).toEqual([
+      10, 11,
+    ]);
+    const saved = (t.local.data.get(LAYOUTS_KEY) as LayoutStore).layouts[0] as WindowLayout;
+    expect(flattenItems(saved).map((i) => i.tabId)).toEqual([10, 11]);
+  });
+});

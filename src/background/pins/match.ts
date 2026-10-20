@@ -11,7 +11,7 @@ export interface PinnedTabLite {
   title: string;
 }
 
-interface Match {
+export interface Match {
   layoutId: string;
   bind: Map<string, number>;
 }
@@ -37,7 +37,10 @@ function originOf(url: string): string | null {
 }
 
 /** Pairs a window's pinned tabs with a layout's items: exact URLs first, then same origin. */
-function pair(items: readonly PinItem[], tabs: readonly PinnedTabLite[]): Map<string, number> {
+export function pair(
+  items: readonly PinItem[],
+  tabs: readonly PinnedTabLite[],
+): Map<string, number> {
   const keyed = items.map((item) => ({
     item,
     urls: [normalise(item.lastUrl), normalise(item.homeUrl)],

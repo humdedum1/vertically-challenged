@@ -28,7 +28,7 @@ import type { SetupSummary, WorkerMessage } from '../../shared/protocol';
 import type { TabInfo, WindowInfo } from '../../shared/types';
 import type { SingleMove } from '../move-plan';
 import type { TabStore } from '../tab-store';
-import { matchLayouts } from './match';
+import { type Match, matchLayouts, pair } from './match';
 import { appendLayout, insertItems, removeItem } from './ops';
 import { type ReconcileResult, reconcile } from './reconcile';
 
@@ -77,6 +77,8 @@ export interface PinManagerDeps {
   windows: () => readonly WindowInfo[];
   broadcast: (windowId: number | null, msg: WorkerMessage) => void;
   notice: (windowId: number, text: string) => void;
+  /** Clock for the late-restore grace period; Date.now unless a test injects one. */
+  now?: () => number;
 }
 
 /**
@@ -99,6 +101,12 @@ const MAX_MOVE_RETRIES = 3;
 const MAX_PASSES = 4;
 /** How long a tab our command is pinning may take to show up pinned before reconcile stops waiting. */
 const PENDING_TIMEOUT_MS = 5000;
+/**
+ * After a cold start Chrome may restore some windows, or some of a window's pinned tabs,
+ * after restart matching ran. For this long, such arrivals are still matched against
+ * the saved layouts instead of being adopted as plain pinned tabs.
+ */
+export const LATE_RESTORE_MS = 60_000;
 
 interface Settled {
   windowId: number;
@@ -130,6 +138,12 @@ export class PinManager {
   private readonly resume = new Set<number>();
   /** Restart matching waits for a window list; see tryMatch. */
   private pendingMatch = false;
+  /** End of the late-restore grace period (LATE_RESTORE_MS); 0 when there is none. */
+  private lateUntil = 0;
+  /** Layouts restart matching left unmatched, still eligible for a late window. */
+  private readonly lateCandidates = new Set<string>();
+  /** Windows bound by restart matching, whose dormant items may still find a late tab. */
+  private readonly restartMatched = new Set<number>();
   /** Set when the stored layouts couldn't be read: writing would replace them. */
   private noPersist = false;
   /** `vc:alive` is written with the first layouts write after restart matching. */
@@ -246,6 +260,8 @@ export class PinManager {
     const windows = this.deps.windows();
     if (windows.length === 0) return false;
     this.pendingMatch = false;
+    const now = this.deps.now?.() ?? Date.now();
+    this.lateUntil = now + LATE_RESTORE_MS;
     const open = windows.filter((w) => {
       const id = this.bindings.get(w.id);
       const l = id === undefined ? undefined : this.layouts.get(id);
@@ -263,22 +279,97 @@ export class PinManager {
           .map((t) => ({ id: t.id, url: t.url, title: t.title })),
       })),
     );
-    for (const [windowId, m] of matches) {
-      const x = this.layouts.get(m.layoutId);
-      if (!x) continue;
-      const placeholder = this.bindings.get(windowId);
-      if (placeholder !== undefined) this.layouts.delete(placeholder);
-      this.layouts.set(
-        x.id,
-        withTabIds(x, (i) => m.bind.get(i.id) ?? null),
-      );
-      this.bindings.set(windowId, x.id);
-    }
+    for (const [windowId, m] of matches) this.bindMatch(windowId, m);
     // Bound layouts were exempt from the stored cap; unmatched ones are setups now.
     this.evictSetups(null);
+    for (const l of this.layouts.values()) {
+      if (this.setupLayout(l.id)) this.lateCandidates.add(l.id);
+    }
     this.aliveDue = true;
     this.markDirty(false);
     this.markDirty(true);
+    return true;
+  }
+
+  /** Binds a matched layout to the window, replacing an (empty) placeholder it had. */
+  private bindMatch(windowId: number, m: Match): void {
+    const x = this.layouts.get(m.layoutId);
+    if (!x) return;
+    const placeholder = this.bindings.get(windowId);
+    if (placeholder !== undefined) {
+      this.markDirty(this.layouts.get(placeholder)?.incognito ?? true);
+      this.layouts.delete(placeholder);
+    }
+    this.layouts.set(
+      x.id,
+      withTabIds(x, (i) => m.bind.get(i.id) ?? null),
+    );
+    this.bindings.set(windowId, x.id);
+    this.lateCandidates.delete(x.id);
+    this.restartMatched.add(windowId);
+    this.markDirty(false);
+  }
+
+  private inLateRestore(): boolean {
+    if (this.lateUntil === 0) return false;
+    if ((this.deps.now?.() ?? Date.now()) < this.lateUntil) return true;
+    this.lateUntil = 0;
+    this.lateCandidates.clear();
+    this.restartMatched.clear();
+    return false;
+  }
+
+  /**
+   * A window that shows its first pinned tabs during the grace period (unbound, or bound
+   * to an empty placeholder) is matched against the setups restart matching left over.
+   */
+  private lateMatch(windowId: number, tabs: readonly TabInfo[]): boolean {
+    const id = this.bindings.get(windowId);
+    const l = id === undefined ? undefined : this.layouts.get(id);
+    if (l && !isEmptyLayout(l)) return false;
+    const pinnedTabs = tabs.filter((t) => t.pinned);
+    if (pinnedTabs.length === 0) return false;
+    const candidates = [...this.lateCandidates]
+      .map((c) => this.setupLayout(c))
+      .filter((c): c is WindowLayout => c !== undefined);
+    const m = matchLayouts(candidates, [
+      {
+        windowId,
+        incognito: this.incognitoOf(windowId) ?? true,
+        pinned: pinnedTabs.map((t) => ({ id: t.id, url: t.url, title: t.title })),
+      },
+    ]).get(windowId);
+    if (!m) return false;
+    this.bindMatch(windowId, m);
+    this.publishSetups();
+    return true;
+  }
+
+  /**
+   * During the grace period, a restart-matched window's newly arriving pinned tabs are
+   * paired with its dormant items (exact URL, then origin) before rule 2 could adopt them
+   * as duplicates next to those dormant tiles.
+   */
+  private pairDormant(windowId: number, tabs: readonly TabInfo[]): boolean {
+    if (!this.restartMatched.has(windowId)) return false;
+    const id = this.bindings.get(windowId);
+    const l = id === undefined ? undefined : this.layouts.get(id);
+    if (!l) return false;
+    const items = flattenItems(l);
+    const known = new Set(items.map((i) => i.tabId));
+    const fresh = tabs.filter((t) => t.pinned && !known.has(t.id) && !this.pending.has(t.id));
+    if (fresh.length === 0) return false;
+    const dormant = items.filter((i) => i.tabId === null || !this.deps.store.get(i.tabId));
+    if (dormant.length === 0) return false;
+    const bind = pair(
+      dormant,
+      fresh.map((t) => ({ id: t.id, url: t.url, title: t.title })),
+    );
+    if (bind.size === 0) return false;
+    this.layouts.set(
+      l.id,
+      withTabIds(l, (i) => bind.get(i.id) ?? i.tabId),
+    );
     return true;
   }
 
@@ -746,6 +837,12 @@ export class PinManager {
     // The window's tabs and the lookup must describe the same store state, so both are
     // read in this one synchronous step.
     const tabs = store.snapshot(windowId).tabs;
+    // Bindings made here are changes even when reconcile below finds nothing to do.
+    let late = false;
+    if (this.inLateRestore()) {
+      late = this.lateMatch(windowId, tabs);
+      late = this.pairDormant(windowId, tabs) || late;
+    }
     // A window without pinned tabs needs no layout until a panel asks for one.
     if (!this.bindings.has(windowId) && !tabs.some((t) => t.pinned)) return null;
     let layout = this.layoutOf(windowId);
@@ -770,7 +867,7 @@ export class PinManager {
     if (r.moves.length === 0) this.retries.delete(windowId);
     else if (!stale && !this.inFlight.has(windowId)) this.issueMoves(windowId, r.moves);
     if (resumed) void this.writeMoving();
-    return flipped ? { ...r, changed: true } : r;
+    return flipped || late ? { ...r, changed: true } : r;
   }
 
   /** True while Chrome still shows the order we gave up on (relative order of those tabs). */

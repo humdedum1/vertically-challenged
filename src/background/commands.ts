@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import type { MoveTarget, PanelMessage, PinMessage } from '../shared/protocol';
+import { saveSummary } from '../shared/sessions';
 import type { GroupColor, GroupInfo, TabInfo } from '../shared/types';
 import { planGroupMove, planMoves } from './move-plan';
 import type { SessionLayouts } from './sessions';
@@ -159,10 +160,8 @@ export async function runCommand(
         const id = w.tabs[0]?.windowId;
         return id === undefined || !deps.layouts ? w : { ...w, layout: deps.layouts.layoutOf(id) };
       });
-      const n = await saveSession(msg.name, wins);
-      return n
-        ? `Saved “${msg.name}” (${n} tab${n === 1 ? '' : 's'})`
-        : 'Nothing to save in this window';
+      const { count, skipped } = await saveSession(msg.name, wins);
+      return saveSummary(msg.name, count, skipped);
     }
     case 'renameSession':
       await renameSession(msg.id, msg.name);

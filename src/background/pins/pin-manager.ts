@@ -409,52 +409,64 @@ export class PinManager {
   }
 
   /**
-   * Session restore: `run` creates the tabs and reports which of them belong in the
-   * layout. It runs inside the queue, so no reconcile can adopt the new pinned tabs as
+   * Session restore: `run` creates the pinned tabs and `report`s which of them belong in
+   * the layout. It runs inside the queue, so no reconcile can adopt the new pinned tabs as
    * plain items before they are bound; each stays pending until the store has seen it.
-   * The items are appended after the window's existing layout (a new window has none);
-   * past MAX_ITEMS the remaining tabs simply stay plain pinned tabs.
+   * Whatever was reported is bound even when `run` throws (the error is rethrown), so a
+   * failed restore doesn't lose the layout of the tabs it did create. The items are
+   * appended after the window's existing layout (a new window has none); past MAX_ITEMS
+   * the remaining tabs simply stay plain pinned tabs.
    */
-  restoreLayout(run: () => Promise<RestoredLayout | null>): Promise<void> {
+  restoreLayout(run: (report: (r: RestoredLayout) => void) => Promise<void>): Promise<void> {
     return this.exclusive(async () => {
-      const r = await run();
-      if (!r || this.closed.has(r.windowId)) return;
-      let budget = MAX_ITEMS - flattenItems(this.layoutOf(r.windowId)).length;
-      const bind = (n: RestoredItem): PinItem | null => {
-        if (budget <= 0) return null;
-        budget--;
-        this.expect(n.tabId, r.windowId);
-        return {
-          kind: 'item',
-          id: newId('i'),
-          homeUrl: n.url,
-          lastUrl: n.url,
-          title: n.title,
-          tabId: n.tabId,
-        };
-      };
-      const walk = (nodes: RestoredNode[]): PinNode[] => {
-        const out: PinNode[] = [];
-        for (const n of nodes) {
-          if (n.kind === 'item') {
-            const i = bind(n);
-            if (i) out.push(i);
-          } else {
-            const children = walk(n.children);
-            if (children.length) out.push({ ...n, id: newId('f'), children });
-          }
-        }
-        return out;
-      };
-      const essentials = r.essentials.map(bind).filter((i): i is PinItem => i !== null);
-      const pinned = walk(r.pinned);
-      if (!essentials.length && !pinned.length) return;
-      this.edit(r.windowId, (l) => ({
-        ...l,
-        essentials: [...l.essentials, ...essentials],
-        pinned: [...l.pinned, ...pinned],
-      }));
+      let reported: RestoredLayout | null = null;
+      try {
+        await run((r) => {
+          reported = r;
+        });
+      } finally {
+        if (reported) this.bindRestored(reported);
+      }
     });
+  }
+
+  private bindRestored(r: RestoredLayout): void {
+    if (this.closed.has(r.windowId)) return;
+    let budget = MAX_ITEMS - flattenItems(this.layoutOf(r.windowId)).length;
+    const bind = (n: RestoredItem): PinItem | null => {
+      if (budget <= 0) return null;
+      budget--;
+      this.expect(n.tabId, r.windowId);
+      return {
+        kind: 'item',
+        id: newId('i'),
+        homeUrl: n.url,
+        lastUrl: n.url,
+        title: n.title,
+        tabId: n.tabId,
+      };
+    };
+    const walk = (nodes: RestoredNode[]): PinNode[] => {
+      const out: PinNode[] = [];
+      for (const n of nodes) {
+        if (n.kind === 'item') {
+          const i = bind(n);
+          if (i) out.push(i);
+        } else {
+          const children = walk(n.children);
+          if (children.length) out.push({ ...n, id: newId('f'), children });
+        }
+      }
+      return out;
+    };
+    const essentials = r.essentials.map(bind).filter((i): i is PinItem => i !== null);
+    const pinned = walk(r.pinned);
+    if (!essentials.length && !pinned.length) return;
+    this.edit(r.windowId, (l) => ({
+      ...l,
+      essentials: [...l.essentials, ...essentials],
+      pinned: [...l.pinned, ...pinned],
+    }));
   }
 
   /**

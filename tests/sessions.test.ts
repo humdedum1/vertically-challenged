@@ -6,7 +6,9 @@ import {
   MAX_SESSIONS,
   parseSessions,
   type Session,
+  saveSummary,
   sessionTabCount,
+  splitIncognito,
 } from '../src/shared/sessions';
 import { group, tab } from './helpers';
 
@@ -515,5 +517,58 @@ describe('session layouts', () => {
     expect((l?.pinned[1] as unknown as { name: string })?.name).toHaveLength(100);
     // The folder whose only item is invalid is gone.
     expect(l?.pinned).toHaveLength(2);
+  });
+});
+
+describe('incognito windows are never saved (R23)', () => {
+  const win = (incognito: boolean) => ({
+    tabs: [tab(1, { incognito, url: 'https://a.com/' })],
+    groups: [],
+  });
+
+  it('splits incognito windows out, counting them', () => {
+    const { keep, skipped } = splitIncognito([win(false), win(true), win(true)]);
+    expect(keep).toHaveLength(1);
+    expect(skipped).toBe(2);
+  });
+
+  it('a window with any incognito tab is skipped', () => {
+    const mixed = { tabs: [tab(1), tab(2, { incognito: true })], groups: [] };
+    expect(splitIncognito([mixed]).skipped).toBe(1);
+  });
+
+  it('words the toast', () => {
+    expect(saveSummary('X', 12, 0)).toBe('Saved “X” (12 tabs)');
+    expect(saveSummary('X', 1, 0)).toBe('Saved “X” (1 tab)');
+    expect(saveSummary('X', 12, 1)).toBe('Saved “X” (12 tabs) · 1 incognito window skipped');
+    expect(saveSummary('X', 12, 2)).toBe('Saved “X” (12 tabs) · 2 incognito windows skipped');
+    expect(saveSummary('X', 0, 1)).toBe("Incognito windows aren't saved");
+    expect(saveSummary('X', 0, 0)).toBe('Nothing to save in this window');
+  });
+});
+
+describe('parseSessions on hostile nesting', () => {
+  it('survives ~10,000 nested folders without throwing', () => {
+    let node: unknown = { kind: 'item', tab: 0 };
+    for (let i = 0; i < 10_000; i++) {
+      node = { kind: 'folder', name: 'F', icon: 'folder', collapsed: false, children: [node] };
+    }
+    const raw = [
+      {
+        id: 's1',
+        name: 'S',
+        createdAt: 1,
+        windows: [
+          {
+            groups: [],
+            tabs: [{ url: 'https://a.com', title: 'A', pinned: true, group: null }],
+            layout: { essentials: [], pinned: [node] },
+          },
+        ],
+      },
+    ];
+    const w = parseSessions(raw)[0]?.windows[0];
+    expect(w?.tabs).toHaveLength(1);
+    expect(JSON.stringify(w?.layout)).toContain('"tab":0');
   });
 });

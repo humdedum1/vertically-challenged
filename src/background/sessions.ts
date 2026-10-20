@@ -9,6 +9,7 @@ import {
   type SavedWindow,
   SESSIONS_KEY,
   type Session,
+  splitIncognito,
 } from '../shared/sessions';
 import type { GroupInfo, TabInfo } from '../shared/types';
 import type { RestoredLayout, RestoredNode } from './pins/pin-manager';
@@ -16,7 +17,7 @@ import type { RestoredLayout, RestoredNode } from './pins/pin-manager';
 /** The slice of PinManager sessions use; optional so sessions work without layouts. */
 export interface SessionLayouts {
   layoutOf(windowId: number): WindowLayout;
-  restoreLayout(run: () => Promise<RestoredLayout | null>): Promise<void>;
+  restoreLayout(run: (report: (r: RestoredLayout) => void) => Promise<void>): Promise<void>;
 }
 
 /** Writes are queued so concurrent saves/renames can't lose each other's changes. */
@@ -40,17 +41,18 @@ const newId = (): string => crypto.randomUUID().replace(/-/g, '').slice(0, 16);
 export async function saveSession(
   name: string,
   windows: { tabs: readonly TabInfo[]; groups: readonly GroupInfo[]; layout?: WindowLayout }[],
-): Promise<number> {
+): Promise<{ count: number; skipped: number }> {
   const own = browser.runtime.getURL('/');
-  const saved = windows
+  const { keep, skipped } = splitIncognito(windows);
+  const saved = keep
     .map((w) => captureWindow(w.tabs, w.groups, own, w.layout))
     .filter((w) => w.tabs.length > 0);
   const count = saved.reduce((n, w) => n + w.tabs.length, 0);
-  if (count === 0) return 0;
+  if (count === 0) return { count, skipped };
   const session: Session = { id: newId(), name, createdAt: Date.now(), windows: saved };
   // Newest first; the oldest fall off past the cap rather than failing the save.
   await mutate((list) => [session, ...list].slice(0, MAX_SESSIONS));
-  return count;
+  return { count, skipped };
 }
 
 export const renameSession = (id: string, name: string): Promise<void> =>
@@ -131,21 +133,21 @@ async function restoreWindow(
 
   const created: Created[] = [];
   let windowId = targetWindowId;
-  const openTabs = async (): Promise<number | null> => {
-    let rest = tabs;
-    if (windowId === null) {
-      const first = tabs[0] as (typeof tabs)[number];
-      const win = await browser.windows.create({ url: first.url, focused: true });
-      const firstTab = win?.tabs?.[0];
-      if (!win?.id || firstTab?.id === undefined) return null;
-      windowId = win.id;
-      if (first.pinned) await browser.tabs.update(firstTab.id, { pinned: true });
-      created.push({ id: firstTab.id, at: first.at, group: first.group, active: true });
-      rest = tabs.slice(1);
-    }
-    for (const t of rest) {
+  const first = windowId === null ? (tabs[0] as (typeof tabs)[number]) : null;
+  /** Creates the window around the first tab; false when Chrome didn't give one. */
+  const openFirst = async (f: (typeof tabs)[number]): Promise<boolean> => {
+    const win = await browser.windows.create({ url: f.url, focused: true });
+    const firstTab = win?.tabs?.[0];
+    if (!win?.id || firstTab?.id === undefined) return false;
+    windowId = win.id;
+    if (f.pinned) await browser.tabs.update(firstTab.id, { pinned: true });
+    created.push({ id: firstTab.id, at: f.at, group: f.group, active: true });
+    return true;
+  };
+  const openRest = async (list: typeof tabs): Promise<void> => {
+    for (const t of list) {
       const tab = await browser.tabs.create({
-        windowId,
+        windowId: windowId as number,
         url: t.url,
         pinned: t.pinned,
         active: false,
@@ -153,18 +155,29 @@ async function restoreWindow(
       if (tab.id !== undefined)
         created.push({ id: tab.id, at: t.at, group: t.group, active: false });
     }
-    return windowId;
+  };
+  // Chrome keeps pinned tabs in front, so they are created first and the rest after.
+  const pinnedRest = tabs.filter((t) => t.pinned && t !== first);
+  const plainRest = tabs.filter((t) => !t.pinned && t !== first);
+  const openPinned = async (): Promise<void> => {
+    if (first && !(await openFirst(first))) return;
+    await openRest(pinnedRest);
   };
   if (w.layout && layouts) {
-    // Binding happens inside the layout queue so the new pinned tabs are never adopted
-    // as plain items first.
-    await layouts.restoreLayout(async () => {
-      const id = await openTabs();
-      return id === null ? null : restoredLayout(w, id, created);
+    // Only the pinned tabs are created inside the layout queue, where binding keeps them
+    // from being adopted as plain items; the (possibly many) others are created after, so
+    // the queue isn't held for every window while a large restore runs.
+    await layouts.restoreLayout(async (report) => {
+      try {
+        await openPinned();
+      } finally {
+        if (windowId !== null) report(restoredLayout(w, windowId, created) as RestoredLayout);
+      }
     });
   } else {
-    await openTabs();
+    await openPinned();
   }
+  if (windowId !== null) await openRest(plainRest);
   if (windowId === null) return { opened: 0, skipped: w.tabs.length };
 
   for (const [i, g] of w.groups.entries()) {

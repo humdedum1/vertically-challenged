@@ -222,6 +222,32 @@ function parseLayout(
     const i = take(v);
     if (i !== null) essentials.push(i);
   }
+  /**
+   * Folders nested deeper than MAX_FOLDER_DEPTH are flattened into their parent. That is
+   * done with an explicit stack: crafted input can nest far deeper than the call stack.
+   */
+  const flatten = (list: unknown): SavedPinNode[] => {
+    const out: SavedPinNode[] = [];
+    const stack: { list: unknown[]; at: number }[] = [
+      { list: Array.isArray(list) ? list : [], at: 0 },
+    ];
+    while (stack.length) {
+      const top = stack[stack.length - 1] as { list: unknown[]; at: number };
+      if (top.at >= top.list.length) {
+        stack.pop();
+        continue;
+      }
+      const n = top.list[top.at++];
+      if (!isObj(n)) continue;
+      if (n.kind === 'item') {
+        const i = take(n.tab);
+        if (i !== null) out.push({ kind: 'item', tab: i });
+      } else if (n.kind === 'folder' && Array.isArray(n.children)) {
+        stack.push({ list: n.children, at: 0 });
+      }
+    }
+    return out;
+  };
   /** `depth` is the depth of the folder holding `list`; 0 for the root. */
   const walk = (list: unknown, depth: number): SavedPinNode[] => {
     const out: SavedPinNode[] = [];
@@ -231,9 +257,12 @@ function parseLayout(
         const i = take(n.tab);
         if (i !== null) out.push({ kind: 'item', tab: i });
       } else if (n.kind === 'folder') {
+        if (depth + 1 > MAX_FOLDER_DEPTH) {
+          out.push(...flatten(n.children));
+          continue;
+        }
         const children = walk(n.children, depth + 1);
-        if (depth + 1 > MAX_FOLDER_DEPTH) out.push(...children);
-        else if (children.length) {
+        if (children.length) {
           out.push({
             kind: 'folder',
             name: str(n.name, MAX_NAME).trim() || 'Folder',
@@ -261,4 +290,26 @@ export function isRestorableUrl(url: string): boolean {
   if (/^chrome:\/\/(kill|hang|crash|quit|restart|inducebrowsercrashforrealz)/i.test(url))
     return false;
   return /^(https?|chrome|chrome-extension|about|ftp):/i.test(url);
+}
+
+/**
+ * Incognito windows never reach storage.local (Chrome itself doesn't persist them), so
+ * save skips any window holding an incognito tab and reports how many it skipped.
+ */
+export function splitIncognito<T extends { tabs: readonly { incognito: boolean }[] }>(
+  windows: readonly T[],
+): { keep: T[]; skipped: number } {
+  const keep = windows.filter((w) => !w.tabs.some((t) => t.incognito));
+  return { keep, skipped: windows.length - keep.length };
+}
+
+/** The toast after a save; `count` is the saved tabs, `skipped` the incognito windows left out. */
+export function saveSummary(name: string, count: number, skipped: number): string {
+  if (count === 0) {
+    return skipped > 0 ? "Incognito windows aren't saved" : 'Nothing to save in this window';
+  }
+  const base = `Saved “${name}” (${count} tab${count === 1 ? '' : 's'})`;
+  return skipped > 0
+    ? `${base} · ${skipped} incognito window${skipped === 1 ? '' : 's'} skipped`
+    : base;
 }

@@ -572,10 +572,11 @@ export class PinManager {
   /**
    * Places items at `dest` of `windowId`'s layout in one step. `moved` items (by the
    * window whose layout holds them) are taken out of their layouts; `tabs` reuse the item
-   * already bound to them in any window, else get a new item (a tab whose URL a layout
-   * can't store gets none and is just pinned, a stray row until it navigates). Returns the tabs Chrome
-   * still has to move into the window and/or pin (they are pending until it has), or null
-   * when nothing was placed (the window is gone, the layout is full or `dest` is missing).
+   * already bound to them in any window, else get a new item. A tab on a URL a layout
+   * can't store gets no item and is only pinned, a stray row until it navigates. Returns
+   * the tabs Chrome still has to move into the window and/or pin (they are pending until
+   * it has), or null when nothing was placed (the window is gone, the layout is full or
+   * `dest` is missing).
    */
   pinInto(
     windowId: number,

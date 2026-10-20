@@ -133,6 +133,8 @@ export class PointerDrag<P> {
     document.addEventListener('pointercancel', this.abort);
     el.addEventListener('scroll', this.updateHover);
     document.addEventListener('keydown', this.key, true);
+    window.addEventListener('blur', this.lose);
+    document.addEventListener('visibilitychange', this.lose);
   }
 
   /** Cancels an in-flight drag (Escape, or the component going away). */
@@ -205,14 +207,26 @@ export class PointerDrag<P> {
     this.cleanup();
     if (wasDragging || wasCancelled) this.swallowClick();
     if (wasDragging && payload !== null) {
-      this.o.onHover(null);
+      // Drop first: clearing the hover would also clear targets the host keeps beside it
+      // (a grid slot), and the drop must land on what was shown at release.
       this.o.onDrop(payload, target);
+      this.o.onHover(null);
       this.o.onEnd();
     }
   };
 
   private abort = (e: PointerEvent): void => {
     if (e.pointerId !== this.pointerId) return;
+    this.cancel();
+    this.cleanup();
+  };
+
+  /**
+   * The panel lost focus or was hidden mid-drag (Alt+Tab, the side panel closing): the
+   * pointerup may never arrive here, so cancel like Escape and drop the session at once.
+   */
+  private lose = (e: Event): void => {
+    if (e.type === 'visibilitychange' && document.visibilityState !== 'hidden') return;
     this.cancel();
     this.cleanup();
   };
@@ -241,6 +255,8 @@ export class PointerDrag<P> {
       if (el.hasPointerCapture(this.pointerId)) el.releasePointerCapture(this.pointerId);
     }
     document.removeEventListener('keydown', this.key, true);
+    window.removeEventListener('blur', this.lose);
+    document.removeEventListener('visibilitychange', this.lose);
     cancelAnimationFrame(this.raf);
     this.el = null;
     this.phase = null;

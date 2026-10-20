@@ -924,12 +924,26 @@ function dragName(payload: Drag): string {
   return t?.title || t?.url || 'New Tab';
 }
 
-/** Folders and groups never become Essentials, so they don't open the empty drop area. */
+/**
+ * Whether the drag could land in the home grid, which decides if the empty drop area
+ * opens: not folders or groups, and nothing from a window of the other incognito kind.
+ */
 function canBeEssential(payload: Drag): boolean {
-  if (payload.kind === 'group') return false;
-  if (payload.kind === 'tabs') return true;
+  const home = tabState.windowId;
+  if (payload.kind === 'group' || home === null) return false;
+  const incognito = multiCtx.isIncognito(home);
+  if (payload.kind === 'tabs') {
+    return payload.tabIds.every((id) => {
+      const t = tabById.get(id);
+      return t !== undefined && multiCtx.isIncognito(t.windowId) === incognito;
+    });
+  }
   const l = layoutOf(payload.windowId);
-  return !!l && flattenItems(l).some((i) => i.id === payload.nodeId);
+  return (
+    multiCtx.isIncognito(payload.windowId) === incognito &&
+    !!l &&
+    flattenItems(l).some((i) => i.id === payload.nodeId)
+  );
 }
 
 /** The slot between mini tiles of another window's row under the pointer. */

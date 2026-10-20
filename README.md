@@ -55,6 +55,21 @@ throwaway profile and check it against Chrome's real tab state:
   sees changes made before searching.
 - `reconnect.mjs`: the panel reconnects and catches up when the background script is
   stopped at 30 different moments while the panel loads.
+- `drag.mjs`: reordering by drag, dropping onto another window's mini Essentials, and the
+  list changing under a pointer that holds still mid-drag.
+- `essentials-keys.mjs`: arrow keys in the Essentials grid keep their column across a run
+  of Up/Down and start a new one after any other focus.
+- `pin-transfer.mjs`: pinned tabs and Essentials moved between windows outside the panel
+  take their item along (or leave both layouts if Chrome unpins them), never doubled.
+- `discard.mjs`: Chrome's real discarding, including when it gives the tab a new id:
+  suspending from the panel, closing and reopening an Essential, and a closed Essential
+  coming back at its home URL.
+- `restart.mjs`: two windows' Essentials, pinned tabs and folders survive a full browser
+  restart (new tab and window ids) and reattach to the right windows.
+- `incognito.mjs`: in Chrome's real side panel in an incognito window, only incognito tabs
+  are listed, Essentials work, and no incognito URL is written to `storage.local`.
+
+`npm run test:e2e` runs them all and prints a summary (about 1.5 minutes).
 
 Google Chrome itself ignores `--load-extension`, so the scripts use Playwright's Chromium
 (or any Chromium or Chrome for Testing binary in `CHROME_BIN`). One-time setup, then run:
@@ -72,8 +87,7 @@ $env:CHROME_BIN = "C:\path\to\chrome.exe"
 node tests/e2e/tab-sync.mjs .output\chrome-mv3-dev
 ```
 
-Each script prints `PASS`/`FAIL` lines and exits non-zero on any failure. They take under half a
-minute each.
+Each script prints `PASS`/`FAIL` lines and exits non-zero on any failure.
 
 ### Benchmarks
 

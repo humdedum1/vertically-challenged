@@ -1,6 +1,7 @@
 // Shared setup for the real-Chrome checks in this folder. Each script loads the built
 // extension unpacked into a fresh, throwaway profile, prints PASS/FAIL lines and exits
 // non-zero on any failure.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -37,10 +38,19 @@ export function chromeBinary() {
   return bin;
 }
 
-/** A headless Chromium with only this extension, plus its id. */
-export async function launch(ext, { width = 400, height = 1400 } = {}) {
-  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'vc-e2e-'));
-  const args = ['--headless=new', `--disable-extensions-except=${ext}`, `--load-extension=${ext}`];
+/**
+ * A headless Chromium with only this extension, plus its id. Pass `profile` to reuse a
+ * profile across launches (it is then left in place on close); `args` adds flags.
+ */
+export async function launch(ext, { width = 400, height = 1400, profile, args: extra = [] } = {}) {
+  const own = profile === undefined;
+  profile ??= fs.mkdtempSync(path.join(os.tmpdir(), 'vc-e2e-'));
+  const args = [
+    '--headless=new',
+    `--disable-extensions-except=${ext}`,
+    `--load-extension=${ext}`,
+    ...extra,
+  ];
   // Chromium refuses to start sandboxed as root (CI containers).
   if (process.getuid?.() === 0) args.push('--no-sandbox');
   const ctx = await chromium.launchPersistentContext(profile, {
@@ -53,7 +63,7 @@ export async function launch(ext, { width = 400, height = 1400 } = {}) {
   if (!sw) sw = await ctx.waitForEvent('serviceworker');
   const close = async () => {
     await ctx.close();
-    fs.rmSync(profile, { recursive: true, force: true });
+    if (own) fs.rmSync(profile, { recursive: true, force: true });
   };
   return { ctx, extId: new URL(sw.url()).host, close };
 }
@@ -98,4 +108,62 @@ export function startMirror(windowId) {
     }
   });
   port.postMessage({ type: 'subscribe', windowId });
+}
+
+/**
+ * Chrome's own id for an unpacked extension loaded from `dir` (from the path), so a
+ * profile can be prepared for it before launch (e.g. incognito access).
+ */
+export function unpackedId(dir) {
+  const hex = crypto.createHash('sha256').update(path.resolve(dir)).digest('hex').slice(0, 32);
+  return [...hex].map((c) => String.fromCharCode(97 + Number.parseInt(c, 16))).join('');
+}
+
+/**
+ * Raw CDP on a browser launched with --remote-debugging-port=0, for targets Playwright
+ * doesn't expose (the real side panel, incognito pages). Port from the profile's
+ * DevToolsActivePort file.
+ */
+export async function rawCDP(profile) {
+  const file = path.join(profile, 'DevToolsActivePort');
+  for (let i = 0; i < 50 && !fs.existsSync(file); i++) await sleep(100);
+  const [port, wsPath] = fs.readFileSync(file, 'utf8').trim().split('\n');
+  const ws = new WebSocket(`ws://127.0.0.1:${port}${wsPath}`);
+  await new Promise((res, rej) => {
+    ws.onopen = res;
+    ws.onerror = rej;
+  });
+  let id = 0;
+  const waiting = new Map();
+  ws.onmessage = (m) => {
+    const d = JSON.parse(m.data);
+    const w = d.id && waiting.get(d.id);
+    if (!w) return;
+    waiting.delete(d.id);
+    if (d.error) w.rej(new Error(d.error.message));
+    else w.res(d.result);
+  };
+  const send = (method, params = {}, sessionId) =>
+    new Promise((res, rej) => {
+      const n = ++id;
+      waiting.set(n, { res, rej });
+      ws.send(JSON.stringify({ id: n, method, params, sessionId }));
+    });
+  return {
+    send,
+    targets: async () => (await send('Target.getTargets')).targetInfos,
+    attach: async (targetId) =>
+      (await send('Target.attachToTarget', { targetId, flatten: true })).sessionId,
+    /** Evaluates in a session; returns the value, throws on an exception. */
+    eval: async (sessionId, expression, { userGesture = false } = {}) => {
+      const r = await send(
+        'Runtime.evaluate',
+        { expression, awaitPromise: true, returnByValue: true, userGesture },
+        sessionId,
+      );
+      if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails).slice(0, 300));
+      return r.result.value;
+    },
+    close: () => ws.close(),
+  };
 }

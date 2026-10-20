@@ -287,3 +287,78 @@ describe('buildPanelRows transient duplicates', () => {
     expect(keys(rows).filter((k) => k === 'px')).toHaveLength(1);
   });
 });
+
+describe('buildPanelRows during a move between windows', () => {
+  // The tab is already in window 2's tab list, but window 2's layout hasn't caught up;
+  // window 1's layout still lists it.
+  const midMove = () =>
+    buildPanelRows(
+      [
+        {
+          info: win(1),
+          tabs: [tab(5, { windowId: 1, pinned: true }), tab(10, { windowId: 1 })],
+          groups: [],
+          layout: layout({ pinned: [item('x', 7), item('y', 5)] }),
+        },
+        {
+          info: win(2),
+          tabs: [tab(8, { windowId: 2, pinned: true }), tab(7, { windowId: 2, pinned: true })],
+          groups: [],
+          layout: layout({ id: 'lbbbbbbbbbb', pinned: [item('z', 8)] }),
+        },
+      ],
+      1,
+      opts,
+    );
+
+  it('shows the moving tab once, where a layout lists it, not as a loose row too', () => {
+    const rows = midMove();
+    expect(keys(rows).filter((k) => k === 't7')).toEqual([]);
+    const px = rows.find((r) => r.key === 'px');
+    // Still live (not drawn as a dormant tile) for the moment it is in between.
+    expect(px?.kind === 'pin' && px.tab?.id).toBe(7);
+  });
+
+  it('a pinned tab no layout lists still shows as a loose row', () => {
+    const rows = buildPanelRows(
+      [
+        {
+          info: win(1),
+          tabs: [tab(5, { windowId: 1, pinned: true })],
+          groups: [],
+          layout: layout({ pinned: [] }),
+        },
+      ],
+      1,
+      opts,
+    );
+    expect(keys(rows)).toContain('t5');
+  });
+
+  it('counts only the rows actually shown in aria positions', () => {
+    // Window 2's copy of item x is the duplicate that is dropped.
+    const both = item('x', 7);
+    const rows = buildPanelRows(
+      [
+        {
+          info: win(1),
+          tabs: [tab(7, { windowId: 1, pinned: true })],
+          groups: [],
+          layout: layout({ pinned: [both] }),
+        },
+        {
+          info: win(2),
+          tabs: [tab(7, { windowId: 2, pinned: true }), tab(20, { windowId: 2 })],
+          groups: [],
+          layout: layout({ id: 'lbbbbbbbbbb', pinned: [both] }),
+        },
+      ],
+      1,
+      opts,
+    );
+    const w2 = rows.filter((r) => rowWindowId(r) === 2 && r.kind !== 'window' && r.level === 2);
+    expect(w2.map((r) => [r.key, r.pos, r.size])).toEqual(
+      w2.map((r, i) => [r.key, i + 1, w2.length]),
+    );
+  });
+});

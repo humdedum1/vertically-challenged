@@ -1085,6 +1085,19 @@ $effect(() => {
   untrack(() => dnd.remeasure());
 });
 
+// The list can change under a pointer that isn't moving (a tab opens, a move settles):
+// the hovered index now names another row, so the target is planned again instead of
+// leaving an indicator (or a mini-tile bar) that no longer matches what a drop would do.
+$effect(() => {
+  void view;
+  untrack(() => {
+    if (!dragPayload) return;
+    if (listHover && listHover.index >= view.length) listHover = null;
+    dropKey = '';
+    refreshDrop();
+  });
+});
+
 $effect(() => () => dnd.dispose());
 
 function onPointerDown(e: PointerEvent): void {

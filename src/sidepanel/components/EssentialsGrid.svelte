@@ -89,6 +89,8 @@ export function focus(): void {
  * coming back up returns to the tile you came from.
  */
 let column: number | null = null;
+/** Set while Up/Down moves focus, so that focus keeps `column`; any other focus resets it. */
+let verticalFocus = false;
 
 function vertical(i: number, dir: -1 | 1): number | null {
   const els = tileEls();
@@ -201,8 +203,11 @@ function onkeydown(e: KeyboardEvent): void {
       case 'ArrowUp':
       case 'ArrowDown': {
         const j = vertical(i, e.key === 'ArrowUp' ? -1 : 1);
-        if (j !== null) focusAt(j);
-        else if (e.key === 'ArrowDown') onexit?.();
+        if (j !== null) {
+          verticalFocus = true;
+          focusAt(j);
+          verticalFocus = false;
+        } else if (e.key === 'ArrowDown') onexit?.();
         break;
       }
       case 'Enter':
@@ -252,9 +257,14 @@ function onkeydown(e: KeyboardEvent): void {
       oncontextmenu={(e) => {
         e.preventDefault();
         focusId = item.id;
+        column = null;
         onmenu(e.clientX, e.clientY, item);
       }}
-      onfocus={() => (focusId = item.id)}
+      onfocus={() => {
+        focusId = item.id;
+        // Focus that didn't come from Up/Down (a click, Tab, the list) starts a new column.
+        if (!verticalFocus) column = null;
+      }}
     />
   {/each}
   {#if bar && items.length > 0}

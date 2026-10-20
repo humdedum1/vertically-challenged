@@ -210,11 +210,15 @@ const windowName = (tabs: readonly TabInfo[], layout: WindowLayout | undefined, 
 const countItems = (nodes: readonly PinNode[]): number =>
   nodes.reduce((n, x) => n + (x.kind === 'item' ? 1 : countItems(x.children)), 0);
 
+interface TabLookup {
+  get(id: number): TabInfo | undefined;
+}
+
 /** Rows for one window's pinned tree; `offset` is 1 under a window header. */
 function pinnedTreeRows(
   nodes: readonly PinNode[],
   windowId: number,
-  byTab: ReadonlyMap<number, TabInfo>,
+  byTab: TabLookup,
   offset: number,
   depth = 1,
   parentId: string | null = null,
@@ -285,11 +289,42 @@ export function buildPanelRows(
   const homeLayout = windows.find((w) => w.info.id === homeId)?.layout;
   const perRow = Math.max(1, opts.tilesPerRow);
   const rows: Row[] = [];
+  // Windows' layouts and tab lists arrive as separate messages, so for a moment a moved
+  // item or tab can be in two windows at once. Row keys must be unique (keyed each blocks
+  // throw); the first window to show a row keeps it.
+  const seen = new Set<string>();
+  // Mid-move, a tab can already be in its new window's tab list while only the old
+  // window's layout lists it. It is drawn once, as that layout's item, not also as a loose
+  // pinned tab in the new window.
+  // Only needed while a tab is between windows, so it is built on first use.
+  let allTabs: Map<number, TabInfo> | undefined;
+  const anyTab = (id: number) => {
+    allTabs ??= new Map(windows.flatMap((w) => w.tabs.map((t) => [t.id, t] as const)));
+    return allTabs.get(id);
+  };
+  const listedBy = new Map<number, number>();
+  for (const w of windows) {
+    if (!w.layout) continue;
+    for (const i of flattenItems(w.layout)) if (i.tabId !== null) listedBy.set(i.tabId, w.info.id);
+  }
   // The home window has no header, so only the other windows' headers are siblings.
   const headers = windows.filter((w) => w.info.id !== homeId).length;
   let header = 0;
 
+  /** Drops rows from `start` on whose key an earlier row already has, in place. */
+  const dedupeFrom = (start: number) => {
+    let j = start;
+    for (let i = start; i < rows.length; i++) {
+      const r = rows[i] as Row;
+      if (seen.has(r.key)) continue;
+      seen.add(r.key);
+      rows[j++] = r;
+    }
+    rows.length = j;
+  };
+
   windows.forEach((w, wi) => {
+    const windowStart = rows.length;
     const windowId = w.info.id;
     const isHome = windowId === homeId;
     const offset = isHome ? 0 : 1;
@@ -312,11 +347,15 @@ export function buildPanelRows(
         pos: ++header,
         size: headers,
       });
-      if (collapsed) return;
+      if (collapsed) {
+        dedupeFrom(windowStart);
+        return;
+      }
     }
 
     if (!layout) {
       rows.push(...buildRows(w.tabs, w.groups, offset));
+      dedupeFrom(windowStart);
       return;
     }
 
@@ -324,6 +363,10 @@ export function buildPanelRows(
     const referenced = new Set<number>();
     for (const item of flattenItems(layout))
       if (item.tabId !== null && byTab.has(item.tabId)) referenced.add(item.tabId);
+    // Items find their tab in any window (see listedBy): one moving out stays live here.
+    const itemTabs: TabLookup = {
+      get: (id) => byTab.get(id) ?? (listedBy.get(id) === windowId ? anyTab(id) : undefined),
+    };
 
     // Same-level siblings across tiles, pinned tree, strays, divider and unpinned tops.
     const top: Row[] = [];
@@ -346,12 +389,13 @@ export function buildPanelRows(
       }
     }
     rows.push(...top);
-    const topStart = rows.length - top.length;
 
-    rows.push(...pinnedTreeRows(layout.pinned, windowId, byTab, offset));
+    rows.push(...pinnedTreeRows(layout.pinned, windowId, itemTabs, offset));
     let strays = 0;
     for (const t of w.tabs) {
       if (!t.pinned || referenced.has(t.id)) continue;
+      const other = listedBy.get(t.id);
+      if (other !== undefined && other !== windowId) continue;
       strays++;
       rows.push({
         kind: 'tab',
@@ -378,17 +422,16 @@ export function buildPanelRows(
     }
     rows.push(...buildRows(unpinned, w.groups, offset));
 
+    // Drop duplicates before numbering, so aria positions count only the rows shown.
+    dedupeFrom(windowStart);
     // Renumber this window's rows at the top level; deeper levels were numbered by their parents.
-    const own = rows.slice(topStart).filter((r) => r.level === level);
+    const own = rows.slice(windowStart).filter((r) => r.level === level && r.kind !== 'window');
     own.forEach((r, i) => {
       r.pos = i + 1;
       r.size = own.length;
     });
   });
-  // Windows' layouts and tab lists arrive as separate messages, so for a moment a moved item
-  // or tab can be in two windows at once. Row keys must be unique (keyed each blocks throw).
-  const seen = new Set<string>();
-  return rows.filter((r) => !seen.has(r.key) && seen.add(r.key));
+  return rows;
 }
 
 /** Equal by reference, or arrays whose items are equal objects field by field (tiles). */

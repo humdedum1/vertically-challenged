@@ -12,13 +12,14 @@
  *   Escape             clear selection, then clear the search
  * Configurable (Settings > Shortcuts; defaults in parentheses), looked up with actionFor():
  *   closeTab (Delete; suspends a pinned tab), renameGroup (F2; also folders and windows),
- *   moveUp / moveDown (Alt+Up / Down), openMenu
+ *   moveUp / moveDown (Alt+Up / Down; pins and folders move among their siblings), openMenu
  *   (Shift+F10, ContextMenu), selectAll (Ctrl+A), focusSearch (/, Ctrl+F; also works from
  *   outside the tree), newTab, duplicateTab, togglePin, toggleMute, suspendTab (unbound).
  */
 
 import { untrack } from 'svelte';
 import { type HoverTarget, PointerDrag } from '../../lib/drag/pointer-drag';
+import { tileInsertionIndex } from '../../lib/drag/tile-hit';
 import { actionFor } from '../../lib/keymap';
 import { FuzzyIndex } from '../../lib/search/fuzzy-index';
 import type { SearchIndex } from '../../lib/search/search-index';
@@ -26,7 +27,14 @@ import type { Keymap, ShortcutAction } from '../../settings/schema';
 import { flattenItems, type PinItem, type PinNode, type WindowLayout } from '../../shared/layout';
 import type { PanelMessage } from '../../shared/protocol';
 import type { GroupInfo, TabInfo } from '../../shared/types';
-import { type Drag, type DropZone, type MultiDropContext, planDropMulti } from '../model/drop-plan';
+import {
+  type Drag,
+  type DropZone,
+  type GridTarget,
+  type MultiDropContext,
+  planDropMulti,
+  planPinDrop,
+} from '../model/drop-plan';
 import {
   dividerMenu,
   essentialMenu,
@@ -38,7 +46,14 @@ import {
   windowLabel,
   windowMenu,
 } from '../model/menus';
-import { buildPanelRows, buildSearchRows, type Row, rowWindowId } from '../model/rows';
+import { pinStep } from '../model/pin-step';
+import {
+  buildPanelRows,
+  buildSearchRows,
+  type PinRow as PinRowT,
+  type Row,
+  rowWindowId,
+} from '../model/rows';
 import { movableTabIds, pruneSelection, tabIdsBetween } from '../model/selection';
 import type { TabState } from '../tab-state.svelte';
 import { tintCache } from '../tint-cache.svelte';
@@ -170,6 +185,17 @@ const essentials = $derived(homeLayout?.essentials ?? []);
 const layoutOf = (windowId: number): WindowLayout | undefined => tabState.layoutOf(windowId);
 const homeTabById = $derived(new Map(tabState.tabs.map((t) => [t.id, t])));
 const showGrid = $derived(!searching && essentials.length > 0);
+/** A running drag that could become an Essential: an empty grid then shows a drop area. */
+let dragWantsGrid = $state(false);
+/**
+ * The empty grid's drop area lies over the search field instead of taking room in the
+ * flow, which would push the list down under the pointer mid-drag. Without a top search
+ * field there is nowhere to put it; Essentials then start from the menus.
+ */
+const dropArea = $derived(
+  !showGrid && dragWantsGrid && !searching && search === 'top' && homeLayout !== undefined,
+);
+const gridVisible = $derived(showGrid || dropArea);
 let grid: ReturnType<typeof EssentialsGrid> | undefined = $state();
 
 // --- Focus -----------------------------------------------------------------------------
@@ -649,7 +675,7 @@ function rowName(r: Row): string {
   }
 }
 
-/** Rows that keyboard moves of normal tabs step over (pinned area; Task 12 adds moves into it). */
+/** Rows that keyboard moves of normal tabs step over (pins move with their own keys). */
 const isPinnedArea = (r: Row | undefined): boolean =>
   r?.kind === 'pin' || r?.kind === 'folder' || r?.kind === 'divider' || r?.kind === 'tiles';
 
@@ -660,15 +686,56 @@ const multiCtx: MultiDropContext = {
   },
   tab: (id) => tabById.get(id),
   isIncognito: (id) => windowViewById.get(id)?.info.incognito ?? false,
+  layoutOf: (id) => tabState.layoutOf(id),
 };
 
 function planFor(drag: Drag, index: number, zone: DropZone): PanelMessage | null {
   return planDropMulti(multiCtx, view, drag, index, zone);
 }
 
+/** Display name of a node of a layout (item: its tab's title first). */
+function nodeName(l: WindowLayout, id: string): string {
+  const stack: PinNode[] = [...l.essentials, ...l.pinned];
+  while (stack.length) {
+    const n = stack.pop() as PinNode;
+    if (n.id === id) {
+      if (n.kind === 'folder') return n.name;
+      const t = n.tabId === null ? undefined : tabById.get(n.tabId);
+      return t?.title || n.title || n.homeUrl;
+    }
+    if (n.kind === 'folder') stack.push(...n.children);
+  }
+  return '';
+}
+
+/** Keyboard move of a pin, folder or tile (`across`: a tile, announced as before / after). */
+function moveNodeByKey(windowId: number, nodeId: string, dir: -1 | 1, across = false): void {
+  const l = layoutOf(windowId);
+  const step = l && pinStep(l, nodeId, dir);
+  if (!l || !step) return;
+  const what = nodeName(l, nodeId);
+  if ('edge' in step) {
+    announcement = `${what} is already ${dir < 0 ? 'first' : 'last'}`;
+    return;
+  }
+  send({ type: 'pinMove', windowId, nodeId, toWindowId: windowId, dest: step.dest });
+  const ref = nodeName(l, step.ref);
+  const how =
+    across && step.how !== 'into' && step.how !== 'out of'
+      ? dir < 0
+        ? 'before'
+        : 'after'
+      : step.how;
+  announcement = `Moved ${what} ${how} ${ref}`;
+}
+
 function moveByKey(dir: -1 | 1): void {
   if (searching) return;
   const row = focusedRow;
+  if (row?.kind === 'pin' || row?.kind === 'folder') {
+    moveNodeByKey(row.windowId, row.kind === 'pin' ? row.item.id : row.folder.id, dir);
+    return;
+  }
   if (row?.kind !== 'tab' && row?.kind !== 'group') return;
   let drag: Drag;
   let isMoving: (r: Row) => boolean;
@@ -774,57 +841,215 @@ function moveByKey(dir: -1 | 1): void {
 let ghost: HTMLDivElement | undefined = $state();
 let dragLabel = $state<string | null>(null);
 let drop = $state.raw<(HoverTarget & { ok: boolean }) | null>(null);
+/** Insertion index shown in the home grid while an allowed drop is aimed at it. */
+let gridDrop = $state<number | null>(null);
+/** Bar between two mini tiles of another window's row, in list content coordinates. */
+let tilesBar = $state.raw<{ top: number; left: number; height: number } | null>(null);
 let dragPayload: Drag | null = null;
 // The ghost mounts a frame after the drag starts, so remember where the pointer is.
 let pointer = { x: 0, y: 0 };
+// Plain: the list row under the pointer, and the grid / tile slot that overrides it.
+let listHover: HoverTarget | null = null;
+let gridTarget: GridTarget | null = null;
+let dropKey = '';
 
 const placeGhost = (node: HTMLElement): void => {
   node.style.transform = `translate(${pointer.x + 14}px, ${pointer.y + 14}px)`;
 };
 
+/** The item of a pinned tab, in whichever layout has it. */
+function itemOfTab(tabId: number): { windowId: number; item: PinItem } | null {
+  for (const w of tabState.windows) {
+    const l = tabState.layoutOf(w.info.id);
+    const item = l && flattenItems(l).find((i) => i.tabId === tabId);
+    if (item) return { windowId: w.info.id, item };
+  }
+  return null;
+}
+
+/**
+ * A pinned row drags its node, or the selection when every selected tab is a live pin
+ * of that window (then as tabs, in layout order, which pinTabs moves as their items).
+ */
+function pinDrag(row: PinRowT): Drag {
+  const tab = row.tab;
+  const l = layoutOf(row.windowId);
+  if (tab && l && selection.size > 1 && selection.has(tab.id)) {
+    const ids = flattenItems(l)
+      .map((i) => i.tabId)
+      .filter((id): id is number => id !== null && selection.has(id) && tabById.has(id));
+    if (ids.length === selection.size) return { kind: 'tabs', tabIds: ids };
+  }
+  return { kind: 'node', windowId: row.windowId, nodeId: row.item.id };
+}
+
+function dragOf(i: number, e: PointerEvent): Drag | null {
+  const row = view[i];
+  if (!row || searching) return null;
+  switch (row.kind) {
+    case 'group':
+      return { kind: 'group', groupId: row.group.id };
+    case 'folder':
+      return { kind: 'node', windowId: row.windowId, nodeId: row.folder.id };
+    case 'pin':
+      return pinDrag(row);
+    case 'tiles': {
+      const id = (e.target as Element).closest<HTMLElement>('[data-item]')?.dataset.item;
+      return id ? { kind: 'node', windowId: row.windowId, nodeId: id } : null;
+    }
+    case 'tab': {
+      // R18: anything pinned drags as a pin (its item, or the bare tab for pinTabs / unpin).
+      if (row.tab.pinned || layoutTabIds.has(row.tab.id)) {
+        const own = itemOfTab(row.tab.id);
+        return own
+          ? { kind: 'node', windowId: own.windowId, nodeId: own.item.id }
+          : { kind: 'tabs', tabIds: [row.tab.id] };
+      }
+      const tabIds = movableTargets(row.tab);
+      return tabIds.length > 0 ? { kind: 'tabs', tabIds } : null;
+    }
+    default:
+      return null;
+  }
+}
+
+function dragName(payload: Drag): string {
+  if (payload.kind === 'group') return groupById.get(payload.groupId)?.title || 'Unnamed group';
+  if (payload.kind === 'node') {
+    const l = layoutOf(payload.windowId);
+    return (l && nodeName(l, payload.nodeId)) || 'Pinned tab';
+  }
+  if (payload.tabIds.length > 1) return `${payload.tabIds.length} tabs`;
+  const t = tabById.get(payload.tabIds[0] as number);
+  return t?.title || t?.url || 'New Tab';
+}
+
+/** Folders and groups never become Essentials, so they don't open the empty drop area. */
+function canBeEssential(payload: Drag): boolean {
+  if (payload.kind === 'group') return false;
+  if (payload.kind === 'tabs') return true;
+  const l = layoutOf(payload.windowId);
+  return !!l && flattenItems(l).some((i) => i.id === payload.nodeId);
+}
+
+/** The slot between mini tiles of another window's row under the pointer. */
+function tilesSlot(
+  i: number,
+  x: number,
+  y: number,
+): { target: GridTarget; bar: { top: number; left: number; height: number } } | null {
+  const row = view[i];
+  const el = document.getElementById(`vc-row-${row?.key}`);
+  const spacer = list?.scroller()?.firstElementChild;
+  const l = row?.kind === 'tiles' ? layoutOf(row.windowId) : undefined;
+  if (row?.kind !== 'tiles' || !el || !spacer || !l) return null;
+  const tiles = [...el.querySelectorAll<HTMLElement>('.tile')].map((t) =>
+    t.getBoundingClientRect(),
+  );
+  const at = tileInsertionIndex(tiles, x, y);
+  const start = l.essentials.findIndex((e) => e.id === row.tiles[0]?.item.id);
+  if (start < 0) return null;
+  const origin = spacer.getBoundingClientRect();
+  const ref = tiles[at] ?? tiles[at - 1];
+  if (!ref) return null;
+  const left = (tiles[at] ? ref.left - 3 : ref.right + 1) - origin.left;
+  return {
+    target: { kind: 'grid', windowId: row.windowId, index: start + at },
+    bar: { top: ref.top - origin.top, left, height: ref.height },
+  };
+}
+
+/**
+ * Recomputes the drop target after the pointer or the hovered row changed: the home grid
+ * first, then a slot between another window's mini tiles, then the list row. Plans are
+ * only re-run when the target changes.
+ */
+function refreshDrop(): void {
+  const payload = dragPayload;
+  if (!payload) return;
+  const home = tabState.windowId;
+  const gi = grid && home !== null ? grid.targetAt(pointer.x, pointer.y) : null;
+  let target: GridTarget | null =
+    gi !== null && home !== null ? { kind: 'grid', windowId: home, index: gi } : null;
+  let bar: { top: number; left: number; height: number } | null = null;
+  if (!target && listHover && view[listHover.index]?.kind === 'tiles') {
+    const slot = tilesSlot(listHover.index, pointer.x, pointer.y);
+    if (slot) ({ target, bar } = slot);
+  }
+  const key = target
+    ? `g${target.windowId}:${target.index}`
+    : listHover
+      ? `r${listHover.index}:${listHover.zone}`
+      : '';
+  if (key === dropKey) return;
+  dropKey = key;
+  gridTarget = target;
+  if (target) {
+    const ok = planPinDrop(multiCtx, view, payload, target) !== null;
+    gridDrop = ok && gi !== null ? gi : null;
+    tilesBar = ok ? bar : null;
+    drop = null;
+    return;
+  }
+  gridDrop = null;
+  tilesBar = null;
+  drop = listHover
+    ? { ...listHover, ok: planFor(payload, listHover.index, listHover.zone) !== null }
+    : null;
+}
+
 const dnd = new PointerDrag<Drag>({
   scroller: () => list?.scroller(),
   rowHeight: () => rowHeight,
   rowCount: () => view.length,
-  isGroup: (i) => view[i]?.kind === 'group' || view[i]?.kind === 'window',
-  begin: (i) => {
-    const row = view[i];
-    if (!row || searching) return null;
-    if (row.kind === 'group') return { kind: 'group', groupId: row.group.id };
-    // Pinned rows, folders and tiles get their own drags in Task 12.
-    if (row.kind !== 'tab') return null;
-    const tabIds = movableTargets(row.tab);
-    return tabIds.length > 0 ? { kind: 'tabs', tabIds } : null;
+  isGroup: (i) => {
+    const k = view[i]?.kind;
+    return k === 'group' || k === 'window' || k === 'folder';
   },
+  begin: dragOf,
+  elsewhere: (x, y) => (grid?.targetAt(x, y) ?? null) !== null,
   onStart: (payload) => {
     dragPayload = payload;
-    if (payload.kind === 'group') {
-      dragLabel = groupById.get(payload.groupId)?.title || 'Unnamed group';
-    } else if (payload.tabIds.length > 1) {
-      dragLabel = `${payload.tabIds.length} tabs`;
-    } else {
-      const t = tabById.get(payload.tabIds[0] as number);
-      dragLabel = t?.title || t?.url || 'New Tab';
-    }
+    dragLabel = dragName(payload);
+    dragWantsGrid = canBeEssential(payload);
     menu = null;
   },
   onHover: (t) => {
-    drop = t && dragPayload ? { ...t, ok: planFor(dragPayload, t.index, t.zone) !== null } : null;
+    listHover = t;
+    refreshDrop();
   },
   onMove: (x, y) => {
     pointer = { x, y };
     if (ghost) ghost.style.transform = `translate(${x + 14}px, ${y + 14}px)`;
+    refreshDrop();
   },
   onDrop: (payload, t) => {
-    if (!t) return;
-    const plan = planFor(payload, t.index, t.zone);
+    const plan = gridTarget
+      ? planPinDrop(multiCtx, view, payload, gridTarget)
+      : t
+        ? planFor(payload, t.index, t.zone)
+        : null;
     if (plan) send(plan);
   },
   onEnd: () => {
     dragLabel = null;
     drop = null;
+    gridDrop = null;
+    tilesBar = null;
     dragPayload = null;
+    dragWantsGrid = false;
+    listHover = null;
+    gridTarget = null;
+    dropKey = '';
   },
+});
+
+// The grid above the list can appear (empty drop area) or change height mid-drag, which
+// moves the list: hit-testing must use its new position.
+$effect(() => {
+  void gridVisible;
+  void essentials.length;
+  untrack(() => dnd.remeasure());
 });
 
 $effect(() => () => dnd.dispose());
@@ -1111,26 +1336,37 @@ $effect(() => {
   </div>
 {/snippet}
 
+{#snippet essentialsGrid(homeId: number)}
+  <EssentialsGrid
+    bind:this={grid}
+    windowId={homeId}
+    items={essentials}
+    tabs={homeTabById}
+    tints={tintCache}
+    {send}
+    {shortcuts}
+    onmenu={openEssentialMenu}
+    onexit={() => {
+      setFocus(0);
+      tree()?.focus();
+    }}
+    onpress={(e, item) => {
+      if (!searching) dnd.pressWith(e, { kind: 'node', windowId: homeId, nodeId: item.id });
+    }}
+    onmove={(item, dir) => moveNodeByKey(homeId, item.id, dir, true)}
+    dropIndex={gridDrop}
+    dropping={dragWantsGrid}
+  />
+{/snippet}
+
 <div class="wrap">
   {#if search === 'top'}{@render searchField()}{/if}
+  {#if dropArea && tabState.windowId !== null}
+    <div class="drop-area">{@render essentialsGrid(tabState.windowId)}</div>
+  {/if}
 
   <div class="body">
-    {#if showGrid && tabState.windowId !== null}
-      <EssentialsGrid
-        bind:this={grid}
-        windowId={tabState.windowId}
-        items={essentials}
-        tabs={homeTabById}
-        tints={tintCache}
-        {send}
-        {shortcuts}
-        onmenu={openEssentialMenu}
-        onexit={() => {
-          setFocus(0);
-          tree()?.focus();
-        }}
-      />
-    {/if}
+    {#if showGrid && tabState.windowId !== null}{@render essentialsGrid(tabState.windowId)}{/if}
     <div class="list" use:observeWidth>
       {#if searching && view.length === 0}
         <p class="empty" role="status">No tabs match “{needle}”</p>
@@ -1285,8 +1521,11 @@ $effect(() => {
             {/if}
           {/snippet}
           {#snippet overlay()}
+            {#if tilesBar}
+              <div class="tiles-bar" style:top="{tilesBar.top}px" style:left="{tilesBar.left}px" style:height="{tilesBar.height}px"></div>
+            {/if}
             {#if drop?.ok}
-              {#if drop.zone === 'inside' || view[drop.index]?.kind === 'window'}
+              {#if drop.zone === 'inside' || view[drop.index]?.kind === 'window' || view[drop.index]?.kind === 'tiles'}
                 <div class="drop-box" style:top="{drop.index * rowHeight}px" style:height="{rowHeight}px"></div>
               {:else}
                 <div class="drop-line" style:top="{(drop.index + (drop.zone === 'after' ? 1 : 0)) * rowHeight - 1}px"></div>
@@ -1313,6 +1552,7 @@ $effect(() => {
 
 <style>
   .wrap {
+    position: relative;
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -1405,6 +1645,32 @@ $effect(() => {
     left: 4px;
     right: 4px;
     height: 2px;
+    border-radius: 2px;
+    background: var(--mPrimary);
+    pointer-events: none;
+  }
+
+  /* Over the search field (2 + 32 + 6 px), so showing it moves nothing. */
+  .drop-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    background: var(--surface-1);
+  }
+
+  .drop-area :global(.grid) {
+    padding: 2px 8px 6px;
+  }
+
+  .drop-area :global(.empty) {
+    height: 32px;
+  }
+
+  .tiles-bar {
+    position: absolute;
+    width: 2px;
     border-radius: 2px;
     background: var(--mPrimary);
     pointer-events: none;

@@ -5,8 +5,10 @@
  *   Up / Down          tile above / below (rows are measured, see `vertical`);
  *                      Down from the last row leaves for the list (`onexit`)
  *   Enter / Space      open
+ *   Alt+Left / Right   move the tile one place (onmove)
  * Configurable: closeTab (Delete) suspends the tile's tab, openMenu (Shift+F10, ContextMenu).
  */
+import { tileInsertionIndex } from '../../lib/drag/tile-hit';
 import { actionFor } from '../../lib/keymap';
 import type { Keymap } from '../../settings/schema';
 import type { PinItem } from '../../shared/layout';
@@ -26,9 +28,30 @@ interface Props {
   shortcuts: Keymap;
   /** Down from the last row: hand focus to the list below. */
   onexit?: () => void;
+  /** A press on a tile, which may become a drag (the list's drag session runs it). */
+  onpress?: (e: PointerEvent, item: PinItem) => void;
+  /** Alt+Left / Right on a tile. */
+  onmove?: (item: PinItem, dir: -1 | 1) => void;
+  /** Insertion index of an allowed drop being aimed here, for the indicator bar. */
+  dropIndex?: number | null;
+  /** A drag that could land here is running: an empty grid shows a drop area. */
+  dropping?: boolean;
 }
 
-let { windowId, items, tabs, tints, send, onmenu, shortcuts, onexit }: Props = $props();
+let {
+  windowId,
+  items,
+  tabs,
+  tints,
+  send,
+  onmenu,
+  shortcuts,
+  onexit,
+  onpress,
+  onmove,
+  dropIndex = null,
+  dropping = false,
+}: Props = $props();
 
 let el: HTMLDivElement | undefined = $state();
 let focusId = $state<string | null>(null);
@@ -89,6 +112,46 @@ function vertical(i: number, dir: -1 | 1): number | null {
   return best;
 }
 
+/**
+ * Where a drop at the client point would insert, or null when the point is outside the
+ * grid. Reads tile rects, so it is only called while a drag is running.
+ */
+export function targetAt(x: number, y: number): number | null {
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  if (x < r.left || x > r.right || y < r.top || y > r.bottom) return null;
+  return tileInsertionIndex(
+    tileEls().map((t) => t.getBoundingClientRect()),
+    x,
+    y,
+  );
+}
+
+/** The vertical bar in the gap before tile `dropIndex` (after the last tile at the end). */
+const bar = $derived.by(() => {
+  void items;
+  if (dropIndex === null || !el) return null;
+  const els = tileEls();
+  const before = els[dropIndex];
+  const last = els[els.length - 1];
+  if (before)
+    return { left: before.offsetLeft - 4, top: before.offsetTop, height: before.offsetHeight };
+  if (last) {
+    return {
+      left: last.offsetLeft + last.offsetWidth + 2,
+      top: last.offsetTop,
+      height: last.offsetHeight,
+    };
+  }
+  return null;
+});
+
+function onpointerdown(e: PointerEvent): void {
+  const tile = (e.target as Element).closest<HTMLElement>('[role=option]');
+  const item = tile && items[Number(tile.dataset.index)];
+  if (item) onpress?.(e, item);
+}
+
 function open(item: PinItem): void {
   send({ type: 'pinOpen', windowId, itemId: item.id });
 }
@@ -112,7 +175,15 @@ function onkeydown(e: KeyboardEvent): void {
   if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') column = null;
   if (action === 'closeTab') close(item);
   else if (action === 'openMenu') menuAt(item, tile);
-  else if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  else if (
+    e.altKey &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !e.shiftKey &&
+    (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+  ) {
+    onmove?.(item, e.key === 'ArrowLeft' ? -1 : 1);
+  } else if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
   else {
     switch (e.key) {
       case 'ArrowLeft':
@@ -154,7 +225,12 @@ function onkeydown(e: KeyboardEvent): void {
   tabindex="-1"
   bind:this={el}
   {onkeydown}
+  {onpointerdown}
+  ondragstart={(e) => e.preventDefault()}
 >
+  {#if items.length === 0 && dropping}
+    <div class="empty" class:target={dropIndex !== null}>Drop here to add to Essentials</div>
+  {/if}
   {#each items as item, i (item.id)}
     {@const tab = tabOf(item)}
     <EssentialTile
@@ -181,6 +257,9 @@ function onkeydown(e: KeyboardEvent): void {
       onfocus={() => (focusId = item.id)}
     />
   {/each}
+  {#if bar && items.length > 0}
+    <div class="bar" style:left="{bar.left}px" style:top="{bar.top}px" style:height="{bar.height}px"></div>
+  {/if}
 </div>
 
 <style>
@@ -197,5 +276,31 @@ function onkeydown(e: KeyboardEvent): void {
     overflow-x: hidden;
     overscroll-behavior: contain;
     outline: none;
+  }
+
+  /* Drop indicator: a vertical bar in the gap between two tiles. */
+  .bar {
+    position: absolute;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--mPrimary);
+    pointer-events: none;
+  }
+
+  .empty {
+    flex: 1;
+    display: grid;
+    place-items: center;
+    height: 48px;
+    border: 1px dashed var(--mOutline);
+    border-radius: 12px;
+    color: var(--mOnSurfaceVariant);
+    font-size: 12px;
+  }
+
+  .empty.target {
+    border: 2px solid var(--mPrimary);
+    background: color-mix(in srgb, var(--mPrimary) 12%, transparent);
+    color: var(--mOnSurface);
   }
 </style>

@@ -1,8 +1,25 @@
+import {
+  findNode,
+  flattenItems,
+  MAX_FOLDER_DEPTH,
+  type PinDest,
+  type PinFolder,
+  type PinNode,
+  type WindowLayout,
+} from '../../shared/layout';
 import type { PanelMessage } from '../../shared/protocol';
 import type { TabInfo } from '../../shared/types';
 import { type Row, rowWindowId } from './rows';
 
-export type Drag = { kind: 'tabs'; tabIds: number[] } | { kind: 'group'; groupId: number };
+/** `node`: an Essential, pinned item or folder of `windowId`'s layout. */
+export type Drag =
+  | { kind: 'tabs'; tabIds: number[] }
+  | { kind: 'group'; groupId: number }
+  | { kind: 'node'; windowId: number; nodeId: string };
+
+/** A drop on an Essentials grid (the home grid, or another window's tiles row). */
+export type GridTarget = { kind: 'grid'; windowId: number; index: number }; // insertion index among essentials
+export type RowTarget = { index: number; zone: DropZone };
 
 /**
  * Where the pointer is relative to the target row. Tab rows use before/after (top/bottom
@@ -33,6 +50,8 @@ export function planDrop(
 ): PanelMessage | null {
   const target = rows[index];
   if (!target || (target.kind !== 'tab' && target.kind !== 'group')) return null;
+  // Pins need the layouts to plan; planPinDrop (via planDropMulti) handles them.
+  if (drag.kind === 'node') return null;
 
   const moving = new Set(
     drag.kind === 'tabs'
@@ -147,17 +166,58 @@ export interface MultiDropContext {
   ctxFor(windowId: number): DropContext | null;
   tab(tabId: number): TabInfo | undefined;
   isIncognito(windowId: number): boolean;
+  /** The window's layout; undefined while it hasn't arrived (pinned-area drops are then refused). */
+  layoutOf?(windowId: number): WindowLayout | undefined;
 }
 
 /**
  * planDrop for the multi-window view. Resolves the target row's window and delegates;
  * dropping on a window header appends to that window. Not allowed: moving tabs between
  * incognito and normal windows (Chrome refuses) and moving whole groups across windows.
+ * Drags of pins and drops on the pinned area (pins, folders, tiles, divider) go through
+ * planPinDrop.
  */
 export function planDropMulti(
   m: MultiDropContext,
   rows: readonly Row[],
   drag: Drag,
+  index: number,
+  zone: DropZone,
+): PanelMessage | null {
+  const target = rows[index];
+  if (!target) return null;
+  if (drag.kind === 'node' || isPinArea(target) || (drag.kind === 'tabs' && isPinDrag(m, drag))) {
+    return planPinDrop(m, rows, drag, { index, zone });
+  }
+  return planNormalDrop(m, rows, drag, index, zone);
+}
+
+const isPinArea = (r: Row): boolean =>
+  r.kind === 'pin' || r.kind === 'folder' || r.kind === 'tiles' || r.kind === 'divider';
+
+/** Tab ids that back a layout item of their own window. */
+function hasItem(m: MultiDropContext, t: TabInfo): boolean {
+  const l = m.layoutOf?.(t.windowId);
+  return !!l && flattenItems(l).some((i) => i.tabId === t.id);
+}
+
+/**
+ * A drag of pinned tabs (live pins, or pinned tabs without an item). These never take the
+ * normal `move` path, which would reorder them among pinned tabs behind the layout's back:
+ * they go into the layout with pinTabs, or out of the pinned area with an explicit unpin.
+ */
+function isPinDrag(m: MultiDropContext, drag: { tabIds: number[] }): boolean {
+  return drag.tabIds.some((id) => {
+    const t = m.tab(id);
+    return !!t && (t.pinned || hasItem(m, t));
+  });
+}
+
+/** Tab and group drags onto normal rows: the pre-Essentials rules. */
+function planNormalDrop(
+  m: MultiDropContext,
+  rows: readonly Row[],
+  drag: Exclude<Drag, { kind: 'node' }>,
   index: number,
   zone: DropZone,
 ): PanelMessage | null {
@@ -187,4 +247,239 @@ export function planDropMulti(
     };
   }
   return planDrop(ctx, rows, drag, index, zone);
+}
+
+/**
+ * Pinned tabs dropped on normal rows: an explicit unpin to that spot. Pinned tab rows are
+ * refused as targets (a pinned tab only moves as a pin), and so is a window header of the
+ * window they are already in.
+ */
+function planUnpin(
+  m: MultiDropContext,
+  rows: readonly Row[],
+  tabIds: number[],
+  index: number,
+  zone: DropZone,
+): PanelMessage | null {
+  const target = rows[index];
+  if (!target) return null;
+  if (target.kind === 'tab' && target.tab.pinned) return null;
+  const drag = { kind: 'tabs' as const, tabIds };
+  if (target.kind === 'window') {
+    const dragged = tabIds.map((id) => m.tab(id));
+    if (dragged.some((t) => !t || m.isIncognito(t.windowId) !== m.isIncognito(target.info.id)))
+      return null;
+    if (dragged.every((t) => t?.windowId === target.info.id)) return null;
+    return {
+      type: 'move',
+      tabIds,
+      target: { windowId: target.info.id, beforeTabId: null, groupId: -1, pinned: false },
+    };
+  }
+  const plan = planNormalDrop(m, rows, drag, index, zone);
+  return plan?.type === 'move' && plan.target.pinned === false ? plan : null;
+}
+
+/** Just below a divider: the top of that window's normal tabs. */
+function planBelowDivider(
+  m: MultiDropContext,
+  rows: readonly Row[],
+  drag: Exclude<Drag, { kind: 'node' }>,
+  index: number,
+  pinDrag: boolean,
+): PanelMessage | null {
+  const divider = rows[index];
+  const next = rows[index + 1];
+  if (!divider) return null;
+  const windowId = rowWindowId(divider);
+  if (next && rowWindowId(next) === windowId && (next.kind === 'tab' || next.kind === 'group')) {
+    return pinDrag && drag.kind === 'tabs'
+      ? planUnpin(m, rows, drag.tabIds, index + 1, 'before')
+      : planNormalDrop(m, rows, drag, index + 1, 'before');
+  }
+  // No normal tabs in the window: append, unpinned.
+  if (drag.kind !== 'tabs') return null;
+  const dragged = drag.tabIds.map((id) => m.tab(id));
+  if (dragged.some((t) => !t || m.isIncognito(t.windowId) !== m.isIncognito(windowId))) return null;
+  return {
+    type: 'move',
+    tabIds: drag.tabIds,
+    target: { windowId, beforeTabId: null, groupId: -1, pinned: false },
+  };
+}
+
+/** A spot in a layout, counted in the list as it is now (the moved nodes still in it). */
+interface Spot {
+  windowId: number;
+  layout: WindowLayout;
+  dest: PinDest;
+}
+
+/** The sibling list a destination points at, or null when its folder is missing. */
+function listOf(l: WindowLayout, dest: PinDest): readonly PinNode[] | null {
+  if (dest.zone === 'essentials') return l.essentials;
+  if (dest.folderId === null) return l.pinned;
+  const hit = findNode(l, dest.folderId);
+  return hit?.zone === 'pinned' && hit.node.kind === 'folder' ? hit.node.children : null;
+}
+
+/**
+ * Where a drop lands in the pinned area, or null when the target isn't part of it. A
+ * folder header splits like a group header: before it is its sibling, inside (and just
+ * below an expanded header, where the line is drawn) is its first child, below a
+ * collapsed one is the sibling after it. Below the last child of an expanded folder
+ * stays in that folder.
+ */
+function spotFor(
+  m: MultiDropContext,
+  rows: readonly Row[],
+  target: RowTarget | GridTarget,
+): Spot | null {
+  if ('kind' in target) {
+    const layout = m.layoutOf?.(target.windowId);
+    if (!layout) return null;
+    const index = Math.max(0, Math.min(target.index, layout.essentials.length));
+    return { windowId: target.windowId, layout, dest: { zone: 'essentials', index } };
+  }
+  const row = rows[target.index];
+  if (!row) return null;
+  const windowId = rowWindowId(row);
+  const layout = m.layoutOf?.(windowId);
+  if (!layout) return null;
+  const pinned = (folderId: string | null, index: number): Spot => ({
+    windowId,
+    layout,
+    dest: { zone: 'pinned', folderId, index },
+  });
+  switch (row.kind) {
+    case 'tiles':
+      return { windowId, layout, dest: { zone: 'essentials', index: layout.essentials.length } };
+    case 'pin':
+      return pinned(row.parentId, row.index + (target.zone === 'before' ? 0 : 1));
+    case 'folder':
+      if (target.zone === 'before') return pinned(row.parentId, row.index);
+      if (target.zone === 'inside' || !row.folder.collapsed) return pinned(row.folder.id, 0);
+      return pinned(row.parentId, row.index + 1);
+    case 'divider':
+      return target.zone === 'before' ? pinned(null, layout.pinned.length) : null;
+    default:
+      return null;
+  }
+}
+
+/** Number of folder levels in a subtree, counting the folder itself. */
+function height(f: PinFolder): number {
+  let h = 0;
+  for (const c of f.children) if (c.kind === 'folder') h = Math.max(h, height(c));
+  return h + 1;
+}
+
+/**
+ * Mirrors moveNode in background/pins/ops.ts, so a drop the worker would ignore shows no
+ * indicator: folders stay out of Essentials, out of themselves, within the depth limit.
+ */
+export function folderFits(l: WindowLayout, f: PinFolder, dest: PinDest): boolean {
+  if (dest.zone === 'essentials') return false;
+  if (dest.folderId === null) return height(f) <= MAX_FOLDER_DEPTH;
+  if (dest.folderId === f.id || findNode({ ...l, essentials: [], pinned: [f] }, dest.folderId))
+    return false;
+  const hit = findNode(l, dest.folderId);
+  return hit?.node.kind === 'folder' && hit.depth + height(f) <= MAX_FOLDER_DEPTH;
+}
+
+/**
+ * Turns a spot into the wire destination: the index counts the siblings left once the
+ * moved nodes are taken out (as the worker applies it). Null when the folder is gone or
+ * when the moved nodes already sit there in that order.
+ */
+function resolve(spot: Spot, movedIds: readonly string[]): PinDest | null {
+  const list = listOf(spot.layout, spot.dest);
+  if (!list) return null;
+  const raw = Math.min(spot.dest.index, list.length);
+  const moved = new Set(movedIds);
+  const index = list.slice(0, raw).filter((n) => !moved.has(n.id)).length;
+  if (movedIds.length > 0 && movedIds.every((id) => list.some((n) => n.id === id))) {
+    const rest = list.filter((n) => !moved.has(n.id)).map((n) => n.id);
+    const after = [...rest.slice(0, index), ...movedIds, ...rest.slice(index)];
+    if (after.every((id, i) => list[i]?.id === id)) return null;
+  }
+  return { ...spot.dest, index };
+}
+
+/**
+ * Drops that involve the pinned area: a drag of pins (a node, or pinned tabs) or a drop on
+ * pinned rows, folders, tiles, the divider or a grid. Tabs land with pinTabs, nodes with
+ * pinMove (`toWindowId` is the target row's window); a live pin dropped on normal rows is
+ * unpinned there with `move`, a dormant one or a folder can't be. Folders never go into
+ * Essentials, into themselves, past the depth limit or to another window. Nothing crosses
+ * between incognito and normal windows. Null means no indicator and no command.
+ */
+export function planPinDrop(
+  m: MultiDropContext,
+  rows: readonly Row[],
+  drag: Drag,
+  target: RowTarget | GridTarget,
+): PanelMessage | null {
+  const row = 'kind' in target ? undefined : rows[target.index];
+  if (!('kind' in target) && !row) return null;
+  const windowId = row ? rowWindowId(row) : (target as GridTarget).windowId;
+  const spot = spotFor(m, rows, target);
+  const belowDivider = row?.kind === 'divider' && (target as RowTarget).zone === 'after';
+
+  if (drag.kind === 'group') {
+    return belowDivider
+      ? planBelowDivider(m, rows, drag, (target as RowTarget).index, false)
+      : null;
+  }
+
+  if (drag.kind === 'tabs') {
+    const pinDrag = isPinDrag(m, drag);
+    if (!spot) {
+      if (!row) return null;
+      if (belowDivider)
+        return planBelowDivider(m, rows, drag, (target as RowTarget).index, pinDrag);
+      const t = target as RowTarget;
+      return pinDrag
+        ? planUnpin(m, rows, drag.tabIds, t.index, t.zone)
+        : planNormalDrop(m, rows, drag, t.index, t.zone);
+    }
+    const dragged = drag.tabIds.map((id) => m.tab(id));
+    const incognito = m.isIncognito(windowId);
+    if (dragged.some((t) => !t || m.isIncognito(t.windowId) !== incognito)) return null;
+    const moved = drag.tabIds.flatMap((id) => {
+      const it = flattenItems(spot.layout).find((i) => i.tabId === id);
+      return it ? [it.id] : [];
+    });
+    const dest = resolve(spot, moved);
+    return dest && { type: 'pinTabs', tabIds: drag.tabIds, windowId, dest };
+  }
+
+  const from = m.layoutOf?.(drag.windowId);
+  const hit = from && findNode(from, drag.nodeId);
+  if (!hit) return null;
+  if (m.isIncognito(drag.windowId) !== m.isIncognito(windowId)) return null;
+  const { node } = hit;
+
+  if (!spot) {
+    // Normal rows: unpin a live item there; folders and dormant items have no tab to move.
+    if (!row || node.kind !== 'item' || node.tabId === null || !m.tab(node.tabId)) return null;
+    const t = target as RowTarget;
+    if (belowDivider)
+      return planBelowDivider(m, rows, { kind: 'tabs', tabIds: [node.tabId] }, t.index, true);
+    return planUnpin(m, rows, [node.tabId], t.index, t.zone);
+  }
+  if (node.kind === 'folder') {
+    // R13: folders exist only in one window's layout.
+    if (windowId !== drag.windowId || !folderFits(spot.layout, node, spot.dest)) return null;
+  }
+  const dest = resolve(spot, windowId === drag.windowId ? [node.id] : []);
+  return (
+    dest && {
+      type: 'pinMove',
+      windowId: drag.windowId,
+      nodeId: node.id,
+      toWindowId: windowId,
+      dest,
+    }
+  );
 }

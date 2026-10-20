@@ -33,7 +33,12 @@ export interface PointerDragOptions<P> {
   rowCount: () => number;
   isGroup: (index: number) => boolean;
   /** What a press on row `index` would drag, or null if that row can't start a drag. */
-  begin: (index: number) => P | null;
+  begin: (index: number, e: PointerEvent) => P | null;
+  /**
+   * The pointer is over another drop area (the Essentials grid above the list): list
+   * hover clears and edge autoscroll pauses while this returns true.
+   */
+  elsewhere?: (clientX: number, clientY: number) => boolean;
   onStart: (payload: P) => void;
   /** Fired only when the hovered row/zone changes. */
   onHover: (target: HoverTarget | null) => void;
@@ -76,27 +81,56 @@ export class PointerDrag<P> {
 
   press(e: PointerEvent): void {
     const el = this.o.scroller();
-    if (!el || this.phase || e.button !== 0 || !e.isPrimary) return;
-    if ((e.target as Element).closest('button, input')) return;
-    // The rect and padding are read once per press; the move path never touches layout.
+    if (!el || this.phase || !this.pressable(e)) return;
+    this.remeasure();
+    const index = Math.floor(
+      (e.clientY - this.top - this.padTop + el.scrollTop) / this.o.rowHeight(),
+    );
+    const payload = this.o.begin(index, e);
+    if (payload !== null) this.arm(e, el, payload);
+  }
+
+  /**
+   * A press outside the list (an Essentials tile) that drags `payload`. The session is
+   * the same one: the pointer is still captured by the list, so it can drop there.
+   */
+  pressWith(e: PointerEvent, payload: P): void {
+    const el = this.o.scroller();
+    if (!el || this.phase || !this.pressable(e)) return;
+    this.remeasure();
+    this.arm(e, el, payload);
+  }
+
+  /**
+   * Re-reads the list's position. Done once per press (the move path never touches
+   * layout), and again when something above the list changes height mid-drag.
+   */
+  remeasure(): void {
+    const el = this.el ?? this.o.scroller();
+    if (!el) return;
     const rect = el.getBoundingClientRect();
     this.top = rect.top;
     this.bottom = rect.bottom;
     this.padTop = Number.parseFloat(getComputedStyle(el).paddingTop) || 0;
-    const index = Math.floor(
-      (e.clientY - this.top - this.padTop + el.scrollTop) / this.o.rowHeight(),
-    );
-    const payload = this.o.begin(index);
-    if (payload === null) return;
+    this.updateHover();
+  }
+
+  private pressable(e: PointerEvent): boolean {
+    return e.button === 0 && e.isPrimary && !(e.target as Element).closest('button, input');
+  }
+
+  private arm(e: PointerEvent, el: HTMLElement, payload: P): void {
     this.payload = payload;
     this.phase = 'pending';
     this.pointerId = e.pointerId;
     this.startX = this.lastX = e.clientX;
     this.startY = this.lastY = e.clientY;
     this.el = el;
-    el.addEventListener('pointermove', this.move);
-    el.addEventListener('pointerup', this.up);
-    el.addEventListener('pointercancel', this.abort);
+    // On the document: until the pointer is captured, a press outside the list (a tile)
+    // sends its moves to wherever it is; captured events bubble up here too.
+    document.addEventListener('pointermove', this.move);
+    document.addEventListener('pointerup', this.up);
+    document.addEventListener('pointercancel', this.abort);
     el.addEventListener('scroll', this.updateHover);
     document.addEventListener('keydown', this.key, true);
   }
@@ -139,7 +173,9 @@ export class PointerDrag<P> {
     const el = this.el;
     if (this.phase !== 'dragging' || !el) return;
     const y = this.lastY - this.top - this.padTop + el.scrollTop;
-    const next = hitTest(y, this.o.rowHeight(), this.o.rowCount(), this.o.isGroup);
+    const next = this.o.elsewhere?.(this.lastX, this.lastY)
+      ? null
+      : hitTest(y, this.o.rowHeight(), this.o.rowCount(), this.o.isGroup);
     const prev = this.hover;
     if (prev?.index === next?.index && prev?.zone === next?.zone) return;
     this.hover = next;
@@ -152,7 +188,8 @@ export class PointerDrag<P> {
     const fromTop = this.lastY - this.top;
     const fromBottom = this.bottom - this.lastY;
     let speed = 0;
-    if (fromTop < EDGE) speed = -Math.min(1, (EDGE - fromTop) / EDGE);
+    if (this.o.elsewhere?.(this.lastX, this.lastY)) speed = 0;
+    else if (fromTop < EDGE) speed = -Math.min(1, (EDGE - fromTop) / EDGE);
     else if (fromBottom < EDGE) speed = Math.min(1, (EDGE - fromBottom) / EDGE);
     if (speed !== 0) el.scrollTop += speed * MAX_SPEED;
     this.raf = requestAnimationFrame(this.tick);
@@ -187,21 +224,19 @@ export class PointerDrag<P> {
     this.cancel();
   };
 
-  /** The pointerup after a drag would otherwise also be delivered as a click on a row. */
+  /** The pointerup after a drag would otherwise also be delivered as a click on a row or tile. */
   private swallowClick(): void {
-    const el = this.o.scroller();
-    if (!el) return;
     const stop = (ev: Event) => ev.stopPropagation();
-    el.addEventListener('click', stop, { capture: true, once: true });
-    setTimeout(() => el.removeEventListener('click', stop, true), 0);
+    document.addEventListener('click', stop, { capture: true, once: true });
+    setTimeout(() => document.removeEventListener('click', stop, true), 0);
   }
 
   private cleanup(): void {
     const el = this.el;
+    document.removeEventListener('pointermove', this.move);
+    document.removeEventListener('pointerup', this.up);
+    document.removeEventListener('pointercancel', this.abort);
     if (el) {
-      el.removeEventListener('pointermove', this.move);
-      el.removeEventListener('pointerup', this.up);
-      el.removeEventListener('pointercancel', this.abort);
       el.removeEventListener('scroll', this.updateHover);
       if (el.hasPointerCapture(this.pointerId)) el.releasePointerCapture(this.pointerId);
     }

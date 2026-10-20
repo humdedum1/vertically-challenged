@@ -1,6 +1,17 @@
 import type { GroupInfo, TabInfo, WindowPatch } from '../shared/types';
 
 /**
+ * A structural tab event, applied to the store's order locally instead of re-querying
+ * the window. Indices are Chrome's at the time of the event, so ops replay in order.
+ */
+export type TabOp =
+  | { kind: 'create'; windowId: number; tab: TabInfo; index: number }
+  | { kind: 'move'; windowId: number; tabId: number; from: number; to: number }
+  | { kind: 'remove'; windowId: number; tabId: number }
+  | { kind: 'detach'; windowId: number; tabId: number; position: number }
+  | { kind: 'attach'; windowId: number; tabId: number; position: number };
+
+/**
  * Raw chrome.tabs events accumulated between flushes. Kept separate from the store so the
  * flush can swap it out atomically while events keep arriving during async window queries.
  */
@@ -14,6 +25,13 @@ export class ChangeSet {
   readonly activations = new Map<number, number>();
   /** Windows whose tab groups changed; their group list is re-queried. */
   readonly groupWindows = new Set<number>();
+  /** Structural events in arrival order, for windows that aren't resynced. */
+  readonly ops: TabOp[] = [];
+  /**
+   * Windows that had a structural event that is not in `ops` (it came while the window
+   * was being queried). Their ops can't be replayed, so they are queried instead.
+   */
+  readonly unlogged = new Set<number>();
 
   get isEmpty(): boolean {
     return (
@@ -21,7 +39,8 @@ export class ChangeSet {
       this.removed.size === 0 &&
       this.resync.size === 0 &&
       this.activations.size === 0 &&
-      this.groupWindows.size === 0
+      this.groupWindows.size === 0 &&
+      this.ops.length === 0
     );
   }
 }
@@ -144,6 +163,115 @@ export class TabStore {
   }
 
   /**
+   * Windows whose ops in `changes` can't be replayed on the store: an event is missing
+   * (`unlogged`) or an index doesn't line up. The caller queries these instead.
+   */
+  unreplayable(changes: ChangeSet): Set<number> {
+    const out = new Set<number>();
+    const byWindow = new Map<number, TabOp[]>();
+    for (const op of changes.ops) {
+      if (changes.resync.has(op.windowId)) continue;
+      const list = byWindow.get(op.windowId) ?? [];
+      list.push(op);
+      byWindow.set(op.windowId, list);
+    }
+    for (const [windowId, ops] of byWindow) {
+      if (changes.unlogged.has(windowId) || !this.simulate(windowId, ops)) out.add(windowId);
+    }
+    return out;
+  }
+
+  /**
+   * The window's order after `ops`, or null when they don't fit it. Each op is checked
+   * against the order it applies to, so an event that the store already reflects (or a
+   * missed one) is caught here rather than scrambling the order.
+   */
+  private simulate(windowId: number, ops: readonly TabOp[]): number[] | null {
+    const order = [...(this.orders.get(windowId) ?? [])];
+    for (const op of ops) {
+      switch (op.kind) {
+        case 'create':
+          if (this.tabs.has(op.tab.id) || order.includes(op.tab.id)) return null;
+          if (op.index > order.length) return null;
+          order.splice(op.index, 0, op.tab.id);
+          break;
+        case 'move':
+          if (order[op.from] !== op.tabId || op.to >= order.length) return null;
+          order.splice(op.from, 1);
+          order.splice(op.to, 0, op.tabId);
+          break;
+        case 'remove': {
+          const i = order.indexOf(op.tabId);
+          if (i !== -1) order.splice(i, 1);
+          break;
+        }
+        case 'detach':
+          if (order[op.position] !== op.tabId) return null;
+          order.splice(op.position, 1);
+          break;
+        case 'attach':
+          if (!this.tabs.has(op.tabId) || order.includes(op.tabId)) return null;
+          if (op.position > order.length) return null;
+          order.splice(op.position, 0, op.tabId);
+          break;
+      }
+    }
+    return order;
+  }
+
+  /**
+   * Applies the ops of every window that isn't resynced, in event order (so a tab that
+   * moves between windows ends up owned by the last window it was attached to).
+   */
+  private replay(changes: ChangeSet, resynced: ReadonlyMap<number, unknown>, out: PatchBuilder) {
+    const skip = new Set<number>(resynced.keys());
+    const orders = new Map<number, number[]>();
+    const windows = new Set<number>();
+    for (const op of changes.ops) if (!skip.has(op.windowId)) windows.add(op.windowId);
+    for (const windowId of windows) {
+      const ops = changes.ops.filter((op) => op.windowId === windowId);
+      const order = this.simulate(windowId, ops);
+      // The flush queries these windows instead (see unreplayable).
+      if (order) orders.set(windowId, order);
+      else skip.add(windowId);
+    }
+    for (const op of changes.ops) {
+      if (skip.has(op.windowId)) continue;
+      switch (op.kind) {
+        case 'create':
+          this.tabs.set(op.tab.id, op.tab);
+          out.upsert(op.tab);
+          break;
+        case 'remove':
+          if (this.tabs.get(op.tabId)?.windowId === op.windowId) {
+            this.tabs.delete(op.tabId);
+            out.remove(op.windowId, op.tabId);
+          }
+          break;
+        case 'detach':
+          out.remove(op.windowId, op.tabId);
+          break;
+        case 'attach': {
+          const prev = this.tabs.get(op.tabId);
+          if (!prev) break;
+          const next = { ...prev, windowId: op.windowId };
+          this.tabs.set(op.tabId, next);
+          out.upsert(next);
+          break;
+        }
+        case 'move':
+          break;
+      }
+    }
+    for (const [windowId, order] of orders) {
+      const prev = this.orders.get(windowId) ?? [];
+      if (order.length === 0) this.orders.delete(windowId);
+      else this.orders.set(windowId, order);
+      if (!arraysEqual(prev, order)) out.order(windowId, order);
+    }
+  }
+
+  /**
    * @param resynced fresh, index-sorted query results for every window in `changes.resync`.
    *   A query runs after all events in the ChangeSet, so for those windows it is the newest
    *   truth and the older per-tab events are skipped.
@@ -163,6 +291,10 @@ export class TabStore {
       else this.groupsByWindow.set(windowId, groups);
       out.groups(windowId, groups);
     }
+
+    // Before the resynced windows: a tab attached here and queried there must end up
+    // owned by the query's window, and replay never deletes a tab another window holds.
+    this.replay(changes, resynced, out);
 
     for (const id of changes.removed) {
       const prev = this.tabs.get(id);

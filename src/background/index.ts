@@ -14,7 +14,7 @@ import { registerContextMenus } from './context-menus';
 import { runPinCommand } from './pins/commands';
 import { PinManager } from './pins/pin-manager';
 import { createSuspender } from './suspend/suspender';
-import { ChangeSet, TabStore } from './tab-store';
+import { ChangeSet, type TabOp, TabStore } from './tab-store';
 import { toGroupInfo, toTabInfo } from './to-tab-info';
 import { shouldDeliver, snapshotPlan, visibleWindows } from './visibility';
 
@@ -91,17 +91,33 @@ export function startBackground(): void {
     store.apply(new ChangeSet(), byWindow, groupsByWindow);
   })();
 
+  /**
+   * Windows being re-read by tabs.query. A structural event for one of them may or may
+   * not be in the query's result, so it can't be replayed; it marks the window instead.
+   * Until `ready` every window counts as being queried.
+   */
+  let querying: Set<number> | 'all' = 'all';
+  void ready.then(() => {
+    if (querying === 'all') querying = new Set();
+  });
+
   const batcher = createBatcher(async () => {
     await ready;
     const changes = pending;
     pending = new ChangeSet();
     if (changes.isEmpty) return;
+    for (const w of store.unreplayable(changes)) changes.resync.add(w);
     const resynced = new Map<number, TabInfo[]>();
     const groups = new Map<number, GroupInfo[]>();
-    await Promise.all([
-      ...[...changes.resync].map(async (w) => resynced.set(w, await queryWindow(w))),
-      ...[...changes.groupWindows].map(async (w) => groups.set(w, await queryGroups(w))),
-    ]);
+    querying = new Set(changes.resync);
+    try {
+      await Promise.all([
+        ...[...changes.resync].map(async (w) => resynced.set(w, await queryWindow(w))),
+        ...[...changes.groupWindows].map(async (w) => groups.set(w, await queryGroups(w))),
+      ]);
+    } finally {
+      querying = new Set();
+    }
     const patches = store.apply(changes, resynced, groups);
     for (const patch of patches) {
       broadcast(patch.windowId, { type: 'patch', patch });
@@ -145,8 +161,25 @@ export function startBackground(): void {
     batcher.schedule();
   }
 
+  /**
+   * Records a structural event to apply locally, which saves a full-window tabs.query
+   * (about 37 ms for 1,400 tabs). A window being queried right now gets a resync
+   * instead: the event may already be in the query's result.
+   */
+  function logOp(op: TabOp): void {
+    if (querying === 'all' || querying.has(op.windowId)) {
+      if (op.kind === 'remove') pending.unlogged.add(op.windowId);
+      else pending.resync.add(op.windowId);
+    } else if (!pending.resync.has(op.windowId)) {
+      pending.ops.push(op);
+    }
+    batcher.schedule();
+  }
+
   browser.tabs.onCreated.addListener((tab) => {
-    markResync(tab.windowId);
+    const info = toTabInfo(tab);
+    if (info) logOp({ kind: 'create', windowId: tab.windowId, tab: info, index: tab.index });
+    else markResync(tab.windowId);
   });
   browser.tabs.onUpdated.addListener((_id, changeInfo, tab) => {
     const info = toTabInfo(tab);
@@ -157,11 +190,11 @@ export function startBackground(): void {
       pending.resync.add(info.windowId);
     batcher.schedule();
   });
-  browser.tabs.onRemoved.addListener((tabId) => {
+  browser.tabs.onRemoved.addListener((tabId, { windowId }) => {
     suspender.onRemoved(tabId);
     pending.removed.add(tabId);
     pending.upserts.delete(tabId);
-    batcher.schedule();
+    logOp({ kind: 'remove', windowId, tabId });
   });
   browser.tabs.onActivated.addListener(({ tabId, windowId }) => {
     // The store is at most one flush behind, which is plenty for an idle timer.
@@ -170,9 +203,15 @@ export function startBackground(): void {
     pending.activations.set(windowId, tabId);
     batcher.schedule();
   });
-  browser.tabs.onMoved.addListener((_id, { windowId }) => markResync(windowId));
-  browser.tabs.onAttached.addListener((_id, { newWindowId }) => markResync(newWindowId));
-  browser.tabs.onDetached.addListener((_id, { oldWindowId }) => markResync(oldWindowId));
+  browser.tabs.onMoved.addListener((tabId, { windowId, fromIndex, toIndex }) =>
+    logOp({ kind: 'move', windowId, tabId, from: fromIndex, to: toIndex }),
+  );
+  browser.tabs.onAttached.addListener((tabId, { newWindowId, newPosition }) =>
+    logOp({ kind: 'attach', windowId: newWindowId, tabId, position: newPosition }),
+  );
+  browser.tabs.onDetached.addListener((tabId, { oldWindowId, oldPosition }) =>
+    logOp({ kind: 'detach', windowId: oldWindowId, tabId, position: oldPosition }),
+  );
   browser.tabs.onReplaced.addListener((added, removed) => {
     // Prerender/instant swaps replace the tab id in place.
     pending.removed.add(removed);

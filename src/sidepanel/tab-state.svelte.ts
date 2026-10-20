@@ -7,7 +7,6 @@ import {
   type WorkerMessage,
 } from '../shared/protocol';
 import type { GroupInfo, TabInfo, WindowInfo, WindowPatch } from '../shared/types';
-import { type PanelBoot, takeBoot } from './boot';
 
 export type ConnectionStatus = 'connecting' | 'ready' | 'error';
 
@@ -68,30 +67,15 @@ export class TabState {
   private disposed = false;
 
   async start(): Promise<void> {
-    const boot = takeBoot();
     try {
-      const win = await (boot?.window ?? browser.windows.getCurrent());
+      const win = await browser.windows.getCurrent();
       if (win.id === undefined) throw new Error('No window id');
-      if (this.disposed) {
-        boot?.port.disconnect();
-        return;
-      }
       this.windowId = win.id;
       this.incognito = win.incognito;
-      if (boot && !boot.disconnected) this.adopt(boot);
-      else this.connect();
+      this.connect();
     } catch (err) {
-      boot?.port.disconnect();
       this.fail(err);
     }
-  }
-
-  /** Takes over the boot script's port (already subscribed) and replays what it buffered. */
-  private adopt(boot: PanelBoot): void {
-    // All synchronous, so no message can slip between the buffer and the listener.
-    boot.release();
-    this.attach(boot.port);
-    for (const msg of boot.messages.splice(0)) this.receive(msg);
   }
 
   dispose(): void {
@@ -117,11 +101,7 @@ export class TabState {
 
   private connect(): void {
     if (this.disposed || this.windowId === null) return;
-    this.attach(browser.runtime.connect({ name: PANEL_PORT_NAME }));
-    this.subscribe();
-  }
-
-  private attach(port: Browser.runtime.Port): void {
+    const port = browser.runtime.connect({ name: PANEL_PORT_NAME });
     this.port = port;
     port.onMessage.addListener((msg: WorkerMessage) => this.receive(msg));
     // The worker is suspended after ~30s idle (or restarted on update). Reconnecting
@@ -135,6 +115,7 @@ export class TabState {
       const delay = Math.min(1000, 50 * 2 ** this.retries++);
       setTimeout(() => this.connect(), delay);
     });
+    this.subscribe();
   }
 
   private receive(msg: WorkerMessage): void {

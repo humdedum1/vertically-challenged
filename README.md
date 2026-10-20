@@ -49,13 +49,12 @@ pnpm install
 `tests/e2e/` holds scripts that load the built extension into a headless Chromium with a
 throwaway profile and check it against Chrome's real tab state:
 
-- `speedups.mjs`: after bursts of moves, new and closed tabs, moves between windows,
+- `tab-sync.mjs`: after bursts of moves, new and closed tabs, moves between windows,
   group and pin changes and a suspended background script, the worker's updates and the
   panel's rows both match Chrome's tab order; a title change redraws only its row; search
   sees changes made before searching.
-- `boot-handoff.mjs`: the panel still connects when its early connection is dropped, when
-  the early script never ran, and when the background script is stopped at 30 different
-  moments while the panel loads.
+- `reconnect.mjs`: the panel reconnects and catches up when the background script is
+  stopped at 30 different moments while the panel loads.
 
 Google Chrome itself ignores `--load-extension`, so the scripts use Playwright's Chromium
 (or any Chromium or Chrome for Testing binary in `CHROME_BIN`). One-time setup, then run:
@@ -70,7 +69,7 @@ To test a different build or browser:
 
 ```powershell
 $env:CHROME_BIN = "C:\path\to\chrome.exe"
-node tests/e2e/speedups.mjs .output\chrome-mv3-dev
+node tests/e2e/tab-sync.mjs .output\chrome-mv3-dev
 ```
 
 Each script prints `PASS`/`FAIL` lines and exits non-zero on any failure. They take under half a

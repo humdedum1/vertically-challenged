@@ -1,8 +1,8 @@
-// Real-Chrome checks for the panel boot connection, the worker's local tab ops and row
-// reuse: after bursts of moves, creates, closes, cross-window moves, group and pin changes
-// and a suspended worker, the worker's patch stream and the panel's rows must both match
+// Real-Chrome checks for the worker's local tab ops and the panel's row reuse: after
+// bursts of moves, creates, closes, cross-window moves, group and pin changes and a
+// suspended worker, the worker's patch stream and the panel's rows must both match
 // Chrome's real tab order.
-//   node tests/e2e/speedups.mjs [extension dir]
+//   node tests/e2e/tab-sync.mjs [extension dir]
 import http from 'node:http';
 import { check, extensionDir, finish, launch, sleep, startMirror, tabRows } from './harness.mjs';
 
@@ -21,19 +21,6 @@ page.on('pageerror', (e) => check(false, 'no page errors', e.message));
 page.on('console', (m) => m.type() === 'error' && console.log('  [panel console]', m.text()));
 await page.goto(`chrome-extension://${extId}/sidepanel.html`);
 await page.waitForSelector('[role=treeitem]');
-
-// --- 1. Early connect: the boot script ran first and the panel took its port over.
-check((await page.evaluate(() => globalThis.__vcBoot)) === undefined, 'boot connection taken over');
-// Module scripts (the bundle, and WXT's dev client in dev builds) run after parsing, so
-// the boot script only has to be the first classic script.
-const classic = await page.evaluate(() =>
-  [...document.scripts].filter((s) => s.type !== 'module').map((s) => s.src.split('/').pop()),
-);
-check(
-  classic[0] === 'panel-boot.js',
-  'panel-boot.js is the first classic script',
-  JSON.stringify(classic),
-);
 
 // All chrome.* calls below run in the panel page (an extension page has the same APIs).
 const api = (fn, arg) => page.evaluate(fn, arg);
@@ -90,7 +77,7 @@ async function compare(label) {
 
 await compare('initial');
 
-// --- 2. Local structural ops: single and burst moves, creates at indices, removes.
+// --- 1. Local structural ops: single and burst moves, creates at indices, removes.
 await api(async (a) => {
   const ids = (await chrome.tabs.query({ windowId: a }))
     .sort((x, y) => x.index - y.index)
@@ -125,7 +112,7 @@ await api(async (a) => {
 }, winA);
 await compare('40 rapid moves');
 
-// --- 3. Between windows (detach + attach), both directions in one burst.
+// --- 2. Between windows (detach + attach), both directions in one burst.
 await api(
   async ({ a, b }) => {
     const sorted = async (w) =>
@@ -142,7 +129,7 @@ await api(
 );
 await compare('moves between windows');
 
-// --- 4. Group and pin changes still go through a full re-query and stay right.
+// --- 3. Group and pin changes still go through a full re-query and stay right.
 await api(async (a) => {
   const ids = (await chrome.tabs.query({ windowId: a }))
     .sort((x, y) => x.index - y.index)
@@ -162,7 +149,7 @@ await api(async (a) => {
 await sleep(400);
 await compare('pin and unpin');
 
-// --- 5. A title update re-renders only the changed row (row reuse): no row is replaced.
+// --- 4. A title update re-renders only the changed row (row reuse): no row is replaced.
 const before = await page.evaluate(() => {
   const rows = [...document.querySelectorAll('[id^="vc-row-t"]')];
   for (const r of rows) r.__keep = true;
@@ -195,7 +182,7 @@ check(
   'renamed title is shown',
 );
 
-// --- 6. Search sees changes made while not searching (the index is fed lazily).
+// --- 5. Search sees changes made while not searching (the index is fed lazily).
 await page.fill('input', 'Renamed');
 await sleep(300);
 const hits = await page.evaluate(() =>
@@ -218,7 +205,7 @@ check(hitCount === 2, 'search results update while searching', String(hitCount))
 await page.fill('input', '');
 await sleep(300);
 
-// --- 7. Worker suspended: the events that wake it are applied; a cold reopen works.
+// --- 6. Worker suspended: the events that wake it are applied; a cold reopen works.
 const cdp = await ctx.newCDPSession(page);
 const stopWorker = async () => {
   await cdp.send('ServiceWorker.enable');
@@ -241,10 +228,6 @@ await compare('after the worker was suspended');
 await stopWorker();
 await page.reload();
 await page.waitForSelector('[role=treeitem]');
-check(
-  (await page.evaluate(() => globalThis.__vcBoot)) === undefined,
-  'cold open: boot connection taken over',
-);
 await sleep(800);
 const coldWant = [...(await ordered(winA)), ...(await ordered(winB))];
 check(
@@ -252,7 +235,7 @@ check(
   'cold open: panel rows match Chrome',
 );
 
-// --- 8. Closing window B removes its rows.
+// --- 7. Closing window B removes its rows.
 await api((b) => chrome.windows.remove(b), winB);
 await sleep(1000);
 check(

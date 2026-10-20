@@ -13,7 +13,7 @@
     "lint:fix": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "node tests/e2e/speedups.mjs && node tests/e2e/boot-handoff.mjs",
+    "test:e2e": "node tests/e2e/tab-sync.mjs && node tests/e2e/reconnect.mjs",
     "bench:pure": "vitest run --config bench/vitest.config.ts",
     "postinstall": "wxt prepare"
   },

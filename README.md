@@ -38,6 +38,7 @@ pnpm install
 | `test` | `npm test` | Run the Vitest suite once |
 | `test:watch` | `npm run test:watch` | Run Vitest in watch mode |
 | `test:e2e` | `npm run test:e2e` | Real-Chrome checks against the built extension (see below) |
+| `bench:pure` | `npm run bench:pure` | Benchmarks of the pure functions at 1,500 tabs (see `bench/README.md`) |
 
 `pnpm` equivalents: `pnpm dev`, `pnpm build`, `pnpm zip`, `pnpm check`, `pnpm lint`, `pnpm lint:fix`, `pnpm test`.
 
@@ -74,6 +75,13 @@ node tests/e2e/speedups.mjs .output\chrome-mv3-dev
 
 Each script prints `PASS`/`FAIL` lines and exits non-zero on any failure. They take under half a
 minute each.
+
+### Benchmarks
+
+`bench/` has the scripts behind `docs/m6-profile.md`: pure-function benchmarks, a
+1,500-tab Chrome fixture, and measurements of opening the panel (in a tab and in the real
+side panel), tab events, scrolling and search. See `bench/README.md` for how to run them
+and how to compare two builds fairly.
 
 ## Load unpacked
 

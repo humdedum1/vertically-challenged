@@ -8,5 +8,12 @@
     "verbatimModuleSyntax": true,
     "isolatedModules": true
   },
-  "include": [".wxt/wxt.d.ts", "src/**/*", "tests/**/*", "wxt.config.ts", "vitest.config.ts"]
+  "include": [
+    ".wxt/wxt.d.ts",
+    "src/**/*",
+    "tests/**/*",
+    "bench/**/*",
+    "wxt.config.ts",
+    "vitest.config.ts"
+  ]
 }

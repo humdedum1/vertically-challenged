@@ -25,7 +25,7 @@ export function extensionDir() {
  * Chrome to drive: CHROME_BIN, else Playwright's own Chromium. Branded Google Chrome
  * ignores --load-extension (since Chrome 137), so it can't be used here.
  */
-function chromeBinary() {
+export function chromeBinary() {
   const bin = process.env.CHROME_BIN || chromium.executablePath();
   if (!bin || !fs.existsSync(bin)) {
     console.error(

@@ -776,7 +776,7 @@ describe('refusals that would lose items', () => {
 
   it('pinSetHome refuses a URL the stored layout would drop', async () => {
     const s = sim({
-      windows: { 1: [pinned(1, 1, 'chrome-extension://abc/page.html'), tab(3, { active: true })] },
+      windows: { 1: [pinned(1, 1, 'view-source:https://a.com/'), tab(3, { active: true })] },
       layouts: [layout(1, { pinned: [item(IT('a'), 'https://a.com/', 1)] })],
       bindings: [{ windowId: 1, layoutId: ID(1) }],
     });

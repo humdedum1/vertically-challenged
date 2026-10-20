@@ -55,24 +55,33 @@ describe('parseLayoutStore', () => {
     }
   });
 
-  it('drops items with disallowed schemes or overlong URLs', () => {
+  it('falls back to the other URL when one is disallowed; drops an item only when both are', () => {
     const long = `https://a.test/${'a'.repeat(8200)}`;
     const raw = store([
       layout(1, {
         essentials: [
           item('i1', { homeUrl: 'javascript:alert(1)' }),
-          item('i2', { homeUrl: 'data:text/html,x' }),
+          item('i2', { homeUrl: 'data:text/html,x', lastUrl: 'blob:https://a.test/x' }),
           item('i3', { lastUrl: 'ftp://x.test/' }),
           item('i4', { lastUrl: long }),
           item('i5', { homeUrl: 'file:///tmp/x', lastUrl: 'chrome://newtab/' }),
           item('i6', { homeUrl: 'about:blank', lastUrl: 'http://a.test/' }),
-          item('i7', { homeUrl: 'not a url' }),
+          item('i7', { homeUrl: 'not a url', lastUrl: 'view-source:https://a.test/' }),
+          item('i8', { lastUrl: 'chrome-extension://abcdef/suspended.html#u=x' }),
         ],
       }),
     ]);
     const out = parseLayoutStore(raw).layouts[0];
     expect(out).toBeDefined();
-    expect(ids(flattenItems(out as WindowLayout))).toEqual(['i5', 'i6']);
+    const urls = flattenItems(out as WindowLayout).map((i) => [i.id, i.homeUrl, i.lastUrl]);
+    expect(urls).toEqual([
+      ['i1', 'https://a.test/x', 'https://a.test/x'],
+      ['i3', 'https://a.test/', 'https://a.test/'],
+      ['i4', 'https://a.test/', 'https://a.test/'],
+      ['i5', 'file:///tmp/x', 'chrome://newtab/'],
+      ['i6', 'about:blank', 'http://a.test/'],
+      ['i8', 'https://a.test/', 'chrome-extension://abcdef/suspended.html#u=x'],
+    ]);
   });
 
   it('drops folders nested deeper than 3 and lifts their items into the depth-3 parent', () => {

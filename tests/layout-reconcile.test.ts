@@ -125,6 +125,29 @@ describe('reconcile', () => {
     expect(r.moves).toEqual([]);
   });
 
+  it('keeps the stored lastUrl when the tab navigates to a URL the layout cannot store', () => {
+    const l = layout([], [item('a', 1)]);
+    const r = run(l, [pinnedTab(1, { url: 'view-source:https://x.test/', title: 'Src' })]);
+    expect(r.layout.pinned[0]).toMatchObject({
+      lastUrl: 'https://example.com/1',
+      title: 'Src',
+      tabId: 1,
+    });
+  });
+
+  it('follows a tab to a chrome-extension: page (e.g. a tab suspender)', () => {
+    const l = layout([item('a', 1)], []);
+    const url = 'chrome-extension://abcdef/suspended.html#uri=https://example.com/1';
+    const r = run(l, [pinnedTab(1, { url })]);
+    expect(r.layout.essentials[0]).toMatchObject({ lastUrl: url, tabId: 1 });
+  });
+
+  it('leaves a newly pinned tab on an unstorable URL a stray, without an item', () => {
+    const l = layout([], [item('a', 1)]);
+    const r = run(l, [pinnedTab(1), pinnedTab(5, { url: 'view-source:https://x.test/' })]);
+    expect(flattenItems(r.layout).map((i) => i.tabId)).toEqual([1]);
+  });
+
   it('places a tab pinned mid-strip where Chrome put it', () => {
     const l = layout([], [item('a', 1), item('b', 2)]);
     const r = run(l, [pinnedTab(1), pinnedTab(5), pinnedTab(2)]);

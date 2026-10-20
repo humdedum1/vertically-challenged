@@ -673,3 +673,82 @@ describe('PinManager restoreLayout', () => {
     expect(flattenItems(pins.layoutOf(2))).toEqual([]);
   });
 });
+
+describe('PinManager worker wake (round trip through storage)', () => {
+  it('keeps items whose tabs navigated to extension or unstorable URLs', async () => {
+    const saved = layout(1, [item('ib', 'https://b.com/', 11)], {
+      essentials: [item('ia', 'https://a.com/', 10)],
+    });
+    const dormant = item('ic', 'https://c.com/');
+    saved.pinned.push(dormant);
+    const t = setup({
+      windows: { 1: [pinned(10, 1, 'https://a.com/'), pinned(11, 1, 'https://b.com/')] },
+      local: { [LAYOUTS_KEY]: stored([saved], [{ windowId: 1, layoutId: ID(1) }]) },
+      session: { [ALIVE_KEY]: true },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    const suspended = 'chrome-extension://abcdef/suspended.html#uri=https://a.com/';
+    t.resync(1, [
+      pinned(10, 1, suspended, { title: 'Suspended' }),
+      pinned(11, 1, 'view-source:https://b.com/', { title: 'Source' }),
+    ]);
+    await pins.afterFlush([1]);
+    await settle();
+
+    // A new worker over the same storage, as after a ~30 s idle suspension.
+    const woken = new PinManager(t.deps);
+    await woken.loaded;
+    await settle();
+
+    const l = woken.layoutOf(1);
+    expect(l.id).toBe(ID(1));
+    expect(l.essentials.map((i) => [i.id, i.tabId, i.homeUrl, i.lastUrl])).toEqual([
+      ['ia', 10, 'https://a.com/', suspended],
+    ]);
+    expect(flattenItems(l).map((i) => [i.id, i.tabId, i.lastUrl, i.title])).toEqual([
+      ['ia', 10, suspended, 'Suspended'],
+      ['ib', 11, 'https://b.com/', 'Source'],
+      ['ic', null, 'https://c.com/', 'ic'],
+    ]);
+  });
+
+  it('pins a tab on an unstorable URL without giving it an item', async () => {
+    const t = setup({
+      windows: { 1: [pinned(10, 1, 'https://a.com/'), tab(12, { windowId: 1, url: 'blob:x' })] },
+      session: { [ALIVE_KEY]: true },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    const src = t.store.get(12) as TabInfo;
+
+    const todo = await pins.pinInto(1, { zone: 'essentials', index: 0 }, [src], []);
+    expect(todo).toEqual([12]);
+    expect(flattenItems(pins.layoutOf(1)).map((i) => i.tabId)).toEqual([10]);
+  });
+
+  it('restores a session tab on an unstorable URL as a plain tab, without an item', async () => {
+    const t = setup({ windows: { 1: [tab(1, { windowId: 1 })] }, session: { [ALIVE_KEY]: true } });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    await pins.restoreLayout(async (report) => {
+      t.resync(1, [pinned(20, 1, 'ftp://f.com/'), pinned(21, 1, 'https://g.com/')]);
+      report({
+        windowId: 1,
+        essentials: [{ kind: 'item', tabId: 20, url: 'ftp://f.com/', title: 'F' }],
+        pinned: [{ kind: 'item', tabId: 21, url: 'https://g.com/', title: 'G' }],
+      });
+    });
+    await pins.afterFlush([1]);
+    await settle();
+
+    expect(flattenItems(pins.layoutOf(1)).map((i) => [i.tabId, i.homeUrl])).toEqual([
+      [21, 'https://g.com/'],
+    ]);
+  });
+});

@@ -80,8 +80,11 @@ const MAX_TITLE = 200;
 const MAX_ID = 40;
 const LAYOUT_ID = /^l[a-z0-9]{10}$/;
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
-/** Only schemes the panel may open. Anything else (javascript:, data:, ...) is dropped on load. */
-const SCHEMES = new Set(['http:', 'https:', 'file:', 'chrome:', 'about:']);
+/**
+ * Only schemes the panel may open. Anything else (javascript:, data:, ...) is never stored.
+ * chrome-extension: covers common pinned targets such as tab-suspender and vault pages.
+ */
+const SCHEMES = new Set(['http:', 'https:', 'file:', 'chrome:', 'chrome-extension:', 'about:']);
 
 /** Ids are prefix + 10 chars; the random byte is rejected above 252 (= 36 * 7) to avoid modulo bias. */
 export function newId(prefix: 'l' | 'i' | 'f'): string {
@@ -153,7 +156,10 @@ export function findNode(l: WindowLayout, id: string): NodeHit | null {
 const isObj = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** Whether a URL survives parsing; anything else is dropped from the stored layout on load. */
+/**
+ * Whether a URL may be stored in a layout. Every writer checks it, so whatever is saved
+ * also survives the next load.
+ */
 export const isLayoutUrl = (v: unknown): v is string => {
   if (typeof v !== 'string' || !v || v.length > MAX_URL) return false;
   try {
@@ -175,23 +181,22 @@ function freshId(v: unknown, ctx: Ctx): v is string {
   return typeof v === 'string' && v.length > 0 && v.length <= MAX_ID && !ctx.ids.has(v);
 }
 
+/**
+ * One bad URL costs the item that URL, not the item itself: losing an Essential's
+ * placement over where its tab last was would be worse than reopening it at home.
+ */
 function parseItem(r: Record<string, unknown>, ctx: Ctx): PinItem | null {
-  const { id, homeUrl, lastUrl } = r;
-  if (
-    ctx.items >= MAX_ITEMS ||
-    !freshId(id, ctx) ||
-    !isLayoutUrl(homeUrl) ||
-    !isLayoutUrl(lastUrl)
-  ) {
-    return null;
-  }
+  const { id } = r;
+  const lastUrl = isLayoutUrl(r.lastUrl) ? r.lastUrl : null;
+  const homeUrl = isLayoutUrl(r.homeUrl) ? r.homeUrl : lastUrl;
+  if (ctx.items >= MAX_ITEMS || !freshId(id, ctx) || homeUrl === null) return null;
   ctx.ids.add(id);
   ctx.items++;
   return {
     kind: 'item',
     id,
     homeUrl,
-    lastUrl,
+    lastUrl: lastUrl ?? homeUrl,
     title: typeof r.title === 'string' ? r.title.slice(0, MAX_TITLE) : '',
     tabId: isTabId(r.tabId) ? r.tabId : null,
   };

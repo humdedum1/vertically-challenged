@@ -11,6 +11,7 @@ import {
   flattenItems,
   INCOGNITO_LAYOUTS_KEY,
   isEmptyLayout,
+  isLayoutUrl,
   LAYOUTS_KEY,
   type LayoutStore,
   MAX_ITEMS,
@@ -434,7 +435,8 @@ export class PinManager {
     if (this.closed.has(r.windowId)) return;
     let budget = MAX_ITEMS - flattenItems(this.layoutOf(r.windowId)).length;
     const bind = (n: RestoredItem): PinItem | null => {
-      if (budget <= 0) return null;
+      // Sessions restore schemes a layout can't store (ftp:); that tab stays a plain one.
+      if (budget <= 0 || !isLayoutUrl(n.url)) return null;
       budget--;
       this.expect(n.tabId, r.windowId);
       return {
@@ -472,7 +474,8 @@ export class PinManager {
   /**
    * Places items at `dest` of `windowId`'s layout in one step. `moved` items (by the
    * window whose layout holds them) are taken out of their layouts; `tabs` reuse the item
-   * already bound to them in any window, else get a new item. Returns the tabs Chrome
+   * already bound to them in any window, else get a new item (a tab whose URL a layout
+   * can't store gets none and is just pinned, a stray row until it navigates). Returns the tabs Chrome
    * still has to move into the window and/or pin (they are pending until it has), or null
    * when nothing was placed (the window is gone, the layout is full or `dest` is missing).
    */
@@ -489,6 +492,8 @@ export class PinManager {
       const get = (id: string) => work.get(id) ?? (this.layouts.get(id) as WindowLayout);
       const owner = new Map<string, number>([...this.bindings].map(([w, id]) => [id, w]));
       const picked: PinItem[] = [];
+      /** Tabs pinned without an item: their URL can't be stored, so they stay strays. */
+      const strays: number[] = [];
       const take = (layoutId: string, itemId: string): boolean => {
         const l = get(layoutId);
         const hit = findNode(l, itemId);
@@ -509,6 +514,10 @@ export class PinManager {
         );
         const existing = owned && flattenItems(get(owned)).find((x) => x.tabId === t.id);
         if (owned && existing && take(owned, existing.id)) continue;
+        if (!isLayoutUrl(t.url)) {
+          strays.push(t.id);
+          continue;
+        }
         picked.push({
           kind: 'item',
           id: newId('i'),
@@ -519,8 +528,8 @@ export class PinManager {
         });
       }
       const base = get(target.id);
-      const next = insertItems(base, picked, dest);
-      if (next === base) return null;
+      const next = picked.length ? insertItems(base, picked, dest) : base;
+      if (picked.length ? next === base : strays.length === 0) return null;
       work.set(target.id, next);
 
       const touched: number[] = [];
@@ -530,12 +539,12 @@ export class PinManager {
         if (w !== undefined && w !== windowId) touched.push(w);
       }
       const chrome: number[] = [];
-      for (const i of picked) {
-        if (i.tabId === null) continue;
-        const t = this.deps.store.get(i.tabId);
+      for (const id of [...picked.map((i) => i.tabId), ...strays]) {
+        if (id === null) continue;
+        const t = this.deps.store.get(id);
         if (t?.pinned && t.windowId === windowId) continue;
-        this.expect(i.tabId, windowId);
-        chrome.push(i.tabId);
+        this.expect(id, windowId);
+        chrome.push(id);
       }
       // As in edit(): a fresh edit gets a fresh set of attempts at moving Chrome.
       this.stale.delete(windowId);

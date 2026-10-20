@@ -6,6 +6,7 @@
  */
 import {
   flattenItems,
+  isLayoutUrl,
   MAX_ITEMS,
   newId,
   type PinDest,
@@ -83,16 +84,19 @@ export function reconcile(
       continue;
     }
     bound.add(orig.tabId);
-    if (orig.lastUrl !== t.url || orig.title !== t.title) {
-      setFields(own(), orig.id, { lastUrl: t.url, title: t.title });
+    // A URL the layout can't store would cost the item on the next load; keep the old one.
+    const lastUrl = isLayoutUrl(t.url) ? t.url : orig.lastUrl;
+    if (orig.lastUrl !== lastUrl || orig.title !== t.title) {
+      setFields(own(), orig.id, { lastUrl, title: t.title });
     }
   }
   for (const id of removals) out = removeItem(out, id);
 
   // Rule 2: pinned tabs no item knows about become plain items; rule 3 then places them.
+  // One on a URL the layout can't store stays a stray pinned tab until it navigates.
   const budget = MAX_ITEMS - flattenItems(out).length;
   const fresh: PinItem[] = windowTabs
-    .filter((t) => t.pinned && !bound.has(t.id) && !pending.has(t.id))
+    .filter((t) => t.pinned && !bound.has(t.id) && !pending.has(t.id) && isLayoutUrl(t.url))
     .slice(0, Math.max(0, budget))
     .map((t) => ({
       kind: 'item',

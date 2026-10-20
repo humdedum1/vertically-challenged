@@ -70,7 +70,7 @@ export async function runPinCommand(
       const it = itemOf(pins, msg.windowId, msg.itemId);
       if (!it) return null;
       const url = (it.tabId !== null ? deps.tab(it.tabId)?.url : undefined) ?? it.lastUrl;
-      // The stored layout drops items with other URLs (extension pages, data:, ...) on load.
+      // The stored layout can't keep other URLs (data:, view-source:, ...).
       if (!isLayoutUrl(url)) return "This page can't be a pinned tab's home";
       await pins.mutate(msg.windowId, (l) => patchItem(l, msg.itemId, { homeUrl: url }));
       return null;

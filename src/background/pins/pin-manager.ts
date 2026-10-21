@@ -25,6 +25,7 @@ import {
   type WindowLayout,
 } from '../../shared/layout';
 import type { SetupSummary, WorkerMessage } from '../../shared/protocol';
+import { type SyncWorkspace, savedFromLayout } from '../../shared/sync';
 import type { TabInfo, WindowInfo } from '../../shared/types';
 import type { SingleMove } from '../move-plan';
 import type { TabStore } from '../tab-store';
@@ -79,6 +80,8 @@ export interface PinManagerDeps {
   notice: (windowId: number, text: string) => void;
   /** Clock for the late-restore grace period; Date.now unless a test injects one. */
   now?: () => number;
+  /** A normal (non-incognito) layout or setup changed; sync publishes from these. */
+  onChange?: () => void;
 }
 
 /**
@@ -525,6 +528,55 @@ export class PinManager {
         folderCount: countFolders(l.pinned),
         lastUsed: l.lastUsed,
       }));
+  }
+
+  /**
+   * What this device publishes for its other machines: each open normal window's layout
+   * (in window order), then the saved setups, most recently used first. Empty layouts and
+   * anything incognito are left out.
+   */
+  syncWorkspaces(): SyncWorkspace[] {
+    const out: SyncWorkspace[] = [];
+    for (const w of this.deps.windows()) {
+      if (w.incognito) continue;
+      const id = this.bindings.get(w.id);
+      const l = id === undefined ? undefined : this.layouts.get(id);
+      if (!l || l.incognito || isEmptyLayout(l)) continue;
+      out.push({
+        id: l.id,
+        name: setupName(l),
+        kind: 'window',
+        lastUsed: l.lastUsed,
+        window: savedFromLayout(l),
+      });
+    }
+    for (const s of this.setups()) {
+      const l = this.layouts.get(s.id);
+      if (!l || isEmptyLayout(l)) continue;
+      out.push({
+        id: l.id,
+        name: s.name,
+        kind: 'setup',
+        lastUsed: l.lastUsed,
+        window: savedFromLayout(l),
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Adds a layout (another device's workspace) as a saved setup here and returns its id,
+   * so it can be opened or applied like any setup. The setup cap applies as usual.
+   */
+  importSetup(layout: WindowLayout): Promise<string | null> {
+    return this.exclusive(() => {
+      if (layout.incognito || isEmptyLayout(layout) || this.layouts.has(layout.id)) return null;
+      this.layouts.set(layout.id, { ...withTabIds(layout, () => null), lastUsed: Date.now() });
+      this.evictSetups(null);
+      this.markDirty(false);
+      this.publishSetups();
+      return this.layouts.has(layout.id) ? layout.id : null;
+    });
   }
 
   // --- Events ----------------------------------------------------------------------------
@@ -1238,6 +1290,8 @@ export class PinManager {
    * changes, so a steady stream of tab events still gets saved.
    */
   private markDirty(incognito: boolean): void {
+    // Incognito layouts are never published; their changes don't concern sync.
+    if (!incognito) this.deps.onChange?.();
     if (this.noPersist) return;
     if (incognito) this.dirty.session = true;
     else this.dirty.local = true;

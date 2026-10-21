@@ -15,6 +15,7 @@ import {
   type Settings,
   SHORTCUT_ACTIONS,
   type SuspendSettings,
+  type SyncSettings,
   type TabRowSettings,
   UNHIDEABLE_PANELS,
 } from './schema';
@@ -38,6 +39,8 @@ const MIGRATIONS: readonly ((s: Raw) => Raw)[] = [
     const { allWindows: _dropped, ...tabs } = s.tabs;
     return { ...s, tabs };
   },
+  // v4 → v5: new `sync` group; default-filled.
+  (s) => s,
 ];
 
 const isObj = (v: unknown): v is Raw => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -152,6 +155,12 @@ function sanitize(raw: Raw): Settings {
     restoreDiscarded: bool(se.restoreDiscarded, d.sessions.restoreDiscarded),
   };
 
+  const sy = isObj(raw.sync) ? raw.sync : {};
+  const sync: SyncSettings = {
+    workspaces: bool(sy.workspaces, d.sync.workspaces),
+    sessions: bool(sy.sessions, d.sync.sessions),
+  };
+
   const l = isObj(raw.layout) ? raw.layout : {};
   const layout: LayoutSettings = {
     panels: sanitizeOrder(l.panels, PANEL_IDS, UNHIDEABLE_PANELS),
@@ -165,6 +174,7 @@ function sanitize(raw: Raw): Settings {
     layout,
     suspend,
     sessions,
+    sync,
     shortcuts: sanitizeKeymap(raw.shortcuts),
   };
 }

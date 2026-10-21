@@ -61,6 +61,15 @@ export const renameSession = (id: string, name: string): Promise<void> =>
 export const deleteSession = (id: string): Promise<void> =>
   mutate((list) => list.filter((s) => s.id !== id));
 
+/** Saved sessions, newest first (for publishing to other devices). */
+export const listSessions = (): Promise<Session[]> => readAll();
+
+/** Keeps a copy of a session (another device's) here, under a new id, as the newest. */
+export const addSession = (session: Session): Promise<void> =>
+  mutate((list) =>
+    [{ ...session, id: newId(), createdAt: Date.now() }, ...list].slice(0, MAX_SESSIONS),
+  );
+
 /** Resolves once the tab has committed a real URL, so discarding it keeps that URL. */
 function whenCommitted(tabId: number, timeoutMs = 8000): Promise<void> {
   return new Promise((resolve) => {
@@ -216,6 +225,17 @@ export async function restoreSession(
 ): Promise<string> {
   const session = (await readAll()).find((s) => s.id === id);
   if (!session) return 'That session no longer exists';
+  return restoreSessionValue(session, target, currentWindowId, discard, layouts);
+}
+
+/** restoreSession for a session that isn't stored here (another device's). */
+export async function restoreSessionValue(
+  session: Session,
+  target: 'newWindow' | 'currentWindow',
+  currentWindowId: number,
+  discard: boolean,
+  layouts?: SessionLayouts,
+): Promise<string> {
   let opened = 0;
   let skipped = 0;
   for (const [i, w] of session.windows.entries()) {

@@ -16,6 +16,8 @@ const PATHS = {
   history: 'M2.8 8a5.2 5.2 0 1 0 1.5-3.7M2.5 2.8v2.7h2.7M8 5v3.2l2.2 1.3',
   sessions: 'M3 4.5h10v8H3zM5 2.5h6M3 7.5h10',
   windows: 'M2.5 5.5h8v7h-8zM5.5 5.5v-2h8v7h-3',
+  devices: 'M3.5 4h9v6.5h-9zM1.5 12.5h13',
+  sync: 'M12.3 6.2A4.6 4.6 0 0 0 4 5.2M3.7 9.8A4.6 4.6 0 0 0 12 10.8M12.6 3.2v3h-3M3.4 12.8v-3h3',
   palette:
     'M8 2a6 6 0 1 0 0 12c1 0 1.5-.7 1.5-1.4 0-.9-.7-1.1-.7-1.9 0-.7.6-1.2 1.4-1.2h1.3A2.5 2.5 0 0 0 14 7.1C14 4.2 11.3 2 8 2zM5 8h.01M7 5.2h.01M10.2 5.5h.01',
   // Folder icons (FOLDER_ICONS in shared/layout); `home` doubles as "back to home URL".

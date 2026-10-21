@@ -68,6 +68,10 @@ throwaway profile and check it against Chrome's real tab state:
   restart (new tab and window ids) and reattach to the right windows.
 - `incognito.mjs`: in Chrome's real side panel in an incognito window, only incognito tabs
   are listed, Essentials work, and no incognito URL is written to `storage.local`.
+- `sync.mjs`: this computer publishes its workspaces and saved sessions; another device's
+  (written into sync storage the way it would arrive) shows in the Sessions panel and can
+  be opened, added, restored and kept; a tampered document is ignored; the Settings switches
+  and renaming work.
 
 `npm run test:e2e` runs them all and prints a summary (about 1.5 minutes).
 
@@ -115,26 +119,28 @@ For development, `npm run dev` launches a browser with the extension loaded and 
 
 - **The service worker owns the canonical tab state.** `TabStore` (`src/background/tab-store.ts`) holds every tab and the order of each window. The side panel is a thin mirror of it.
 - **Events are batched.** Events from `chrome.tabs` are accumulated into a `ChangeSet` and flushed by a 16 ms batcher (`src/background/batcher.ts`). Service workers have no `requestAnimationFrame`, so a timer is used. Flushes never overlap.
-- **Structural changes resync a window.** Create, move, attach, detach, replace, and pin or group changes mark the window for a resync through `chrome.tabs.query`. Title, URL, and state changes (`onUpdated`) and activations are applied incrementally.
+- **Most structural changes are applied locally.** New tabs, moves, closes and a tab leaving a window are replayed on the store from the events' indices; if anything doesn't line up, the window is re-read instead. A tab arriving from another window, a replaced tab, and pin or group changes re-read the window through `chrome.tabs.query`. Title, URL, and state changes (`onUpdated`) and activations are applied incrementally.
 - **The panel gets a snapshot, then diffs.** The panel connects over a long-lived `chrome.runtime` port named `vc-panel`, receives one snapshot, then small `WindowPatch` messages containing upserts, removed IDs, and the tab order only when it changes (`src/shared/protocol.ts`, `src/shared/types.ts`). The tab `index` is excluded from `TabInfo` on purpose: moving one tab shifts the index of many, and sending order as one array avoids a flood of upserts.
 - **Suspension is safe because nothing is persisted.** Tab state is not stored. When the worker wakes, it re-reads all windows from the browser. The panel reconnects with backoff (50 ms, doubling, capped at 1 s) and receives a fresh snapshot.
 - **Panel state uses `$state.raw`.** `TabState` (`src/sidepanel/tab-state.svelte.ts`) replaces changed `TabInfo` objects by reference, so keyed rendering updates only the rows that changed.
 - **The list is virtualized.** `computeRange` in `src/lib/virtual-range.ts` renders only the visible rows at a fixed row height, plus overscan.
 - **Favicons come from Chrome's cache.** `faviconUrl` (`src/shared/favicon.ts`) builds `chrome-extension://<id>/_favicon/?pageUrl=...` URLs. This needs no host permissions and makes no request to the site. Internal pages (`chrome://`, `about:`, `file:`, and similar) get a generic glyph.
 - **Messages from the panel are validated.** `parsePanelMessage` rejects malformed messages before they reach `chrome.tabs`.
+- **Sync publishes, it doesn't merge.** Each computer writes one compressed document about itself into `chrome.storage.sync` (`src/background/sync/`) and only reads the others' (`src/shared/sync.ts`, `src/shared/sync-store.ts`), which are validated like any untrusted input. The document format is transport-neutral, so a later self-hosted transport can carry the same thing.
 
 Directory map:
 
 | Path | Contents |
 | --- | --- |
 | `src/entrypoints/` | WXT entrypoints: `background.ts` starts the service worker; `sidepanel/` holds the panel page |
-| `src/background/` | Service worker: tab store, change batching, `chrome.tabs` event wiring; `pins/` holds layout reconciliation, restart matching and the layout commands |
+| `src/background/` | Service worker: tab store, change batching, `chrome.tabs` event wiring; `pins/` holds layout reconciliation, restart matching and the layout commands; `sync/` publishes this computer's sync document and runs the sync commands |
 | `src/sidepanel/` | Side panel state (`tab-state.svelte.ts`) and Svelte components (`components/`) |
-| `src/shared/` | Code shared by both sides: message protocol, types, favicon URLs |
+| `src/shared/` | Code shared by both sides: message protocol, types, favicon URLs, layouts, sessions, the sync document and its storage format |
 | `src/lib/` | Pure helpers, such as virtual list math |
-| `src/themes/` | Theme definitions (milestone 2) |
-| `src/settings/` | User settings (milestone 4) |
-| `tests/` | Vitest unit tests for pure logic |
+| `src/themes/` | Theme definitions |
+| `src/settings/` | User settings, their schema and migrations |
+| `tests/` | Vitest unit tests for pure logic; `tests/e2e/` real-Chrome checks |
+| `bench/` | Benchmarks (see `bench/README.md`) |
 | `scripts/` | Build helpers, such as `generate-icons.mjs` |
 
 ## Keyboard
@@ -209,6 +215,17 @@ When a window that has Essentials, pinned tabs or folders closes, its layout is 
 
 After a Chrome restart, tab and window ids change, so the worker re-attaches saved layouts to restored windows by comparing the windows' pinned URLs with the layouts' entries; a window needs at least half its pinned tabs to match. A restored pinned tab that matches nothing becomes a new plain pinned entry. Chrome often restores windows, or a window's pinned tabs, a little after startup, so for the first minute after a restart a window that shows its first pinned tabs is still matched against the setups that are left, and a late pinned tab in an already matched window is paired with one of its dormant entries (same URL, then same site) instead of becoming a duplicate. After that minute, a newly opened window's pinned tabs are adopted as plain entries.
 
+## Sync between your computers
+
+Through Chrome Sync, so it works on the computers signed in to the same Google account with Chrome Sync on, and needs no extra permission or server.
+
+- **Settings and custom themes** are shared: change them on one computer and the others follow.
+- **Workspaces**: each computer shares its windows' Essentials, pinned tabs and folders, and its window setups. On another computer they appear in the Sessions panel under **Other devices**, where each can be opened in a new window, added to the current window, or kept there as a window setup.
+- **Saved sessions** are shared the same way, and can be restored or kept on the other computer.
+- **Open tabs** of your other devices come from Chrome's own tab sync (the "Open tabs" sync option) and are listed under **Other devices** too. Click a tab to open it here, or open a whole window.
+
+Every computer shares a copy of its own things and never changes another computer's, so two machines can't overwrite each other. Chrome's sync storage holds 100 KB in total, shared fairly between your computers: workspaces always come first, then as many saved sessions as fit, newest first. Settings › Sync shows what was left out, how much is used, the switches for workspaces and sessions, this computer's name, and your other computers, which can be forgotten. A computer that hasn't synced for 90 days is removed. Incognito windows are never shared.
+
 ## All windows, always
 
 The panel always lists every window; the old "Show all windows" toggle is gone (settings from earlier versions are migrated). Your own window comes first: Essentials grid, pinned tabs and folders, the Clear divider, then normal tabs. Every other window is a collapsible group below it with a header (its name, or its active tab's title, and the tab count), a smaller row of its Essentials, its pinned tabs and folders, then its normal tabs. Click any tab to focus that window and tab; rename a window from its header's menu.
@@ -247,12 +264,12 @@ Search goes through the `SearchIndex` interface (`src/lib/search/search-index.ts
 | `sidePanel` | Render the UI in Chrome's side panel and open it from the shortcut or toolbar icon |
 | `favicon` | Load page favicons through `_favicon` without host permissions |
 | `tabGroups` | Show, create, rename, recolour, collapse and move native tab groups |
-| `sessions` | Recently closed tabs and windows, and restoring them |
+| `sessions` | Recently closed tabs and windows, restoring them, and your other devices' open tabs (Chrome's tab sync) |
 | `bookmarks` | The Bookmarks panel: read, open, search, add, delete |
 | `history` | The History panel: read, search, delete entries |
 | `alarms` | The auto-suspend timer. The worker is shut down when idle, so a timer can't run for 30 minutes; alarms survive and wake it |
 | `contextMenus` | "Suspend this tab", "Save window as session" and similar items in Chrome's page and toolbar-icon menus |
-| `storage` | Settings in `chrome.storage.sync` (follows your Chrome profile); saved sessions, pinned layouts and window setups in `chrome.storage.local`; incognito layouts and worker bookkeeping in `chrome.storage.session` |
+| `storage` | Settings, custom themes and what each computer shares for sync in `chrome.storage.sync` (follows your Chrome profile); saved sessions, pinned layouts and window setups in `chrome.storage.local`; incognito layouts and worker bookkeeping in `chrome.storage.session` |
 
 No host permissions are requested.
 
@@ -265,7 +282,7 @@ No host permissions are requested.
 
 ## Privacy
 
-Vertically Challenged has no accounts, no telemetry, and no network requests. All data stays in the browser. Once settings land in milestone 4, they will be stored with `chrome.storage` on the local machine. Favicons come from Chrome's local cache.
+Vertically Challenged has no accounts, no telemetry, and makes no network requests of its own. Settings, themes and what you share between computers (workspaces and saved sessions, including their URLs) go through Chrome Sync, the same way Chrome syncs your own tabs and bookmarks, and only when Chrome Sync is on; both kinds of sharing can be switched off in Settings › Sync. Everything else stays on the computer. Favicons come from Chrome's local cache.
 
 ## License
 

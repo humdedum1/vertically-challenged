@@ -1,7 +1,7 @@
 import { DEFAULT_THEME_ID } from '../themes/builtin';
 
 /** Bump when the stored shape changes, and add a step to MIGRATIONS in migrate.ts. */
-export const SETTINGS_VERSION = 4;
+export const SETTINGS_VERSION = 5;
 
 export type ColorMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'comfortable';
@@ -73,6 +73,14 @@ export interface SessionSettings {
   restoreDiscarded: boolean;
 }
 
+/** What this device publishes for the user's other machines (see shared/sync.ts). */
+export interface SyncSettings {
+  /** Each window's Essentials, pinned tabs and folders, and saved window setups. */
+  workspaces: boolean;
+  /** Saved sessions, as far as the space allows. */
+  sessions: boolean;
+}
+
 export interface TabRowSettings {
   layout: RowLayout;
   actions: ActionVisibility;
@@ -101,6 +109,7 @@ export interface Settings {
   layout: LayoutSettings;
   suspend: SuspendSettings;
   sessions: SessionSettings;
+  sync: SyncSettings;
   shortcuts: Keymap;
 }
 
@@ -141,6 +150,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   suspend: { auto: false, minutes: 30, skipPinned: true, skipAudible: true, whitelist: [] },
   sessions: { restoreDiscarded: true },
+  sync: { workspaces: true, sessions: true },
   shortcuts: {
     focusSearch: ['/', 'Ctrl+F'],
     closeTab: ['Delete'],

@@ -12,6 +12,7 @@ import LayoutCard from './settings/LayoutCard.svelte';
 import PreviewCard from './settings/PreviewCard.svelte';
 import ShortcutsCard from './settings/ShortcutsCard.svelte';
 import SuspendCard from './settings/SuspendCard.svelte';
+import SyncCard from './settings/SyncCard.svelte';
 import TabRowsCard from './settings/TabRowsCard.svelte';
 import ThemeEditor from './settings/ThemeEditor.svelte';
 import ThemesCard from './settings/ThemesCard.svelte';
@@ -91,6 +92,7 @@ $effect(() => () => {
       <TabRowsCard {settings} />
       <LayoutCard {settings} />
       <SuspendCard {settings} {tabState} />
+      <SyncCard {settings} {tabState} />
       <ShortcutsCard {settings} />
       <!-- Focus fallback when the theme a flow started from no longer has a button. -->
       <span id="vc-themes-anchor" tabindex="-1"></span>

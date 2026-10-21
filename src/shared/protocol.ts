@@ -98,7 +98,46 @@ export type PanelMessage =
   | { type: 'setupOpen'; setupId: string }
   | { type: 'setupApply'; setupId: string; windowId: number }
   | { type: 'setupRename'; setupId: string; name: string }
-  | { type: 'setupDelete'; setupId: string };
+  | { type: 'setupDelete'; setupId: string }
+  /**
+   * Another device's workspace (see shared/sync.ts): open it in a new window, apply it to
+   * `windowId`, or keep it here as a saved setup.
+   */
+  | {
+      type: 'syncWorkspace';
+      deviceId: string;
+      workspaceId: string;
+      action: 'open' | 'apply' | 'keep';
+      windowId: number;
+    }
+  /** Another device's saved session: restore it, or keep a copy here. */
+  | {
+      type: 'syncSession';
+      deviceId: string;
+      sessionId: string;
+      action: 'newWindow' | 'currentWindow' | 'keep';
+      windowId: number;
+    }
+  /** Removes another device's document from sync storage. */
+  | { type: 'syncForget'; deviceId: string }
+  | { type: 'syncRename'; name: string }
+  | { type: 'syncNow' };
+
+/** The sync commands; the worker runs these through its sync publisher. */
+export type SyncMessage = Extract<
+  PanelMessage,
+  { type: 'syncWorkspace' | 'syncSession' | 'syncForget' | 'syncRename' | 'syncNow' }
+>;
+
+const SYNC_TYPES = new Set<string>([
+  'syncWorkspace',
+  'syncSession',
+  'syncForget',
+  'syncRename',
+  'syncNow',
+] satisfies SyncMessage['type'][]);
+
+export const isSyncMessage = (m: PanelMessage): m is SyncMessage => SYNC_TYPES.has(m.type);
 
 /** The layout commands; the worker runs these through the PinManager. */
 export type PinMessage = Extract<
@@ -416,7 +455,44 @@ export function parsePanelMessage(raw: unknown): PanelMessage | null {
         isId(m.windowId)
         ? { type: 'restoreSession', id: m.id, target: m.target, windowId: m.windowId }
         : null;
+    case 'syncWorkspace':
+      return isDeviceId(m.deviceId) &&
+        typeof m.workspaceId === 'string' &&
+        /^l[a-z0-9]{10}$/.test(m.workspaceId) &&
+        (m.action === 'open' || m.action === 'apply' || m.action === 'keep') &&
+        isId(m.windowId)
+        ? {
+            type: 'syncWorkspace',
+            deviceId: m.deviceId,
+            workspaceId: m.workspaceId,
+            action: m.action,
+            windowId: m.windowId,
+          }
+        : null;
+    case 'syncSession':
+      return isDeviceId(m.deviceId) &&
+        isSessionId(m.sessionId) &&
+        (m.action === 'newWindow' || m.action === 'currentWindow' || m.action === 'keep') &&
+        isId(m.windowId)
+        ? {
+            type: 'syncSession',
+            deviceId: m.deviceId,
+            sessionId: m.sessionId,
+            action: m.action,
+            windowId: m.windowId,
+          }
+        : null;
+    case 'syncForget':
+      return isDeviceId(m.deviceId) ? { type: 'syncForget', deviceId: m.deviceId } : null;
+    case 'syncRename':
+      return typeof m.name === 'string' && m.name.trim().length > 0 && m.name.trim().length <= 40
+        ? { type: 'syncRename', name: m.name.trim() }
+        : null;
+    case 'syncNow':
+      return { type: 'syncNow' };
     default:
       return typeof m.type === 'string' && PIN_TYPES.has(m.type) ? parsePinMessage(m) : null;
   }
 }
+
+const isDeviceId = (v: unknown): v is string => typeof v === 'string' && /^[a-z0-9]{10}$/.test(v);

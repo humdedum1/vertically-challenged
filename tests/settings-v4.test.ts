@@ -15,8 +15,7 @@ describe('v3 -> v4 migration', () => {
 
   it('drops tabs.allWindows and keeps everything else', () => {
     const r = migrateSettings(v3);
-    expect(SETTINGS_VERSION).toBe(4);
-    expect(r.version).toBe(4);
+    expect(r.version).toBe(SETTINGS_VERSION);
     expect('allWindows' in r.tabs).toBe(false);
     expect(r.tabs).toEqual({ ...D.tabs, layout: 'double', showClose: false });
     expect(r.appearance.mode).toBe('dark');

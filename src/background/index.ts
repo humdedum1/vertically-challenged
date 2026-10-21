@@ -3,17 +3,22 @@ import { migrateSettings } from '../settings/migrate';
 import { hostOf } from '../shared/host-pattern';
 import {
   isPinMessage,
+  isSyncMessage,
   PANEL_PORT_NAME,
   parsePanelMessage,
   type WorkerMessage,
 } from '../shared/protocol';
+import { SESSIONS_KEY } from '../shared/sessions';
 import type { GroupInfo, TabInfo, WindowInfo } from '../shared/types';
 import { createBatcher } from './batcher';
 import { type CommandDeps, runCommand } from './commands';
 import { registerContextMenus } from './context-menus';
 import { runPinCommand } from './pins/commands';
 import { PinManager } from './pins/pin-manager';
+import { addSession, listSessions, restoreSessionValue } from './sessions';
 import { createSuspender } from './suspend/suspender';
+import { runSyncCommand, type SyncCommandDeps } from './sync/commands';
+import { createSyncPublisher } from './sync/publisher';
 import { ChangeSet, type TabOp, TabStore } from './tab-store';
 import { toGroupInfo, toTabInfo } from './to-tab-info';
 import { shouldDeliver, snapshotPlan, visibleWindows } from './visibility';
@@ -309,6 +314,8 @@ export function startBackground(): void {
     windows: () => windowList,
     broadcast,
     notice: noticeTo,
+    // Called asynchronously (layouts load after `ready`), once `publisher` exists.
+    onChange: () => publisher.schedule(),
   });
   browser.windows.onRemoved.addListener((id) => pins.onWindowRemoved(id));
   browser.windows.onFocusChanged.addListener((id) => pins.onWindowFocused(id));
@@ -317,6 +324,43 @@ export function startBackground(): void {
 
   const settingsNow = async () =>
     migrateSettings((await browser.storage.sync.get('settings')).settings);
+
+  // --- Sync (see shared/sync.ts) -----------------------------------------------------------
+
+  const publisher = createSyncPublisher({
+    sync: browser.storage.sync,
+    local: browser.storage.local,
+    workspaces: async () => {
+      await pins.loaded;
+      return pins.syncWorkspaces();
+    },
+    sessions: listSessions,
+    settings: async () => (await settingsNow()).sync,
+    platform: async () => (await browser.runtime.getPlatformInfo()).os,
+  });
+  // Saved sessions and the sync switches live outside the layouts. Other settings aren't
+  // part of the document; a switch takes effect at once (off removes what was shared).
+  let syncPrefs = '';
+  void settingsNow().then((s) => (syncPrefs = JSON.stringify(s.sync)));
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && SESSIONS_KEY in changes) publisher.schedule();
+    if (area === 'sync' && 'settings' in changes) {
+      const next = JSON.stringify(migrateSettings(changes.settings?.newValue).sync);
+      if (next === syncPrefs) return;
+      syncPrefs = next;
+      void publisher.now();
+    }
+  });
+  void pins.loaded.then(() => publisher.schedule());
+  const syncDeps: SyncCommandDeps = {
+    publisher,
+    pins,
+    syncArea: browser.storage.sync,
+    createWindow: () => browser.windows.create({ focused: true }) as Promise<{ id?: number }>,
+    restoreSession: restoreSessionValue,
+    keepSession: addSession,
+    restoreDiscarded: async () => (await settingsNow()).sessions.restoreDiscarded,
+  };
   const deps: CommandDeps = {
     windows: (scope, windowId) =>
       (scope === 'all' ? windowList.map((w) => w.id) : [windowId]).map((id) => store.snapshot(id)),
@@ -381,7 +425,9 @@ export function startBackground(): void {
       try {
         const text = isPinMessage(msg)
           ? await runPinCommand(msg, pins, deps)
-          : await runCommand(msg, deps);
+          : isSyncMessage(msg)
+            ? await runSyncCommand(msg, syncDeps)
+            : await runCommand(msg, deps);
         if (text) port.postMessage({ type: 'notice', level: 'info', text } satisfies WorkerMessage);
       } catch (err) {
         // Tabs can vanish between the click and the call; those failures are expected
@@ -391,7 +437,8 @@ export function startBackground(): void {
           msg.type === 'restoreSession' ||
           msg.type === 'saveSession' ||
           msg.type === 'moveToNewWindow' ||
-          msg.type === 'setupOpen'
+          msg.type === 'setupOpen' ||
+          isSyncMessage(msg)
         ) {
           const text = `Couldn't complete that: ${err instanceof Error ? err.message : 'unknown error'}`;
           try {

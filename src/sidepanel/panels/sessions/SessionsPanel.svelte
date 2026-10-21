@@ -18,6 +18,7 @@ import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
 import type { SettingsState } from '../../settings-state.svelte';
 import type { TabState } from '../../tab-state.svelte';
+import OtherDevices from './OtherDevices.svelte';
 import { pluralize, relativeTime } from './relative-time';
 
 let { tabState, settings }: { tabState: TabState; settings: SettingsState } = $props();
@@ -313,6 +314,8 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
       </ul>
     {/if}
   </SegmentCard>
+
+  <OtherDevices {tabState} {now} onstatus={(s) => (status = s)} />
 
   <SegmentCard title="Saved sessions" fill>
     {#snippet icon()}<Icon name="list" size={12} />{/snippet}

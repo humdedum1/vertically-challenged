@@ -157,3 +157,60 @@ describe('restoreSession', () => {
       ).toBeNull();
   });
 });
+
+describe('sync messages', () => {
+  const ok = { deviceId: 'abcdefghij', windowId: 3 };
+  it('accepts well-formed commands', () => {
+    expect(
+      parsePanelMessage({
+        type: 'syncWorkspace',
+        ...ok,
+        workspaceId: 'laaaaaaaaaa',
+        action: 'apply',
+      }),
+    ).toEqual({ type: 'syncWorkspace', ...ok, workspaceId: 'laaaaaaaaaa', action: 'apply' });
+    expect(
+      parsePanelMessage({ type: 'syncSession', ...ok, sessionId: 's1', action: 'keep' }),
+    ).toEqual({
+      type: 'syncSession',
+      ...ok,
+      sessionId: 's1',
+      action: 'keep',
+    });
+    expect(parsePanelMessage({ type: 'syncForget', deviceId: 'abcdefghij', extra: 1 })).toEqual({
+      type: 'syncForget',
+      deviceId: 'abcdefghij',
+    });
+    expect(parsePanelMessage({ type: 'syncRename', name: '  Laptop ' })).toEqual({
+      type: 'syncRename',
+      name: 'Laptop',
+    });
+    expect(parsePanelMessage({ type: 'syncNow' })).toEqual({ type: 'syncNow' });
+  });
+
+  it('rejects bad ids, actions and names', () => {
+    expect(
+      parsePanelMessage({ type: 'syncWorkspace', ...ok, workspaceId: 'x', action: 'open' }),
+    ).toBeNull();
+    expect(
+      parsePanelMessage({
+        type: 'syncWorkspace',
+        ...ok,
+        workspaceId: 'laaaaaaaaaa',
+        action: 'delete',
+      }),
+    ).toBeNull();
+    expect(
+      parsePanelMessage({
+        type: 'syncSession',
+        ...ok,
+        deviceId: '../x',
+        sessionId: 's1',
+        action: 'keep',
+      }),
+    ).toBeNull();
+    expect(parsePanelMessage({ type: 'syncForget', deviceId: 'ABCDEFGHIJ' })).toBeNull();
+    expect(parsePanelMessage({ type: 'syncRename', name: 'n'.repeat(41) })).toBeNull();
+    expect(parsePanelMessage({ type: 'syncRename', name: '   ' })).toBeNull();
+  });
+});

@@ -1,7 +1,15 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "files": {
-    "includes": ["**", "!.output", "!.wxt", "!node_modules", "!public/icon", "!bench/.out"]
+    "includes": [
+      "**",
+      "!.output",
+      "!.wxt",
+      "!node_modules",
+      "!public/icon",
+      "!bench/.out",
+      "!.github/release"
+    ]
   },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "javascript": { "formatter": { "quoteStyle": "single" } },

@@ -1,0 +1,192 @@
+# Reusable release workflow (release kit, semantic-versioning skill).
+#
+# analyze  -> lint Conventional Commits and compute the expected release (read-only)
+# validate -> run the project's own build/tests via .github/release/validate.sh (read-only)
+# release  -> preflight checks, then semantic-release: version files, changelog, tag, GitHub Release
+#
+# Nothing is published to package registries or container registries here. Chain such jobs
+# in the caller on `needs.<job>.outputs.released == 'true'` when a project explicitly needs them.
+#
+# The workflow is self-contained apart from the files in .github/release/, so it can be
+# vendored (uses: ./.github/workflows/semantic-release.yml) or later moved to a central
+# repository (uses: <owner>/<repo>/.github/workflows/semantic-release.yml@<sha>) unchanged.
+
+name: semantic-release
+
+on:
+  workflow_call:
+    inputs:
+      dry-run:
+        description: Compute the release and notes without creating tags, commits or releases
+        type: boolean
+        default: false
+      node-version:
+        description: Node.js version for the release tooling (and Node projects)
+        type: string
+        default: '22'
+      dotnet-version:
+        description: .NET SDK version to install for validation ('' = none)
+        type: string
+        default: ''
+      python-version:
+        description: Python version to install for validation ('' = none)
+        type: string
+        default: ''
+      validate-script:
+        description: Project validation script, run before anything is released
+        type: string
+        default: .github/release/validate.sh
+      runs-on:
+        description: Runner label
+        type: string
+        default: ubuntu-latest
+    outputs:
+      released:
+        description: "'true' when a new release was published"
+        value: ${{ jobs.release.outputs.released }}
+      version:
+        description: Released version (e.g. 1.4.0)
+        value: ${{ jobs.release.outputs.version }}
+      tag:
+        description: Released git tag (e.g. v1.4.0)
+        value: ${{ jobs.release.outputs.tag }}
+
+permissions: {}
+
+env:
+  SEMANTIC_RELEASE_PACKAGES: >-
+    semantic-release@25.0.9
+    @semantic-release/commit-analyzer@13.0.1
+    @semantic-release/release-notes-generator@14.1.1
+    @semantic-release/github@12.0.10
+    @semantic-release/exec@7.1.0
+    @semantic-release/git@11.0.1
+    @semantic-release/changelog@7.0.0
+    conventional-changelog-conventionalcommits@9.3.1
+
+jobs:
+  analyze:
+    name: Analyze commits
+    runs-on: ${{ inputs.runs-on }}
+    permissions:
+      contents: read
+    outputs:
+      impact: ${{ steps.analyze.outputs.impact }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Lint pull request commits
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node .github/release/semver-analyze.mjs --lint-range "${BASE_SHA}..${HEAD_SHA}"
+
+      - name: Compute release impact
+        id: analyze
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          node .github/release/semver-analyze.mjs --to "$HEAD_SHA" --json > "$RUNNER_TEMP/analysis.json" || true
+          impact="$(node -e 'try{process.stdout.write(require(process.argv[1]).commitImpact||"none")}catch{process.stdout.write("none")}' "$RUNNER_TEMP/analysis.json")"
+          echo "impact=${impact}" >> "$GITHUB_OUTPUT"
+          {
+            echo '## Release impact'
+            echo '```'
+            node .github/release/semver-analyze.mjs --to "$HEAD_SHA" || true
+            echo '```'
+            echo 'Commit-derived proposal. Review hints mark diffs (deleted files, runtime requirements, migrations, API contracts) to check against the commit types.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  validate:
+    name: Validate
+    needs: analyze
+    if: github.event_name != 'pull_request' && needs.analyze.outputs.impact != 'none'
+    runs-on: ${{ inputs.runs-on }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Setup .NET
+        if: inputs.dotnet-version != ''
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - name: Setup Python
+        if: inputs.python-version != ''
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Check version files
+        run: node .github/release/bump-version.mjs --check
+
+      - name: Run project validation
+        env:
+          VALIDATE_SCRIPT: ${{ inputs.validate-script }}
+        run: bash "$VALIDATE_SCRIPT"
+
+  release:
+    name: Release
+    needs: [analyze, validate]
+    if: github.event_name != 'pull_request' && needs.analyze.outputs.impact != 'none'
+    runs-on: ${{ inputs.runs-on }}
+    permissions:
+      # Tags, the GitHub Release and (when version files are configured) the release commit.
+      # Issue/PR comments and labels are disabled in release.config.cjs, so nothing else is needed.
+      contents: write
+    outputs:
+      released: ${{ steps.release.outputs.released || 'false' }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install release tooling (pinned, no install scripts)
+        run: |
+          # shellcheck disable=SC2086
+          npm install --no-save --no-package-lock --no-audit --no-fund --ignore-scripts \
+            --prefix "$RUNNER_TEMP/release-tools" $SEMANTIC_RELEASE_PACKAGES
+          # Plugins named in an extended config resolve relative to that file's directory.
+          ln -sfn "$RUNNER_TEMP/release-tools/node_modules" .github/release/node_modules
+
+      - name: Preflight
+        run: node .github/release/preflight.mjs
+
+      - name: semantic-release
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          args=(--extends ./.github/release/release.config.cjs)
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          "$RUNNER_TEMP/release-tools/node_modules/.bin/semantic-release" "${args[@]}"

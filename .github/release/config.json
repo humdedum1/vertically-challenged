@@ -1,0 +1,38 @@
+{
+  "branches": [
+    "main"
+  ],
+  "prereleaseBranches": [],
+  "tagFormat": "v${version}",
+  "firstRelease": "require-decision",
+  "initialDevelopment": false,
+  "versionFiles": [
+    {
+      "path": "package.json",
+      "type": "json",
+      "keys": [
+        "version"
+      ]
+    },
+    {
+      "path": "package-lock.json",
+      "type": "json",
+      "keys": [
+        "version",
+        [
+          "packages",
+          "",
+          "version"
+        ]
+      ]
+    }
+  ],
+  "commitVersionFiles": true,
+  "changelog": {
+    "enabled": false,
+    "file": "CHANGELOG.md"
+  },
+  "releaseAssets": [],
+  "extraTypes": [],
+  "paths": []
+}

@@ -1,0 +1,46 @@
+# Automatic releases from Conventional Commits (release kit, semantic-versioning skill).
+# Project settings: .github/release/config.json   Validation: .github/release/validate.sh
+name: Release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Dry run (compute version and notes, publish nothing)
+        type: boolean
+        default: true
+
+permissions: {}
+
+# One release at a time per branch; a queued run is never cancelled mid-release.
+concurrency:
+  group: release-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    uses: ./.github/workflows/semantic-release.yml
+    with:
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
+      node-version: '22'
+      dotnet-version: ''
+      python-version: ''
+
+  # Example: publish an artifact only after a release, only if the project needs it.
+  # publish:
+  #   needs: release
+  #   if: needs.release.outputs.released == 'true'
+  #   permissions:
+  #     contents: read
+  #     packages: write
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+  #       with:
+  #         ref: ${{ needs.release.outputs.tag }}
+  #     - run: echo "publish ${{ needs.release.outputs.version }}"

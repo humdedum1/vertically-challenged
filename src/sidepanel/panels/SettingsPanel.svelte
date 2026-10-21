@@ -8,6 +8,7 @@ import type { ThemeDraft } from '../theme-draft.svelte';
 import type { ThemeRegistry } from '../theme-registry.svelte';
 import AppearanceCard from './settings/AppearanceCard.svelte';
 import BackupCard from './settings/BackupCard.svelte';
+import DisplayCard from './settings/DisplayCard.svelte';
 import LayoutCard from './settings/LayoutCard.svelte';
 import PreviewCard from './settings/PreviewCard.svelte';
 import ShortcutsCard from './settings/ShortcutsCard.svelte';
@@ -88,6 +89,7 @@ $effect(() => () => {
     {/key}
   {:else}
     <div class="cards">
+      <DisplayCard {settings} />
       <AppearanceCard {settings} {themes} />
       <TabRowsCard {settings} />
       <LayoutCard {settings} />

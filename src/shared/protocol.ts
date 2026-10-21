@@ -6,6 +6,7 @@ import {
   type PinDest,
   type WindowLayout,
 } from './layout';
+import type { Surface } from './surface';
 import {
   GROUP_COLORS,
   type GroupColor,
@@ -33,8 +34,11 @@ export interface MoveTarget {
 
 /** Panel → service worker. */
 export type PanelMessage =
-  /** `windowId` is the panel's home window; every panel gets all windows of its incognito kind. */
-  | { type: 'subscribe'; windowId: number }
+  /**
+   * `windowId` is the panel's home window; every panel gets all windows of its incognito
+   * kind. `surface` says where the panel is shown (absent: Chrome's side panel).
+   */
+  | { type: 'subscribe'; windowId: number; surface?: Surface }
   | { type: 'activate'; tabId: number }
   | { type: 'close'; tabIds: number[] }
   | { type: 'closeOthers'; tabId: number }
@@ -228,6 +232,7 @@ const isName = (v: unknown): v is string =>
   typeof v === 'string' && v.trim().length > 0 && v.trim().length <= MAX_SESSION_NAME;
 
 const isId = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0;
+const SURFACES: readonly Surface[] = ['sidebar', 'popup', 'window'];
 const isIdOrNull = (v: unknown): v is number | null => v === null || isId(v);
 const isIds = (v: unknown): v is number[] =>
   Array.isArray(v) && v.length > 0 && v.length <= MAX_IDS && v.every(isId);
@@ -381,9 +386,14 @@ export function parsePanelMessage(raw: unknown): PanelMessage | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const m = raw as Record<string, unknown>;
   switch (m.type) {
-    case 'subscribe':
+    case 'subscribe': {
       // A legacy `all` field is accepted and dropped.
-      return isId(m.windowId) ? { type: 'subscribe', windowId: m.windowId } : null;
+      if (!isId(m.windowId)) return null;
+      const surface = SURFACES.find((x) => x === m.surface);
+      return surface && surface !== 'sidebar'
+        ? { type: 'subscribe', windowId: m.windowId, surface }
+        : { type: 'subscribe', windowId: m.windowId };
+    }
     case 'activate':
     case 'closeOthers':
     case 'closeBelow':

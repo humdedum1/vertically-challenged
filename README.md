@@ -1,6 +1,6 @@
 # Vertically Challenged
 
-Fast, customizable vertical tabs in Chrome's Side Panel. Local-first.
+Fast, customizable vertical tabs in Chrome's Side Panel, or in a popup over the current page. Local-first.
 
 ## Status
 
@@ -72,6 +72,12 @@ throwaway profile and check it against Chrome's real tab state:
   (written into sync storage the way it would arrive) shows in the Sessions panel and can
   be opened, added, restored and kept; a tampered document is ignored; the Settings switches
   and renaming work.
+- `popup.mjs`: the Display setting switches Chrome's toolbar behaviour; the in-page popup
+  lists the page's window, can't be reached by the page, toggles, and closes on a click
+  outside, Escape and its close button; other sites can't frame the panel; the popup window
+  fallback lists the window it was opened for. Headless Chrome can't click the toolbar
+  button, so the popup script is injected from the worker into a build with a test-only
+  host permission.
 
 `npm run test:e2e` runs them all and prints a summary (about 1.5 minutes).
 
@@ -111,7 +117,7 @@ and how to compare two builds fairly.
 2. Open `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select the `.output\chrome-mv3` folder.
 3. After rebuilding, click the reload icon on the extension's card in `chrome://extensions`.
 
-Open the panel from the toolbar icon or with **Alt+Shift+V**. To change the shortcut, go to `chrome://extensions/shortcuts`.
+Open the panel from the toolbar icon or with **Alt+Shift+V**. To change the shortcut, go to `chrome://extensions/shortcuts`. Whether that opens the side panel or an in-page popup is set in Settings → Display.
 
 For development, `npm run dev` launches a browser with the extension loaded and hot reload enabled.
 
@@ -234,6 +240,24 @@ The panel always lists every window; the old "Show all windows" toggle is gone (
 - Drag tabs between windows, including onto another window's Essentials row or folders, or use "Move to window".
 - Incognito and normal windows are kept apart: an incognito panel lists only incognito windows and a normal panel only normal ones, tabs can't move between them, incognito layouts live only in `chrome.storage.session`, and an incognito panel keeps its Essentials' site colours in memory only, so no incognito URL or site is written to disk.
 
+## Side panel or in-page popup
+
+Settings → Display → **Open as** decides what the toolbar button, the toggle and search
+shortcuts and the toolbar menu's "Open vertical tabs" open:
+
+- **Side panel** (default): Chrome's side panel, docked to the window.
+- **In-page popup**: the same panel floating over the right edge of the current page.
+  Click outside it, press Esc (when nothing inside the panel uses it), use its close
+  button or press the shortcut again to close it; switching tabs closes it too. Chrome
+  doesn't let extensions show anything on its own pages (`chrome://`, the New Tab page,
+  the Web Store, PDFs) or frame them in incognito, so there it opens in a small popup
+  window instead, which closes when you go back to the browser.
+
+The popup is injected only into the tab you used the button or shortcut on (`activeTab`),
+so it still needs no host permissions. It lives in a closed shadow root that page styles
+and scripts can't reach, and loads the panel from the extension's per-session dynamic URL,
+so other sites can't frame the panel.
+
 ## Suspending, sessions and windows
 
 - **Suspending** uses Chrome's native tab discarding: memory is freed and the tab reloads when you click it. Suspend from the tab's context menu, Chrome's page or toolbar menu, or a global shortcut. Auto-suspend (off by default) discards background tabs idle for a set time, skipping pinned and audible tabs and whitelisted sites. Only http(s) tabs are auto-suspended.
@@ -269,15 +293,17 @@ Search goes through the `SearchIndex` interface (`src/lib/search/search-index.ts
 | `history` | The History panel: read, search, delete entries |
 | `alarms` | The auto-suspend timer. The worker is shut down when idle, so a timer can't run for 30 minutes; alarms survive and wake it |
 | `contextMenus` | "Suspend this tab", "Save window as session" and similar items in Chrome's page and toolbar-icon menus |
+| `activeTab`, `scripting` | The in-page popup: inject it into the tab where you clicked the toolbar button or used the shortcut, and only then |
 | `storage` | Settings, custom themes and what each computer shares for sync in `chrome.storage.sync` (follows your Chrome profile); saved sessions, pinned layouts and window setups in `chrome.storage.local`; incognito layouts and worker bookkeeping in `chrome.storage.session` |
 
-No host permissions are requested.
+No host permissions are requested. `sidepanel.html` is web-accessible (for the in-page popup) only through Chrome's per-session dynamic URL.
 
 ## Platform limits
 
 - **Panel width.** The extension cannot set the side panel width. Drag the panel's edge to resize it.
 - **Native tab strip.** The extension cannot hide Chrome's horizontal tab strip.
-- **Restricted pages.** Chrome does not let extensions run on some pages. This does not affect the side panel, which is a browser UI, but `chrome://` and Chrome Web Store pages show a generic favicon.
+- **Restricted pages.** Chrome does not let extensions run on some pages. This does not affect the side panel, which is a browser UI, but `chrome://` and Chrome Web Store pages show a generic favicon, and the in-page popup opens as a small window there.
+- **Popup size.** The in-page popup is 360 px wide (narrower windows: the window width) and as tall as the page.
 - **Panel position.** Left or right placement is a Chrome setting: **Settings → Appearance → Side panel position**.
 
 ## Privacy

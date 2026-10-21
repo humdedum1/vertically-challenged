@@ -53,3 +53,23 @@ describe('parsePanelMessage', () => {
     expect(parsePanelMessage({ type: 'close', tabIds: [1, 2.5] })).toBeNull();
   });
 });
+
+describe('subscribe surface', () => {
+  it('keeps popup and window surfaces and drops the default or unknown ones', () => {
+    expect(parsePanelMessage({ type: 'subscribe', windowId: 3, surface: 'popup' })).toEqual({
+      type: 'subscribe',
+      windowId: 3,
+      surface: 'popup',
+    });
+    expect(parsePanelMessage({ type: 'subscribe', windowId: 3, surface: 'window' })).toEqual({
+      type: 'subscribe',
+      windowId: 3,
+      surface: 'window',
+    });
+    for (const surface of ['sidebar', 'frame', 1, null])
+      expect(parsePanelMessage({ type: 'subscribe', windowId: 3, surface })).toEqual({
+        type: 'subscribe',
+        windowId: 3,
+      });
+  });
+});

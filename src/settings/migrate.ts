@@ -3,6 +3,8 @@ import { normalizeHostPattern } from '../shared/host-pattern';
 import {
   type Appearance,
   DEFAULT_SETTINGS,
+  DISPLAY_MODES,
+  type DisplaySettings,
   type Keymap,
   type LayoutSettings,
   LIMITS,
@@ -40,6 +42,8 @@ const MIGRATIONS: readonly ((s: Raw) => Raw)[] = [
     return { ...s, tabs };
   },
   // v4 → v5: new `sync` group; default-filled.
+  (s) => s,
+  // v5 → v6: new `display` group (side panel or in-page popup); default-filled.
   (s) => s,
 ];
 
@@ -161,6 +165,9 @@ function sanitize(raw: Raw): Settings {
     sessions: bool(sy.sessions, d.sync.sessions),
   };
 
+  const di = isObj(raw.display) ? raw.display : {};
+  const display: DisplaySettings = { mode: oneOf(di.mode, DISPLAY_MODES, d.display.mode) };
+
   const l = isObj(raw.layout) ? raw.layout : {};
   const layout: LayoutSettings = {
     panels: sanitizeOrder(l.panels, PANEL_IDS, UNHIDEABLE_PANELS),
@@ -175,6 +182,7 @@ function sanitize(raw: Raw): Settings {
     suspend,
     sessions,
     sync,
+    display,
     shortcuts: sanitizeKeymap(raw.shortcuts),
   };
 }

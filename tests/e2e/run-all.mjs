@@ -15,6 +15,7 @@ const SCRIPTS = [
   'restart.mjs',
   'incognito.mjs',
   'sync.mjs',
+  'popup.mjs',
 ];
 const results = [];
 for (const s of SCRIPTS) {

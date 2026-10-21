@@ -9,10 +9,12 @@ import {
   type WorkerMessage,
 } from '../shared/protocol';
 import { SESSIONS_KEY } from '../shared/sessions';
+import type { Surface } from '../shared/surface';
 import type { GroupInfo, TabInfo, WindowInfo } from '../shared/types';
 import { createBatcher } from './batcher';
 import { type CommandDeps, runCommand } from './commands';
 import { registerContextMenus } from './context-menus';
+import { createDisplay, POPUP_WINDOW, type TargetTab } from './display';
 import { runPinCommand } from './pins/commands';
 import { PinManager } from './pins/pin-manager';
 import { addSession, listSessions, restoreSessionValue } from './sessions';
@@ -29,8 +31,28 @@ import { shouldDeliver, snapshotPlan, visibleWindows } from './visibility';
  * function rather than top-level code because WXT imports entrypoints at build time.
  */
 export function startBackground(): void {
-  // Toolbar icon opens the panel; this persists, but setting it on every wake is cheap.
-  browser.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+  // Side panel or in-page popup (Display setting). In side-panel mode Chrome opens the panel
+  // from the toolbar button itself; the behaviour persists, and is set again on every wake.
+  const display = createDisplay(
+    {
+      setPanelBehavior: (b) => browser.sidePanel.setPanelBehavior(b),
+      openSidePanel: (windowId) => browser.sidePanel.open({ windowId }),
+      closeSidePanel:
+        typeof browser.sidePanel.close === 'function'
+          ? (windowId) => browser.sidePanel.close({ windowId })
+          : undefined,
+      injectToggle: async (tabId) => {
+        await browser.scripting.executeScript({ target: { tabId }, files: ['/popup-toggle.js'] });
+      },
+      createPopupWindow: (url) =>
+        browser.windows.create({ url, type: 'popup', focused: true, ...POPUP_WINDOW }),
+      removeWindow: (id) => browser.windows.remove(id),
+      getURL: (path) => browser.runtime.getURL(path as '/sidepanel.html'),
+    },
+    (...a) => console.warn(...a),
+  );
+  // Only fires in popup mode: in side-panel mode Chrome handles the click.
+  browser.action.onClicked.addListener((tab) => void display.actionClicked(targetOf(tab)));
 
   const store = new TabStore();
   let pending = new ChangeSet();
@@ -39,8 +61,13 @@ export function startBackground(): void {
    * panel sees every window of its own kind; a panel whose kind isn't
    * known yet (null) is sent nothing window-scoped.
    */
-  const subs = new Map<Browser.runtime.Port, { windowId: number; incognito: boolean | null }>();
-  const hasPanel = (windowId: number) => [...subs.values()].some((s) => s.windowId === windowId);
+  const subs = new Map<
+    Browser.runtime.Port,
+    { windowId: number; incognito: boolean | null; surface: Surface }
+  >();
+  /** Whether the window's side panel is open (in-page popups and popup windows don't count). */
+  const hasPanel = (windowId: number) =>
+    [...subs.values()].some((s) => s.windowId === windowId && s.surface === 'sidebar');
   /** Set by the "focus search" shortcut when the panel isn't connected yet. */
   const pendingFocus = new Set<number>();
 
@@ -317,7 +344,10 @@ export function startBackground(): void {
     // Called asynchronously (layouts load after `ready`), once `publisher` exists.
     onChange: () => publisher.schedule(),
   });
-  browser.windows.onRemoved.addListener((id) => pins.onWindowRemoved(id));
+  browser.windows.onRemoved.addListener((id) => {
+    pins.onWindowRemoved(id);
+    display.windowRemoved(id);
+  });
   browser.windows.onFocusChanged.addListener((id) => pins.onWindowFocused(id));
 
   // --- Commands ---------------------------------------------------------------------------
@@ -341,11 +371,16 @@ export function startBackground(): void {
   // Saved sessions and the sync switches live outside the layouts. Other settings aren't
   // part of the document; a switch takes effect at once (off removes what was shared).
   let syncPrefs = '';
-  void settingsNow().then((s) => (syncPrefs = JSON.stringify(s.sync)));
+  void settingsNow().then((s) => {
+    syncPrefs = JSON.stringify(s.sync);
+    display.setMode(s.display.mode);
+  });
   browser.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && SESSIONS_KEY in changes) publisher.schedule();
     if (area === 'sync' && 'settings' in changes) {
-      const next = JSON.stringify(migrateSettings(changes.settings?.newValue).sync);
+      const settings = migrateSettings(changes.settings?.newValue);
+      if (settings.display.mode !== display.mode) display.setMode(settings.display.mode);
+      const next = JSON.stringify(settings.sync);
       if (next === syncPrefs) return;
       syncPrefs = next;
       void publisher.now();
@@ -385,12 +420,17 @@ export function startBackground(): void {
       if (msg.type === 'subscribe') {
         // Re-subscribing keeps a known kind (it can't change for a window); a new port is
         // unknown, hence sent nothing, until the window list has loaded.
-        subs.set(port, { windowId: msg.windowId, incognito: subs.get(port)?.incognito ?? null });
+        const surface = msg.surface ?? 'sidebar';
+        subs.set(port, {
+          windowId: msg.windowId,
+          incognito: subs.get(port)?.incognito ?? null,
+          surface,
+        });
         await ready;
         await windowsReady;
         await pins.loaded;
         const incognito = windowIncognito(msg.windowId);
-        subs.set(port, { windowId: msg.windowId, incognito });
+        subs.set(port, { windowId: msg.windowId, incognito, surface });
         // Patches are deltas against the store, so a snapshot of the store as it is now
         // lines up exactly with the next patch, even if events are still pending.
         const visible = visibleWindows(incognito, windowList);
@@ -462,9 +502,12 @@ export function startBackground(): void {
 
   // --- Global shortcuts and context menus -------------------------------------------------
 
-  /** sidePanel.open must run synchronously in the gesture, before any await. */
-  function openPanel(windowId: number): void {
-    browser.sidePanel.open({ windowId }).catch((err: unknown) => console.warn('[vc] open', err));
+  /**
+   * Opens the panel for a tab's window, as the Display setting says. Must run synchronously
+   * in the gesture (sidePanel.open), before any await.
+   */
+  function openPanel(tab: TargetTab, toggle = false): void {
+    void display.open(tab, { toggle, sidebarOpen: hasPanel(tab.windowId) });
   }
 
   async function activeTab(windowId?: number): Promise<TabInfo | undefined> {
@@ -494,18 +537,15 @@ export function startBackground(): void {
     const windowId = tab?.windowId;
     switch (command) {
       case 'toggle-side-panel':
-        if (windowId === undefined) return;
         // close() exists from Chrome 141; older versions can only open.
-        if (hasPanel(windowId) && typeof browser.sidePanel.close === 'function') {
-          browser.sidePanel.close({ windowId }).catch(() => {});
-        } else openPanel(windowId);
+        if (tab && windowId !== undefined) openPanel(targetOf(tab), true);
         return;
       case 'focus-search': {
-        if (windowId === undefined) return;
+        if (!tab || windowId === undefined) return;
         const connected = [...subs].filter(([, s]) => s.windowId === windowId);
         if (!connected.length) {
           pendingFocus.add(windowId);
-          openPanel(windowId);
+          openPanel(targetOf(tab));
         }
         for (const [port] of connected)
           port.postMessage({ type: 'focusSearch' } satisfies WorkerMessage);
@@ -535,4 +575,8 @@ export function startBackground(): void {
       if (text) noticeTo(windowId, text);
     },
   });
+}
+
+function targetOf(tab: Browser.tabs.Tab): TargetTab {
+  return { id: tab.id, windowId: tab.windowId, incognito: tab.incognito };
 }

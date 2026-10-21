@@ -9,8 +9,7 @@ describe('v4 -> v5 migration', () => {
       appearance: { mode: 'dark' },
       sessions: { restoreDiscarded: false },
     });
-    expect(SETTINGS_VERSION).toBe(5);
-    expect(r.version).toBe(5);
+    expect(r.version).toBe(SETTINGS_VERSION);
     expect(r.sync).toEqual({ workspaces: true, sessions: true });
     expect(r.appearance.mode).toBe('dark');
     expect(r.sessions.restoreDiscarded).toBe(false);

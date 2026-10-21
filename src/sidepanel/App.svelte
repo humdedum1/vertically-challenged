@@ -1,6 +1,7 @@
 <script lang="ts">
 import { tick } from 'svelte';
 import { type PanelId, rowHeight } from '../settings/schema';
+import { POPUP_CLOSE, parseSurface } from '../shared/surface';
 import { applyAppearance } from './appearance';
 import Icon from './components/Icon.svelte';
 import PanelStrip, { type PanelDef } from './components/PanelStrip.svelte';
@@ -16,6 +17,25 @@ import { ThemeDraft } from './theme-draft.svelte';
 import type { ThemeRegistry } from './theme-registry.svelte';
 
 let { settings, themes }: { settings: SettingsState; themes: ThemeRegistry } = $props();
+
+/** Side panel, in-page popup or popup window; fixed for the page's lifetime. */
+const where = parseSurface(location.search);
+
+/** Closes an in-page popup (via its host page) or a popup window; the side panel has no close. */
+function requestClose(): void {
+  if (where.surface === 'popup') window.parent.postMessage({ type: POPUP_CLOSE }, '*');
+  else if (where.surface === 'window') window.close();
+}
+
+// Escape that nothing in the panel used (menu, selection, search, drag) closes a popup.
+function onWindowKeydown(e: KeyboardEvent): void {
+  if (where.surface !== 'sidebar' && e.key === 'Escape' && !e.defaultPrevented) requestClose();
+}
+
+// A popup window is a launcher: it goes away once the user is back in the browser.
+function onWindowBlur(): void {
+  if (where.surface === 'window' && !document.hasFocus()) window.close();
+}
 
 // The strip follows the user's order and visibility; panels not built yet are skipped.
 const panels = $derived(
@@ -57,7 +77,7 @@ const searchPos = $derived.by((): 'top' | 'bottom' | 'hidden' => {
     : 'bottom';
 });
 
-let tabState = $state.raw(new TabState());
+let tabState = $state.raw(new TabState(where));
 let tabList: ReturnType<typeof TabList> | undefined = $state();
 
 // --- Notices ---------------------------------------------------------------------------
@@ -106,12 +126,15 @@ function setWhitelisted(host: string, add: boolean): void {
 const count = $derived(tabState.tabs.length);
 </script>
 
+<svelte:window onkeydown={onWindowKeydown} onblur={onWindowBlur} />
+
 <main>
   <TopBar
     title={currentLabel}
     showBack={panel !== 'tabs'}
     mode={settings.value.appearance.mode}
     onback={() => (selected = 'tabs')}
+    onclose={where.surface === 'sidebar' ? undefined : requestClose}
     onmode={(mode) => settings.update((s) => ({ ...s, appearance: { ...s.appearance, mode } }))}
   />
   <PanelStrip {panels} selected={panel} onselect={(id) => (selected = id)} />
@@ -158,7 +181,7 @@ const count = $derived(tabState.tabs.length);
         {:else if tabState.status === 'error'}
           <div class="message" role="alert">
             <p>{tabState.error ?? 'Could not connect to the extension.'}</p>
-            <button type="button" onclick={() => (tabState = new TabState())}>Retry</button>
+            <button type="button" onclick={() => (tabState = new TabState(where))}>Retry</button>
           </div>
         {:else if count === 0}
           <p class="message empty">No tabs in this window</p>

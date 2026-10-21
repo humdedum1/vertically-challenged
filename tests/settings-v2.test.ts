@@ -76,6 +76,7 @@ describe('migration to v2/v3', () => {
         whitelist: ['example.com'],
       },
       sessions: { restoreDiscarded: false },
+      display: { mode: 'popup' },
       shortcuts: { ...DEFAULT_SETTINGS.shortcuts, newTab: ['Ctrl+Alt+T'], closeTab: [] },
     };
     expect(migrateSettings(s)).toEqual(s);

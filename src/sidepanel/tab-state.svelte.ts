@@ -6,6 +6,7 @@ import {
   type SetupSummary,
   type WorkerMessage,
 } from '../shared/protocol';
+import type { SurfaceInfo } from '../shared/surface';
 import type { GroupInfo, TabInfo, WindowInfo, WindowPatch } from '../shared/types';
 
 export type ConnectionStatus = 'connecting' | 'ready' | 'error';
@@ -51,6 +52,13 @@ export class TabState {
   onFocusSearch: (() => void) | null = null;
   onNotice: ((n: { level: 'info' | 'error'; text: string }) => void) | null = null;
 
+  /** Where this panel is shown; a popup window lists the browser window it was opened for. */
+  private readonly where: SurfaceInfo;
+
+  constructor(where: SurfaceInfo = { surface: 'sidebar', windowId: null }) {
+    this.where = where;
+  }
+
   private mirrors = new Map<number, Mirror>();
   /**
    * Windows whose snapshot arrived before their layout. The worker sends the layouts
@@ -68,7 +76,10 @@ export class TabState {
 
   async start(): Promise<void> {
     try {
-      const win = await browser.windows.getCurrent();
+      const win =
+        this.where.windowId === null
+          ? await browser.windows.getCurrent()
+          : await browser.windows.get(this.where.windowId);
       if (win.id === undefined) throw new Error('No window id');
       this.windowId = win.id;
       this.incognito = win.incognito;
@@ -96,7 +107,12 @@ export class TabState {
 
   private subscribe(): void {
     if (this.windowId === null) return;
-    this.send({ type: 'subscribe', windowId: this.windowId });
+    const { surface } = this.where;
+    this.send(
+      surface === 'sidebar'
+        ? { type: 'subscribe', windowId: this.windowId }
+        : { type: 'subscribe', windowId: this.windowId, surface },
+    );
   }
 
   private connect(): void {

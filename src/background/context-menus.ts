@@ -1,9 +1,11 @@
 import { browser } from 'wxt/browser';
 import type { TabInfo } from '../shared/types';
+import type { TargetTab } from './display';
 import { toTabInfo } from './to-tab-info';
 
 interface MenuActions {
-  openPanel(windowId: number): void;
+  /** Opens the side panel or the in-page popup (Display setting) for the tab's window. */
+  openPanel(tab: TargetTab): void;
   suspend(tab: TabInfo, others: boolean): void;
   neverSuspend(url: string): Promise<void>;
   saveWindow(windowId: number): Promise<void>;
@@ -43,7 +45,8 @@ export function registerContextMenus(actions: MenuActions): void {
     const tab = raw ? toTabInfo(raw) : null;
     if (info.menuItemId === 'vc-open') {
       // Must stay synchronous: sidePanel.open needs the click's user gesture.
-      if (raw?.windowId !== undefined) actions.openPanel(raw.windowId);
+      if (raw?.windowId !== undefined)
+        actions.openPanel({ id: raw.id, windowId: raw.windowId, incognito: raw.incognito });
       return;
     }
     if (!tab) return;

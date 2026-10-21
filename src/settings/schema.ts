@@ -1,7 +1,7 @@
 import { DEFAULT_THEME_ID } from '../themes/builtin';
 
 /** Bump when the stored shape changes, and add a step to MIGRATIONS in migrate.ts. */
-export const SETTINGS_VERSION = 5;
+export const SETTINGS_VERSION = 6;
 
 export type ColorMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'comfortable';
@@ -81,6 +81,18 @@ export interface SyncSettings {
   sessions: boolean;
 }
 
+/** Where the toolbar button, the shortcuts and the toolbar menu open the panel. */
+export type DisplayMode = 'sidebar' | 'popup';
+export const DISPLAY_MODES: readonly DisplayMode[] = ['sidebar', 'popup'];
+
+export interface DisplaySettings {
+  /**
+   * sidebar: Chrome's side panel. popup: floating over the current page (in a small
+   * window on pages extensions can't run on, such as chrome:// pages and incognito).
+   */
+  mode: DisplayMode;
+}
+
 export interface TabRowSettings {
   layout: RowLayout;
   actions: ActionVisibility;
@@ -110,6 +122,7 @@ export interface Settings {
   suspend: SuspendSettings;
   sessions: SessionSettings;
   sync: SyncSettings;
+  display: DisplaySettings;
   shortcuts: Keymap;
 }
 
@@ -151,6 +164,7 @@ export const DEFAULT_SETTINGS: Settings = {
   suspend: { auto: false, minutes: 30, skipPinned: true, skipAudible: true, whitelist: [] },
   sessions: { restoreDiscarded: true },
   sync: { workspaces: true, sessions: true },
+  display: { mode: 'sidebar' },
   shortcuts: {
     focusSearch: ['/', 'Ctrl+F'],
     closeTab: ['Delete'],

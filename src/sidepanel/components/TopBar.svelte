@@ -8,9 +8,11 @@ interface Props {
   mode: ColorMode;
   onback: () => void;
   onmode: (next: ColorMode) => void;
+  /** Shown in the in-page popup and the popup window, which the user closes from here. */
+  onclose?: () => void;
 }
 
-let { title, showBack, mode, onback, onmode }: Props = $props();
+let { title, showBack, mode, onback, onmode, onclose }: Props = $props();
 
 const ORDER: ColorMode[] = ['system', 'light', 'dark'];
 const MODE_ICON: Record<ColorMode, IconName> = { system: 'system', light: 'sun', dark: 'moon' };
@@ -31,6 +33,11 @@ const next = $derived(ORDER[(ORDER.indexOf(mode) + 1) % ORDER.length] as ColorMo
   >
     <Icon name={MODE_ICON[mode]} />
   </button>
+  {#if onclose}
+    <button type="button" class="round" aria-label="Close" title="Close (Esc)" onclick={onclose}>
+      <Icon name="close" />
+    </button>
+  {/if}
 </header>
 
 <style>

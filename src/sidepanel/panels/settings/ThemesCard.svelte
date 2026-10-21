@@ -195,13 +195,17 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
     padding: 6px var(--pad-card) var(--pad-card);
   }
 
+  /* One grouped list: rows divided by hairlines, not a box per theme inside the card. */
   .list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
     margin: 0;
     padding: 0;
     list-style: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-row);
+    background: var(--surface-0);
+    overflow: hidden;
   }
 
   .list > li {
@@ -209,13 +213,15 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
     flex-direction: column;
     gap: 6px;
     padding: 8px 10px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-row);
-    background: var(--surface-0);
   }
 
+  .list > li + li {
+    border-top: 1px solid var(--border);
+  }
+
+  /* With its "In use" badge, the theme in use is the tinted row. */
   .list > li.active {
-    border-color: var(--mPrimary);
+    background: var(--state-selected);
   }
 
   .head {

@@ -267,6 +267,11 @@ const tabLabel = (t: { title: string; url: string }): string => t.title || t.url
     transition: background-color var(--dur) var(--ease);
   }
 
+  /* A tab row's button is not in a flex row, so flex: 1 alone wouldn't size it. */
+  li > .item {
+    width: 100%;
+  }
+
   .win .item {
     padding-left: 4px;
   }

@@ -22,6 +22,36 @@ let { panels, selected, onselect }: Props = $props();
 
 let strip: HTMLDivElement | undefined = $state();
 
+/**
+ * How much label the strip can afford: every label, only the selected pill's, or icons
+ * only. Hidden labels stay as the button's accessible name (and its tooltip), so a
+ * narrow panel still shows every panel instead of scrolling some out of sight.
+ */
+let fit = $state<'full' | 'compact' | 'icons'>('full');
+const labelHidden = (id: Id) => fit === 'icons' || (fit === 'compact' && id !== selected);
+
+async function refit(): Promise<void> {
+  for (const level of ['full', 'compact', 'icons'] as const) {
+    fit = level;
+    await tick();
+    if (!strip || strip.scrollWidth <= strip.clientWidth) return;
+  }
+}
+
+$effect(() => {
+  if (!strip) return;
+  const ro = new ResizeObserver(() => void refit());
+  ro.observe(strip);
+  return () => ro.disconnect();
+});
+
+// The selected pill's label decides whether the compact strip fits.
+$effect(() => {
+  void selected;
+  void panels.length;
+  void refit();
+});
+
 // Selected pill must stay visible when the strip overflows (and when selection changes via Back).
 $effect(() => {
   const id = selected;
@@ -66,10 +96,12 @@ function onkeydown(e: KeyboardEvent): void {
       aria-controls="vc-panel-{p.id}"
       tabindex={p.id === selected ? 0 : -1}
       class:selected={p.id === selected}
+      class:icon-only={labelHidden(p.id)}
+      title={labelHidden(p.id) ? p.label : undefined}
       onclick={() => onselect(p.id)}
     >
       <Icon name={p.icon} size={15} />
-      <span>{p.label}</span>
+      <span class:sr={labelHidden(p.id)}>{p.label}</span>
     </button>
   {/each}
 </div>
@@ -120,7 +152,22 @@ function onkeydown(e: KeyboardEvent): void {
     color: var(--mPrimary);
   }
 
+  button.icon-only {
+    justify-content: center;
+    width: 32px;
+    padding: 0;
+  }
+
   button:focus-visible {
     outline-offset: -2px;
+  }
+
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 </style>

@@ -265,6 +265,15 @@ function openChromeShortcuts(): void {
     list-style: none;
   }
 
+  /* One grouped list: rows divided by hairlines, not a box per row inside the card. */
+  .actions {
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-row);
+    background: var(--surface-0);
+    overflow: hidden;
+  }
+
   .actions li {
     display: flex;
     flex-wrap: wrap;
@@ -272,9 +281,10 @@ function openChromeShortcuts(): void {
     gap: 4px 8px;
     min-height: 40px;
     padding: 4px 8px 4px 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-row);
-    background: var(--surface-0);
+  }
+
+  .actions li + li {
+    border-top: 1px solid var(--border);
   }
 
   .name {

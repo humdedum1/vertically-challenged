@@ -117,6 +117,20 @@ select {
   color: inherit;
 }
 
+:root {
+  accent-color: var(--mPrimary);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--mPrimary) 32%, transparent);
+  color: var(--mOnSurface);
+}
+
+input,
+textarea {
+  caret-color: var(--mPrimary);
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--mOutline) transparent;

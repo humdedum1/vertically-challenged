@@ -40,9 +40,13 @@ export function chromeBinary() {
 
 /**
  * A headless Chromium with only this extension, plus its id. Pass `profile` to reuse a
- * profile across launches (it is then left in place on close); `args` adds flags.
+ * profile across launches (it is then left in place on close); `args` adds flags and
+ * `scale` sets the device pixel ratio (for sharper screenshots).
  */
-export async function launch(ext, { width = 400, height = 1400, profile, args: extra = [] } = {}) {
+export async function launch(
+  ext,
+  { width = 400, height = 1400, scale = 1, profile, args: extra = [] } = {},
+) {
   const own = profile === undefined;
   profile ??= fs.mkdtempSync(path.join(os.tmpdir(), 'vc-e2e-'));
   const args = [
@@ -58,6 +62,7 @@ export async function launch(ext, { width = 400, height = 1400, profile, args: e
     headless: false,
     args,
     viewport: { width, height },
+    deviceScaleFactor: scale,
   });
   let [sw] = ctx.serviceWorkers();
   if (!sw) sw = await ctx.waitForEvent('serviceworker');

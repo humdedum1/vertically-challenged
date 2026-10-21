@@ -78,13 +78,17 @@ async function move(i: number, delta: -1 | 1, id: Id): Promise<void> {
 </ol>
 
 <style>
+  /* One grouped list: rows divided by hairlines, not a box per row inside the card. */
   .list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
     margin: 0;
     padding: 0;
     list-style: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-row);
+    background: var(--surface-0);
+    overflow: hidden;
   }
 
   li {
@@ -93,9 +97,10 @@ async function move(i: number, delta: -1 | 1, id: Id): Promise<void> {
     gap: 4px;
     min-height: 40px;
     padding: 4px 8px 4px 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-row);
-    background: var(--surface-0);
+  }
+
+  li + li {
+    border-top: 1px solid var(--border);
   }
 
   li.off .name {

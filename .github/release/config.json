@@ -4,7 +4,7 @@
   ],
   "prereleaseBranches": [],
   "tagFormat": "v${version}",
-  "firstRelease": "require-decision",
+  "firstRelease": "allow",
   "initialDevelopment": false,
   "versionFiles": [
     {

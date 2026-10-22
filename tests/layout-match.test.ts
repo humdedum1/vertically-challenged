@@ -138,3 +138,107 @@ describe('matchLayouts', () => {
     expect(matchLayouts([layout('l1', [b])], [win(1, tabs('weird-b'))]).size).toBe(0);
   });
 });
+
+describe('named window restart matching', () => {
+  const named = (id: string, urls: string[]) => layout(id, [], { name: id, tabUrls: urls });
+  const restored = (windowId: number, urls: string[]) => ({ ...win(windowId, []), urls });
+
+  it('recovers names without pinned tabs despite changed ids and tab order', () => {
+    const matches = matchLayouts(
+      [
+        named('Work', ['https://work.test/a', 'https://work.test/b#old']),
+        named('Home', ['https://home.test/']),
+      ],
+      [
+        restored(8, ['https://home.test/']),
+        restored(7, ['https://work.test/b#new', 'https://work.test/a']),
+      ],
+    );
+    expect(matches.get(7)?.layoutId).toBe('Work');
+    expect(matches.get(8)?.layoutId).toBe('Home');
+    expect(matches.get(7)?.bind.size).toBe(0);
+  });
+
+  it('does not guess between identical windows or saved names', () => {
+    expect(
+      matchLayouts(
+        [named('Work', ['https://same.test/']), named('Home', ['https://same.test/'])],
+        [restored(7, ['https://same.test/'])],
+      ).size,
+    ).toBe(0);
+    expect(
+      matchLayouts(
+        [named('Work', ['https://same.test/'])],
+        [restored(7, ['https://same.test/']), restored(8, ['https://same.test/'])],
+      ).size,
+    ).toBe(0);
+  });
+
+  it('does not match unrelated windows through one shared page', () => {
+    expect(
+      matchLayouts(
+        [named('Work', ['https://shared.test/', 'https://work.test/a', 'https://work.test/b'])],
+        [restored(7, ['https://shared.test/', 'https://home.test/a', 'https://home.test/b'])],
+      ).size,
+    ).toBe(0);
+  });
+
+  it('never restores a normal window name into an incognito window', () => {
+    expect(
+      matchLayouts(
+        [named('Work', ['https://work.test/'])],
+        [{ ...restored(7, ['https://work.test/']), incognito: true }],
+      ).size,
+    ).toBe(0);
+  });
+
+  it('uses regular tabs to distinguish windows sharing pinned sites', () => {
+    const matches = matchLayouts(
+      [
+        layout('Work', [item('https://shared.test/')], {
+          name: 'Work',
+          tabUrls: ['https://work.test/'],
+        }),
+        layout('Home', [item('https://shared.test/')], {
+          name: 'Home',
+          tabUrls: ['https://home.test/'],
+        }),
+      ],
+      [
+        { ...win(7, tabs('https://shared.test/')), urls: ['https://home.test/'] },
+        { ...win(8, tabs('https://shared.test/')), urls: ['https://work.test/'] },
+      ],
+    );
+    expect(matches.get(7)?.layoutId).toBe('Home');
+    expect(matches.get(8)?.layoutId).toBe('Work');
+  });
+});
+
+it('does not swap named layouts with identical pinned and regular tabs', () => {
+  const urls = ['https://shared.test/'];
+  const named = (id: string) =>
+    layout(id, [item('https://shared.test/')], { name: id, tabUrls: urls });
+  const matches = matchLayouts(
+    [named('Work'), named('Home')],
+    [{ ...win(7, tabs(...urls)), urls }],
+  );
+  expect(matches.size).toBe(0);
+});
+
+it('recovers overlapping named windows once the stronger match is assigned', () => {
+  const a = 'https://a.test/';
+  const b = 'https://b.test/';
+  const c = 'https://c.test/';
+  const matches = matchLayouts(
+    [
+      layout('Work', [], { name: 'Work', tabUrls: [a, b, c] }),
+      layout('Home', [], { name: 'Home', tabUrls: [a, b] }),
+    ],
+    [
+      { ...win(7, []), urls: [a, b, c] },
+      { ...win(8, []), urls: [a, b] },
+    ],
+  );
+  expect(matches.get(7)?.layoutId).toBe('Work');
+  expect(matches.get(8)?.layoutId).toBe('Home');
+});

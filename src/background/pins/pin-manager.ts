@@ -159,8 +159,8 @@ export class PinManager {
   private readonly lateCandidates = new Set<string>();
   /** Windows bound by restart matching, whose dormant items may still find a late tab. */
   private readonly restartMatched = new Set<number>();
-  /** Late windows waiting for their pinned tabs to settle, with when each was first seen. */
-  private readonly lateWaiting = new Map<number, { since: number; pinned: string }>();
+  /** Late windows waiting for their tabs to settle, with when each was first seen. */
+  private readonly lateWaiting = new Map<number, { since: number; signature: string }>();
   /** Late windows already matched (or found unmatched); they are reconciled normally. */
   private readonly lateDone = new Set<number>();
   private lateTimer: ReturnType<typeof setTimeout> | null = null;
@@ -304,6 +304,7 @@ export class PinManager {
       open.map((w) => ({
         windowId: w.id,
         incognito: w.incognito,
+        urls: this.deps.store.snapshot(w.id).tabs.map((t) => t.url),
         pinned: this.deps.store
           .snapshot(w.id)
           .tabs.filter((t) => t.pinned)
@@ -374,7 +375,7 @@ export class PinManager {
   }
 
   /**
-   * A window that shows pinned tabs during the grace period while it has no layout of
+   * A window that shows tabs during the grace period while it has no layout of
    * its own (unbound, or an empty placeholder) may be a late restore. Not when our own
    * command is pinning its tabs: that is the user, not Chrome restoring.
    */
@@ -384,23 +385,26 @@ export class PinManager {
     const l = id === undefined ? undefined : this.layouts.get(id);
     if (l && !isEmptyLayout(l)) return false;
     const pinned = tabs.filter((t) => t.pinned);
-    return pinned.length > 0 && !pinned.some((t) => this.pending.has(t.id));
+    const namedCandidates = [...this.lateCandidates].some(
+      (id) => this.layouts.get(id)?.tabUrls?.length,
+    );
+    return (
+      (pinned.length > 0 || (namedCandidates && tabs.length > 0)) &&
+      !pinned.some((t) => this.pending.has(t.id))
+    );
   }
 
   /**
-   * Holds the window until its pinned tabs stop changing (see LATE_SETTLE_MS). Returns
+   * Holds the window until its tabs stop changing (see LATE_SETTLE_MS). Returns
    * false once it has waited long enough; the caller then matches right away.
    */
   private holdLate(windowId: number, tabs: readonly TabInfo[]): boolean {
     const now = this.deps.now?.() ?? Date.now();
-    const pinned = tabs
-      .filter((t) => t.pinned)
-      .map((t) => t.id)
-      .join(',');
+    const signature = JSON.stringify(tabs.map((t) => [t.id, t.url]));
     const w = this.lateWaiting.get(windowId);
     if (w && now - w.since >= LATE_SETTLE_MAX_MS) return false;
-    if (!w || w.pinned !== pinned) {
-      this.lateWaiting.set(windowId, { since: w?.since ?? now, pinned });
+    if (!w || w.signature !== signature) {
+      this.lateWaiting.set(windowId, { since: w?.since ?? now, signature });
       if (this.lateTimer !== null) clearTimeout(this.lateTimer);
       this.lateTimer = setTimeout(() => {
         this.lateTimer = null;
@@ -426,11 +430,12 @@ export class PinManager {
         const l = id === undefined ? undefined : this.layouts.get(id);
         if (l && !isEmptyLayout(l)) return [];
         const pinned = tabs.filter((t) => t.pinned);
-        if (pinned.length === 0) return [];
+        if (tabs.length === 0) return [];
         return [
           {
             windowId,
             incognito: this.incognitoOf(windowId) ?? true,
+            urls: tabs.map((t) => t.url),
             pinned: pinned.map((t) => ({ id: t.id, url: t.url, title: t.title })),
           },
         ];
@@ -452,6 +457,7 @@ export class PinManager {
       {
         windowId,
         incognito: this.incognitoOf(windowId) ?? true,
+        urls: tabs.map((t) => t.url),
         pinned: pinned.map((t) => ({ id: t.id, url: t.url, title: t.title })),
       },
     ]).get(windowId);
@@ -620,6 +626,11 @@ export class PinManager {
       }
       this.publish(changed);
     });
+  }
+
+  /** Freeze the last complete layout before shutdown's tab-removal events are flushed. */
+  onWindowClosing(windowId: number): void {
+    this.closed.add(windowId);
   }
 
   onWindowRemoved(windowId: number): void {
@@ -1056,6 +1067,23 @@ export class PinManager {
     // A window without pinned tabs needs no layout until a panel asks for one.
     if (!this.bindings.has(windowId) && !tabs.some((t) => t.pinned)) return null;
     let layout = this.layoutOf(windowId);
+    let urlsChanged = false;
+    if (layout.name && tabs.length > 0) {
+      const tabUrls = tabs
+        .map((t) => t.url)
+        .filter(isLayoutUrl)
+        .slice(0, MAX_ITEMS);
+      if (JSON.stringify(tabUrls) !== JSON.stringify(layout.tabUrls)) {
+        layout = { ...layout, tabUrls };
+        this.layouts.set(layout.id, layout);
+        urlsChanged = true;
+      }
+    } else if (!layout.name && layout.tabUrls) {
+      const { tabUrls: _, ...rest } = layout;
+      layout = rest;
+      this.layouts.set(layout.id, layout);
+      urlsChanged = true;
+    }
     const incognito = this.incognitoOf(windowId) ?? layout.incognito;
     const flipped = incognito !== layout.incognito;
     if (flipped) {
@@ -1078,7 +1106,7 @@ export class PinManager {
     if (r.moves.length === 0) this.retries.delete(windowId);
     else if (!stale && !this.inFlight.has(windowId)) this.issueMoves(windowId, r.moves);
     if (resumed) void this.writeMoving();
-    return flipped || late ? { ...r, changed: true } : r;
+    return flipped || late || urlsChanged ? { ...r, changed: true } : r;
   }
 
   /**

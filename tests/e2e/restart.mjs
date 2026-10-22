@@ -72,6 +72,14 @@ const winB = await api(
   async (url) => (await chrome.windows.create({ url, focused: false })).id,
   `${SITE}/b-home`,
 );
+const winC = await api(
+  async (url) => (await chrome.windows.create({ url, focused: false })).id,
+  `${SITE}/c-home`,
+);
+const winD = await api(
+  async (url) => (await chrome.windows.create({ url, focused: false })).id,
+  `${SITE}/d-home`,
+);
 const a = [];
 for (const n of ['a1', 'a2', 'a3', 'a4']) a.push(await open(winA, n));
 const b = [];
@@ -115,6 +123,14 @@ await send({
   dest: { zone: 'pinned', folderId: null, index: 1 },
   itemIds: [a4Item],
 });
+for (const [windowId, name] of [
+  [winA, 'Work'],
+  [winB, 'Home'],
+  [winC, 'No pins C'],
+  [winD, 'No pins D'],
+]) {
+  await send({ type: 'renameWindow', windowId, name });
+}
 await sleep(1500);
 const before = await api(
   ([x, y]) => [globalThis.__layouts[x], globalThis.__layouts[y]],
@@ -145,6 +161,14 @@ check(
   'both windows were restored',
   JSON.stringify(wins),
 );
+for (const [url, name] of [
+  [`${SITE}/c-home`, 'No pins C'],
+  [`${SITE}/d-home`, 'No pins D'],
+]) {
+  const id = winOf(url);
+  const layout = await api((w) => globalThis.__layouts[w], id);
+  check(layout?.name === name, `unpinned window retained name: ${name}`, JSON.stringify(layout));
+}
 const oldTabIds = new Set([...a, ...b]);
 const restoredIds = await api(async () => (await chrome.tabs.query({})).map((t) => t.id));
 check(
@@ -167,6 +191,7 @@ for (const [k, name] of [
   const was = before[k];
   const now = after[k];
   check(now?.id === was.id, `window ${name} got its own layout back`, `${now?.id} vs ${was.id}`);
+  check(now?.name === was.name, `window ${name} retained its custom name`);
   const wasItems = flat(was).map(({ id, url, folder, zone }) => ({ id, url, folder, zone }));
   const nowItems = now ? flat(now) : [];
   check(

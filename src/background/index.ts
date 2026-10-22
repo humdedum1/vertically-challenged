@@ -222,7 +222,8 @@ export function startBackground(): void {
       pending.resync.add(info.windowId);
     batcher.schedule();
   });
-  browser.tabs.onRemoved.addListener((tabId, { windowId }) => {
+  browser.tabs.onRemoved.addListener((tabId, { windowId, isWindowClosing }) => {
+    if (isWindowClosing) pins.onWindowClosing(windowId);
     suspender.onRemoved(tabId);
     pending.removed.add(tabId);
     pending.upserts.delete(tabId);

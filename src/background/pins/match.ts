@@ -1,9 +1,9 @@
 /**
  * Restart matching: after a Chrome restart every tab and window id changes, so saved
- * layouts are re-attached to windows by comparing the restored pinned tabs' URLs with
- * the layouts' items. Pure; the worker applies the result.
+ * layouts are re-attached by pinned-tab URLs and saved URLs from named windows.
+ * Pure; the worker applies the result.
  */
-import { flattenItems, type PinItem, type WindowLayout } from '../../shared/layout';
+import { flattenItems, MAX_ITEMS, type PinItem, type WindowLayout } from '../../shared/layout';
 
 export interface PinnedTabLite {
   id: number;
@@ -69,33 +69,84 @@ export function pair(
 /**
  * Assigns layouts to windows one-to-one. A pair qualifies when at least half the
  * window's pinned tabs find an item, so one shared site does not claim a whole layout.
- * Candidates are taken best score first, then most recently used layout, then lowest
- * window id, which keeps the outcome deterministic.
+ * Saved URLs break pinned-match ties and recover named windows without pins when a
+ * strict majority overlaps. Ambiguous named windows stay unmatched.
  */
 export function matchLayouts(
   layouts: readonly WindowLayout[],
-  windows: readonly { windowId: number; incognito: boolean; pinned: readonly PinnedTabLite[] }[],
+  windows: readonly {
+    windowId: number;
+    incognito: boolean;
+    pinned: readonly PinnedTabLite[];
+    urls?: readonly string[];
+  }[],
 ): Map<number, Match> {
   const flat = new Map(layouts.map((l) => [l.id, flattenItems(l)]));
-  const candidates: { windowId: number; layout: WindowLayout; bind: Map<string, number> }[] = [];
+  const candidates: {
+    windowId: number;
+    layout: WindowLayout;
+    bind: Map<string, number>;
+    overlap: number;
+  }[] = [];
+  const urlCandidates: typeof candidates = [];
   for (const w of windows) {
-    if (w.pinned.length === 0) continue;
     const need = Math.ceil(w.pinned.length / 2);
     for (const layout of layouts) {
       if (layout.incognito !== w.incognito) continue;
       const bind = pair(flat.get(layout.id) ?? [], w.pinned);
-      if (bind.size >= need) candidates.push({ windowId: w.windowId, layout, bind });
+      const saved = new Set(layout.tabUrls?.map(normalise));
+      const live = new Set(w.urls?.slice(0, MAX_ITEMS).map(normalise));
+      const overlap = [...live].filter((url) => saved.has(url)).length;
+      const c = { windowId: w.windowId, layout, bind, overlap };
+      if (bind.size > 0 && bind.size >= need) candidates.push(c);
+      else if (layout.name && overlap > Math.max(saved.size, live.size) / 2) urlCandidates.push(c);
     }
   }
   candidates.sort(
     (a, b) =>
-      b.bind.size - a.bind.size || b.layout.lastUsed - a.layout.lastUsed || a.windowId - b.windowId,
+      b.bind.size - a.bind.size ||
+      b.overlap - a.overlap ||
+      b.layout.lastUsed - a.layout.lastUsed ||
+      a.windowId - b.windowId,
   );
 
   const out = new Map<number, Match>();
   const taken = new Set<string>();
   for (const c of candidates) {
     if (out.has(c.windowId) || taken.has(c.layout.id)) continue;
+    if (
+      c.layout.name &&
+      c.layout.tabUrls?.length &&
+      candidates.some(
+        (other) =>
+          other !== c &&
+          !out.has(other.windowId) &&
+          !taken.has(other.layout.id) &&
+          other.bind.size === c.bind.size &&
+          other.overlap === c.overlap &&
+          (other.windowId === c.windowId || other.layout.id === c.layout.id),
+      )
+    )
+      continue;
+    out.set(c.windowId, { layoutId: c.layout.id, bind: c.bind });
+    taken.add(c.layout.id);
+  }
+  const available = urlCandidates.filter((c) => !out.has(c.windowId) && !taken.has(c.layout.id));
+  available.sort((a, b) => b.overlap - a.overlap);
+  for (const c of available) {
+    if (out.has(c.windowId) || taken.has(c.layout.id)) continue;
+    // Identical evidence cannot identify a window safely; never choose a name by id or recency.
+    if (
+      available.some(
+        (other) =>
+          other !== c &&
+          !out.has(other.windowId) &&
+          !taken.has(other.layout.id) &&
+          other.overlap >= c.overlap &&
+          (other.windowId === c.windowId || other.layout.id === c.layout.id),
+      )
+    )
+      continue;
     out.set(c.windowId, { layoutId: c.layout.id, bind: c.bind });
     taken.add(c.layout.id);
   }

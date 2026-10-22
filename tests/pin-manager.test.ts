@@ -1114,3 +1114,104 @@ describe('PinManager final review fixes', () => {
     expect(flattenItems(pins.layoutOf(1)).map((i) => i.tabId)).toEqual([11, 10, 12]);
   });
 });
+
+describe('named windows without pinned tabs', () => {
+  it('saves a name and URL evidence, then recovers them with new window and tab ids', async () => {
+    const t = setup({ windows: { 1: [tab(1, { url: 'https://work.test/' })] } });
+    const first = new PinManager(t.deps);
+    await first.loaded;
+    await first.mutate(1, (l) => ({ ...l, name: 'Work' }));
+    await settle();
+    const saved = t.local.data.get(LAYOUTS_KEY) as LayoutStore;
+    expect(saved.layouts[0]?.tabUrls).toEqual(['https://work.test/']);
+    const restored = setup({
+      windows: { 7: [tab(70, { windowId: 7, url: 'https://work.test/' })] },
+      local: { [LAYOUTS_KEY]: saved },
+    });
+    const second = new PinManager(restored.deps);
+    await second.loaded;
+    await settle();
+    expect(second.layoutOf(7).name).toBe('Work');
+    expect(second.layoutOf(7).id).toBe(first.layoutOf(1).id);
+  });
+
+  it('updates evidence after navigation and retains it while a closing window empties', async () => {
+    const t = setup({ windows: { 1: [tab(1, { url: 'https://old.test/' })] } });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await pins.mutate(1, (l) => ({ ...l, name: 'Work' }));
+    t.resync(1, [tab(1, { url: 'https://new.test/' })]);
+    await pins.afterFlush([1]);
+    t.resync(1, []);
+    await pins.afterFlush([1]);
+    await settle();
+    expect((t.local.data.get(LAYOUTS_KEY) as LayoutStore).layouts[0]?.tabUrls).toEqual([
+      'https://new.test/',
+    ]);
+  });
+
+  it('matches a late restored window without pinned tabs', async () => {
+    const saved = layout(1, [], { name: 'Work', tabUrls: ['https://work.test/'] });
+    const t = setup({
+      windows: { 2: [tab(20, { windowId: 2, url: 'chrome://newtab/' })] },
+      local: { [LAYOUTS_KEY]: stored([saved]) },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    t.setWindows([
+      { id: 2, focused: false, incognito: false },
+      { id: 7, focused: true, incognito: false },
+    ]);
+    t.resync(7, [tab(70, { windowId: 7, url: 'https://work.test/' })]);
+    await pins.afterFlush([7]);
+    await settle();
+    expect(pins.layoutOf(7).name).toBe('Work');
+  });
+});
+
+it('keeps a named window after close and keeps incognito evidence off disk', async () => {
+  const t = setup({
+    windows: {
+      1: [tab(1, { url: 'https://work.test/' })],
+      2: [tab(2, { windowId: 2, incognito: true, url: 'https://private.test/' })],
+    },
+    incognito: [2],
+  });
+  const pins = new PinManager(t.deps);
+  await pins.loaded;
+  await pins.mutate(1, (l) => ({ ...l, name: 'Work' }));
+  await pins.mutate(2, (l) => ({ ...l, name: 'Private' }));
+  await settle();
+  expect(JSON.stringify([...t.local.data.values()])).not.toContain('private.test');
+  expect(JSON.stringify([...t.session.data.values()])).toContain('private.test');
+  pins.onWindowRemoved(1);
+  await settle();
+  expect(
+    (t.local.data.get(LAYOUTS_KEY) as LayoutStore).layouts.some((l) => l.name === 'Work'),
+  ).toBe(true);
+});
+
+it('keeps the full named-window fingerprint when shutdown removes tabs in separate flushes', async () => {
+  const urls = ['https://work.test/a', 'https://work.test/b', 'https://work.test/c'];
+  const t = setup({ windows: { 1: urls.map((url, i) => tab(i + 1, { url })) } });
+  const pins = new PinManager(t.deps);
+  await pins.loaded;
+  await pins.mutate(1, (l) => ({ ...l, name: 'Work' }));
+  await settle();
+  pins.onWindowClosing(1);
+  t.resync(1, [tab(3, { url: urls[2] })]);
+  await pins.afterFlush([1]);
+  pins.onWindowRemoved(1);
+  await settle();
+  const saved = t.local.data.get(LAYOUTS_KEY) as LayoutStore;
+  expect(saved.layouts[0]?.tabUrls).toEqual(urls);
+  const restarted = setup({
+    windows: { 7: urls.map((url, i) => tab(i + 10, { windowId: 7, url })) },
+    local: { [LAYOUTS_KEY]: saved },
+  });
+  const recovered = new PinManager(restarted.deps);
+  await recovered.loaded;
+  await settle();
+  expect(recovered.layoutOf(7).name).toBe('Work');
+});

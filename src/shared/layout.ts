@@ -46,6 +46,8 @@ export interface WindowLayout {
   id: string;
   /** null = use the active tab's title. */
   name: string | null;
+  /** Last known tab URLs, used to recover named windows after browser ids change. */
+  tabUrls?: string[];
   essentials: PinItem[];
   pinned: PinNode[];
   /** Layout ids of OTHER windows collapsed in this window's panel. */
@@ -124,9 +126,9 @@ export function flattenItems(l: WindowLayout): PinItem[] {
   return out;
 }
 
-/** A layout with a folder but no items is still a real layout, so only a bare one counts as empty. */
+/** A custom name or a folder makes a layout worth keeping even without pinned items. */
 export function isEmptyLayout(l: WindowLayout): boolean {
-  return l.essentials.length === 0 && l.pinned.length === 0;
+  return l.name === null && l.essentials.length === 0 && l.pinned.length === 0;
 }
 
 type NodeHit = {
@@ -257,6 +259,13 @@ function parseLayout(raw: Record<string, unknown>): WindowLayout | null {
   return {
     id,
     name,
+    ...(Array.isArray(raw.tabUrls)
+      ? {
+          tabUrls: raw.tabUrls
+            .filter((url): url is string => typeof url === 'string' && isLayoutUrl(url))
+            .slice(0, MAX_ITEMS),
+        }
+      : {}),
     essentials,
     pinned,
     collapsed,

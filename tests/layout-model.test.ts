@@ -219,3 +219,21 @@ describe('newId and storage keys', () => {
     expect(INCOGNITO_LAYOUTS_KEY).toBe('layouts:incognito');
   });
 });
+
+it('preserves named layouts without pins and validates bounded restart evidence', () => {
+  const raw = store([
+    layout(1, {
+      name: 'Work',
+      tabUrls: [
+        7,
+        'javascript:alert(1)',
+        'https://work.test/',
+        ...Array(MAX_ITEMS + 1).fill('https://other.test/'),
+      ],
+    }),
+  ]);
+  const parsed = parseLayoutStore(raw).layouts[0] as WindowLayout;
+  expect(isEmptyLayout(parsed)).toBe(false);
+  expect(parsed.tabUrls?.[0]).toBe('https://work.test/');
+  expect(parsed.tabUrls).toHaveLength(MAX_ITEMS);
+});

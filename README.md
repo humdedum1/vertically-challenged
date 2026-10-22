@@ -238,6 +238,8 @@ Every computer shares a copy of its own things and never changes another compute
 
 The panel always lists every window; the old "Show all windows" toggle is gone (settings from earlier versions are migrated). Your own window comes first: Essentials grid, pinned tabs and folders, the Clear divider, then normal tabs. Every other window is a collapsible group below it with a header (its name, or its active tab's title, and the tab count), a smaller row of its Essentials, its pinned tabs and folders, then its normal tabs. Click any tab to focus that window and tab; rename a window from its header's menu.
 
+Custom window names are recovered after a browser restart using saved tab URLs, including windows with no pinned tabs. Named windows keep up to 500 URLs locally for matching; incognito evidence stays in session storage. Windows with indistinguishable tabs are left unmatched rather than having names assigned arbitrarily. Existing names need one run of the updated extension to save this evidence.
+
 - Collapse state is per panel: collapsing window B in A's panel does not change B's own panel. The worker remembers each panel's choice.
 - Drag tabs between windows, including onto another window's Essentials row or folders, or use "Move to window".
 - Incognito and normal windows are kept apart: an incognito panel lists only incognito windows and a normal panel only normal ones, tabs can't move between them, incognito layouts live only in `chrome.storage.session`, and an incognito panel keeps its Essentials' site colours in memory only, so no incognito URL or site is written to disk.

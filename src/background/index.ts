@@ -257,6 +257,7 @@ export function startBackground(): void {
   });
 
   const GROUP_COMMANDS = new Set<string>([
+    'autoGroup',
     'group',
     'ungroup',
     'updateGroup',
@@ -478,6 +479,7 @@ export function startBackground(): void {
           msg.type === 'restoreSession' ||
           msg.type === 'saveSession' ||
           msg.type === 'moveToNewWindow' ||
+          msg.type === 'autoGroup' ||
           msg.type === 'setupOpen' ||
           isSyncMessage(msg)
         ) {
@@ -493,6 +495,7 @@ export function startBackground(): void {
       if (GROUP_COMMANDS.has(msg.type)) {
         if (home !== null) markGroups({ windowId: home });
         if (msg.type === 'move') markGroups({ windowId: msg.target.windowId });
+        if (msg.type === 'autoGroup') markGroups({ windowId: msg.windowId });
       }
     });
 

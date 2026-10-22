@@ -252,7 +252,7 @@ describe('dividerMenu', () => {
       send: r.send,
       onNewFolder,
     });
-    expect(labels(items)).toEqual(['New folder', '—', 'Clear 3 tabs']);
+    expect(labels(items)).toEqual(['Group tabs by website', 'New folder', '—', 'Clear 3 tabs']);
     find(items, 'New folder').onselect();
     find(items, 'Clear 3 tabs').onselect();
     expect(r.sent).toEqual([
@@ -266,6 +266,8 @@ describe('dividerMenu', () => {
       { type: 'clearTabs', windowId: 1 },
     ]);
     expect(onNewFolder).toHaveBeenCalledTimes(1);
+    find(items, 'Group tabs by website').onselect();
+    expect(r.sent.at(-1)).toEqual({ type: 'autoGroup', windowId: 1 });
 
     const other = dividerMenu({
       windowId: 2,
@@ -275,7 +277,7 @@ describe('dividerMenu', () => {
       send: r.send,
       onNewFolder,
     });
-    expect(labels(other)).toEqual(['New folder']);
+    expect(labels(other)).toEqual(['Group tabs by website', 'New folder']);
     const none = dividerMenu({
       windowId: 1,
       pinnedCount: 0,
@@ -319,5 +321,7 @@ describe('windowMenu', () => {
     find(items, 'Rename').onselect();
     expect(onRename).toHaveBeenCalledTimes(1);
     expect(r.sent).toEqual([]);
+    find(items, 'Group tabs by website').onselect();
+    expect(r.sent).toEqual([{ type: 'autoGroup', windowId: 2 }]);
   });
 });

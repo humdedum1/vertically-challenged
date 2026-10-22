@@ -32,6 +32,8 @@ export interface ChromeApi {
   };
 }
 
+const groupingWindows = new Set<number>();
+
 type Ids = [number, ...number[]];
 /** The protocol rejects empty id lists; this narrows to the tuple Chrome's typings want. */
 const ids = (list: number[]): Ids | null => (list.length ? (list as Ids) : null);
@@ -118,6 +120,45 @@ export async function runCommand(
       if (msg.color !== undefined) props.color = msg.color;
       if (Object.keys(props).length) await browser.tabGroups.update(groupId, props);
       return;
+    }
+    case 'autoGroup': {
+      if (groupingWindows.has(msg.windowId)) return 'Website grouping is already running';
+      groupingWindows.add(msg.windowId);
+      try {
+        const tabs = await browser.tabs.query({ windowId: msg.windowId });
+        const sites = new Map<string, number[]>();
+        for (const tab of tabs) {
+          if (tab.id === undefined || tab.pinned || tab.groupId !== -1) continue;
+          let url: URL;
+          try {
+            url = new URL(tab.pendingUrl || tab.url || '');
+          } catch {
+            continue;
+          }
+          if (url.protocol !== 'http:' && url.protocol !== 'https:') continue;
+          const host = url.hostname.replace(/^www\./, '');
+          const list = sites.get(host) ?? [];
+          list.push(tab.id);
+          sites.set(host, list);
+        }
+        let grouped = 0;
+        let count = 0;
+        for (const [title, list] of sites) {
+          if (list.length < 2) continue;
+          const groupId = await browser.tabs.group({
+            tabIds: list as Ids,
+            createProperties: { windowId: msg.windowId },
+          });
+          await browser.tabGroups.update(groupId, { title });
+          grouped += list.length;
+          count++;
+        }
+        return count
+          ? `Grouped ${grouped} tabs into ${count} website ${count === 1 ? 'group' : 'groups'}`
+          : 'No ungrouped websites with multiple tabs';
+      } finally {
+        groupingWindows.delete(msg.windowId);
+      }
     }
     case 'ungroup': {
       const tabIds = ids(msg.tabIds);

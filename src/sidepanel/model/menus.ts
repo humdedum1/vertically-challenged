@@ -239,6 +239,11 @@ export function windowMenu(c: WindowMenuContext): MenuItem[] {
     { type: 'item', label: 'Rename', onselect: c.onRename },
     {
       type: 'item',
+      label: 'Group tabs by website',
+      onselect: () => c.send({ type: 'autoGroup', windowId: c.info.id }),
+    },
+    {
+      type: 'item',
       label: 'Switch to window',
       disabled: target === undefined,
       onselect: () => {
@@ -535,6 +540,11 @@ export interface DividerMenuContext {
 
 export function dividerMenu(c: DividerMenuContext): MenuItem[] {
   const items: MenuItem[] = [
+    {
+      type: 'item',
+      label: 'Group tabs by website',
+      onselect: () => c.send({ type: 'autoGroup', windowId: c.windowId }),
+    },
     {
       type: 'item',
       label: 'New folder',

@@ -13,6 +13,7 @@ const SCRIPTS = [
   'pin-transfer.mjs',
   'discard.mjs',
   'restart.mjs',
+  'auto-group.mjs',
   'incognito.mjs',
   'sync.mjs',
   'popup.mjs',

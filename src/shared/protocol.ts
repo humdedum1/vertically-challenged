@@ -51,6 +51,7 @@ export type PanelMessage =
   | { type: 'moveGroup'; groupId: number; windowId: number; beforeTabId: number | null }
   | { type: 'group'; tabIds: number[]; groupId: number | null; title?: string; color?: GroupColor }
   | { type: 'ungroup'; tabIds: number[] }
+  | { type: 'autoGroup'; windowId: number }
   | {
       type: 'updateGroup';
       groupId: number;
@@ -399,6 +400,8 @@ export function parsePanelMessage(raw: unknown): PanelMessage | null {
     case 'closeBelow':
     case 'duplicate':
       return isId(m.tabId) ? { type: m.type, tabId: m.tabId } : null;
+    case 'autoGroup':
+      return isId(m.windowId) ? { type: 'autoGroup', windowId: m.windowId } : null;
     case 'close':
     case 'ungroup':
       return isIds(m.tabIds) ? { type: m.type, tabIds: m.tabIds } : null;

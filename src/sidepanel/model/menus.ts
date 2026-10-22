@@ -10,6 +10,7 @@ export interface TabMenuContext {
   /** What actions apply to: the selection if the target is in it, else just the target. */
   tabs: TabInfo[];
   allTabs: readonly TabInfo[];
+  essentialsCount: number;
   groups: readonly GroupInfo[];
   send: (msg: PanelMessage) => void;
   /** Called after "Add to new group" so the UI can open the rename field once it appears. */
@@ -88,6 +89,22 @@ export function tabMenu(c: TabMenuContext): MenuItem[] {
       onselect: () => c.send({ type: 'setMuted', tabIds: ids, muted: !allMuted }),
     },
     SEP,
+    {
+      type: 'item',
+      label: 'Add to Essentials',
+      onselect: () =>
+        c.send({
+          type: 'pinTabs',
+          tabIds: ids,
+          windowId: c.target.windowId,
+          dest: { zone: 'essentials', index: c.essentialsCount },
+        }),
+    },
+    {
+      type: 'item',
+      label: 'Group tabs by website',
+      onselect: () => c.send({ type: 'autoGroup', windowId: c.target.windowId }),
+    },
     { type: 'item', label: 'Add to new group', onselect: newGroup },
     {
       type: 'submenu',
@@ -388,6 +405,8 @@ export interface PinMenuContext {
   item: PinItem;
   /** The live tab, or null while the item is dormant. */
   tab: TabInfo | null;
+  /** Selection when it contains the clicked tab, otherwise just the clicked tab. */
+  tabs: readonly TabInfo[];
   windowId: number;
   /** Where the item sits, so "New folder" can take its place. */
   parentId: string | null;
@@ -412,14 +431,29 @@ export function pinMenu(c: PinMenuContext): MenuItem[] {
     {
       type: 'item',
       label: 'Add to Essentials',
-      onselect: () =>
+      onselect: () => {
+        if (tab && c.tabs.length > 1) {
+          c.send({
+            type: 'pinTabs',
+            tabIds: c.tabs.map((t) => t.id),
+            windowId,
+            dest: { zone: 'essentials', index: c.essentialsCount },
+          });
+          return;
+        }
         c.send({
           type: 'pinMove',
           windowId,
           nodeId: itemId,
           toWindowId: windowId,
           dest: { zone: 'essentials', index: c.essentialsCount },
-        }),
+        });
+      },
+    },
+    {
+      type: 'item',
+      label: 'Group tabs by website',
+      onselect: () => c.send({ type: 'autoGroup', windowId }),
     },
     {
       type: 'item',

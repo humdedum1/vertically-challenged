@@ -240,7 +240,7 @@ The panel always lists every window; the old "Show all windows" toggle is gone (
 
 Custom window names are recovered after a browser restart using saved tab URLs, including windows with no pinned tabs. Named windows keep up to 500 URLs locally for matching; incognito evidence stays in session storage. Windows with indistinguishable tabs are left unmatched rather than having names assigned arbitrarily. Existing names need one run of the updated extension to save this evidence.
 
-Choose **Group tabs by website** from a window header's menu or by right-clicking the divider above normal tabs. It creates native groups for websites with at least two ungrouped HTTP(S) tabs, ignoring a leading `www.`. Pinned tabs, existing groups and single tabs are preserved. Grouping runs on demand, entirely locally, with no AI provider or API key.
+Choose **Group tabs by website** from a tab or window header's context menu, or by right-clicking the divider above normal tabs. It creates native groups for websites with at least two ungrouped HTTP(S) tabs, ignoring a leading `www.`. Pinned tabs, existing groups and single tabs are preserved. Grouping runs on demand, entirely locally, with no AI provider or API key. **Add to Essentials** in a tab context menu applies to the selected range when the clicked tab is selected; otherwise it adds only the clicked tab. This works for pinned and regular tabs.
 
 - Collapse state is per panel: collapsing window B in A's panel does not change B's own panel. The worker remembers each panel's choice.
 - Drag tabs between windows, including onto another window's Essentials row or folders, or use "Move to window".

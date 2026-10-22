@@ -51,12 +51,18 @@ function recorder() {
 }
 
 describe('pinMenu', () => {
-  const build = (it: PinItem, live: ReturnType<typeof tab> | null, depth = 2) => {
+  const build = (
+    it: PinItem,
+    live: ReturnType<typeof tab> | null,
+    depth = 2,
+    tabs = live ? [live] : [],
+  ) => {
     const r = recorder();
     const onNewFolder = vi.fn();
     const items = pinMenu({
       item: it,
       tab: live,
+      tabs,
       windowId: 1,
       parentId: 'fparent0000',
       index: 2,
@@ -67,6 +73,17 @@ describe('pinMenu', () => {
     });
     return { items, ...r, onNewFolder };
   };
+
+  it('adds the selected range to Essentials and groups the clicked window', () => {
+    const selected = [tab(7, { pinned: true }), tab(8, { pinned: true }), tab(9)];
+    const { items, sent } = build(item(), selected[0] ?? null, 2, selected);
+    find(items, 'Add to Essentials').onselect();
+    find(items, 'Group tabs by website').onselect();
+    expect(sent).toEqual([
+      { type: 'pinTabs', tabIds: [7, 8, 9], windowId: 1, dest: { zone: 'essentials', index: 5 } },
+      { type: 'autoGroup', windowId: 1 },
+    ]);
+  });
 
   it('lists the actions in order', () => {
     const { items } = build(item(), tab(7, { pinned: true }));
@@ -79,6 +96,7 @@ describe('pinMenu', () => {
       'Suspend',
       '—',
       'Add to Essentials',
+      'Group tabs by website',
       'New folder',
       'Unpin',
       '—',

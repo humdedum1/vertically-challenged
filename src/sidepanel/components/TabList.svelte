@@ -577,6 +577,7 @@ function openMenu(i: number, x: number, y: number): void {
       items: pinMenu({
         item: row.item,
         tab: row.tab,
+        tabs: row.tab ? targetTabs(row.tab) : [],
         windowId: row.windowId,
         parentId: row.parentId,
         index: row.index,
@@ -632,6 +633,7 @@ function openMenu(i: number, x: number, y: number): void {
     items: tabMenu({
       target: row.tab,
       tabs: targetTabs(row.tab),
+      essentialsCount: layoutOf(winId)?.essentials.length ?? 0,
       allTabs: tabsOfWindow(winId),
       groups: allGroups.filter((g) => g.windowId === winId),
       send,

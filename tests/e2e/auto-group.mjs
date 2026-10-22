@@ -22,7 +22,7 @@ try {
   }, site);
 
   const groupFromMenu = async () => {
-    await page.getByRole('treeitem', { name: /^End of pinned tabs/ }).click({ button: 'right' });
+    await page.locator(`#vc-row-t${initial.ids[0]}`).click({ button: 'right' });
     await page.getByRole('menuitem', { name: 'Group tabs by website', exact: true }).click();
   };
   await groupFromMenu();

@@ -85,5 +85,75 @@ await page.keyboard.press('ArrowDown');
 await page.keyboard.press('ArrowUp');
 check((await focused()) === 3, 'after a right-click, Up/Down use that tile’s column');
 
+// Range actions use the same selection on pinned and regular tab context menus.
+const added = await page.evaluate(async (windowId) => {
+  const port = chrome.runtime.connect({ name: 'vc-panel' });
+  port.onMessage.addListener((message) => {
+    if (message.type === 'layout' && message.windowId === windowId)
+      globalThis.__rangeLayout = message.layout;
+  });
+  port.postMessage({ type: 'subscribe', windowId });
+  const pinned = [];
+  const normal = [];
+  for (let i = 0; i < 3; i++) {
+    pinned.push(
+      (
+        await chrome.tabs.create({
+          windowId,
+          url: `about:blank#pin-range-${i}`,
+          pinned: true,
+          active: false,
+        })
+      ).id,
+    );
+    normal.push(
+      (await chrome.tabs.create({ windowId, url: `about:blank#normal-range-${i}`, active: false }))
+        .id,
+    );
+  }
+  return { pinned, normal };
+}, win);
+await page.waitForFunction(() => globalThis.__rangeLayout?.pinned.length === 3);
+const pinItems = await page.evaluate(() => globalThis.__rangeLayout.pinned.map((item) => item.id));
+const pinRow = (i) => page.locator(`#vc-row-p${pinItems[i]}`);
+const normalRow = (i) => page.locator(`#vc-row-t${added.normal[i]}`);
+const addEssentials = async (row) => {
+  await row.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Add to Essentials', exact: true }).click();
+};
+await pinRow(0).click({ modifiers: ['Control'] });
+await pinRow(2).click({ modifiers: ['Shift'] });
+await addEssentials(pinRow(1));
+await page.waitForFunction(() => globalThis.__rangeLayout.essentials.length === 8);
+check(
+  await page.evaluate(
+    (ids) =>
+      ids.every((id) => globalThis.__rangeLayout.essentials.some((item) => item.tabId === id)),
+    added.pinned,
+  ),
+  'Add to Essentials moves the whole pinned range',
+);
+await normalRow(0).click({ modifiers: ['Control'] });
+await normalRow(1).click({ modifiers: ['Shift'] });
+await addEssentials(normalRow(2));
+await page.waitForFunction(() => globalThis.__rangeLayout.essentials.length === 9);
+check(
+  await page.evaluate(([a, b, c]) => {
+    const ids = globalThis.__rangeLayout.essentials.map((item) => item.tabId);
+    return ids.includes(c) && !ids.includes(a) && !ids.includes(b);
+  }, added.normal),
+  'right-click outside the range adds only the clicked tab',
+);
+await addEssentials(normalRow(0));
+await page.waitForFunction(() => globalThis.__rangeLayout.essentials.length === 11);
+check(
+  await page.evaluate(
+    (ids) =>
+      ids.every((id) => globalThis.__rangeLayout.essentials.some((item) => item.tabId === id)),
+    added.normal,
+  ),
+  'Add to Essentials moves the whole regular-tab range',
+);
+
 await close();
 finish();

@@ -28,6 +28,9 @@ fs.writeFileSync(manifestPath, JSON.stringify(manifest));
 const server = http
   .createServer((req, res) => {
     res.setHeader('content-type', 'text/html');
+    // Strictest page policy: frames, styles and scripts all forbidden to the page itself.
+    if (req.url === '/strict')
+      res.setHeader('content-security-policy', "default-src 'none'; frame-src 'none'");
     res.end(`<!doctype html><title>${req.url}</title><h1>page ${req.url}</h1>`);
   })
   .listen(0, '127.0.0.1');
@@ -191,6 +194,47 @@ if (f2) {
   }
   await page.bringToFront();
 } else check(false, 'popup reopened for tab activation');
+
+// --- Strict CSP pages, and what a page can learn ----------------------------------------
+const strict = await ctx.newPage();
+await strict.goto(`${origin}/strict`);
+const strictTab = await tabIdOf(`${origin}/strict`);
+await sw.evaluate(
+  (id) => chrome.scripting.executeScript({ target: { tabId: id }, files: ['/popup-toggle.js'] }),
+  strictTab,
+);
+const strictFrame = await until(async () => {
+  const f = strict.frames().find((x) => x.url().includes('surface=popup'));
+  return f && (await f.$('[role=treeitem]').catch(() => null)) ? f : null;
+}, 5000);
+check(!!strictFrame, 'the popup works on a page with a strict Content-Security-Policy');
+if (strictFrame) {
+  await sleep(300); // past the 140 ms slide-in
+  const box = await (await strictFrame.frameElement()).boundingBox();
+  const vw = strict.viewportSize().width;
+  check(
+    !!box &&
+      Math.round(box.width) === 360 &&
+      Math.round(box.x + box.width) === vw - 8 &&
+      Math.round(box.y) === 8,
+    'and is laid out there (CSP does not strip its styles)',
+    JSON.stringify(box),
+  );
+  // The panel's dynamic URL is what keeps other sites from framing it: the page must not see it.
+  const seen = await strict.evaluate(() => ({
+    timing: performance
+      .getEntriesByType('resource')
+      .some((e) => e.name.startsWith('chrome-extension:')),
+    frames: window.length,
+    host: [...document.body.children].some((e) => e.shadowRoot),
+  }));
+  check(
+    !seen.timing && seen.frames === 0 && !seen.host,
+    "the page can't learn the panel URL (timing, frames, shadow root)",
+    JSON.stringify(seen),
+  );
+}
+await strict.close();
 
 // --- Other sites can't frame the panel ---------------------------------------------------
 const framed = await ctx.newPage();

@@ -74,7 +74,9 @@ throwaway profile and check it against Chrome's real tab state:
   and renaming work.
 - `popup.mjs`: the Display setting switches Chrome's toolbar behaviour; the in-page popup
   lists the page's window, can't be reached by the page, toggles, and closes on a click
-  outside, Escape and its close button; other sites can't frame the panel; the popup window
+  outside, Escape and its close button; it works and keeps its layout on a page with the
+  strictest Content-Security-Policy, and the page can't learn the panel's URL; other sites
+  can't frame the panel; the popup window
   fallback lists the window it was opened for. Headless Chrome can't click the toolbar
   button, so the popup script is injected from the worker into a build with a test-only
   host permission.

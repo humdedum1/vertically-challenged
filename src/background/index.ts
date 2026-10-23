@@ -23,7 +23,7 @@ import { createSuspender } from './suspend/suspender';
 import { runSyncCommand, type SyncCommandDeps } from './sync/commands';
 import { createSyncPublisher } from './sync/publisher';
 import { ChangeSet, type TabOp, TabStore } from './tab-store';
-import { toGroupInfo, toTabInfo } from './to-tab-info';
+import { toTabInfo as browserTabInfo, toGroupInfo } from './to-tab-info';
 import { shouldDeliver, snapshotPlan, visibleWindows } from './visibility';
 
 /**
@@ -55,6 +55,17 @@ export function startBackground(): void {
   // Only fires in popup mode: in side-panel mode Chrome handles the click.
   browser.action.onClicked.addListener((tab) => void display.actionClicked(targetOf(tab)));
 
+  const detachedTabs = new Set<number>();
+  const detachedReady = browser.storage.session.get('detachedTabs').then((stored) => {
+    if (Array.isArray(stored.detachedTabs))
+      for (const id of stored.detachedTabs) if (typeof id === 'number') detachedTabs.add(id);
+  });
+  const saveDetached = () => browser.storage.session.set({ detachedTabs: [...detachedTabs] });
+  const toTabInfo = (tab: Browser.tabs.Tab): TabInfo | null => {
+    const info = browserTabInfo(tab);
+    if (info && detachedTabs.has(info.id)) delete info.openerTabId;
+    return info;
+  };
   const store = new TabStore();
   let pending = new ChangeSet();
   /**
@@ -96,11 +107,12 @@ export function startBackground(): void {
   }
 
   /**
-   * Nothing about tabs is persisted: when Chrome suspends the worker, the live browser is
-   * the source of truth, so waking up just re-reads every window. Events that arrive before
+   * Live tab contents come from the browser; only explicit detachments survive worker
+   * suspension in session storage. Waking up re-reads every window. Events that arrive before
    * this finishes accumulate in `pending` and are applied by the first flush.
    */
   const ready: Promise<void> = (async () => {
+    await detachedReady;
     const all = await browser.tabs.query({});
     const byWindow = new Map<number, TabInfo[]>();
     for (const tab of all.sort((a, b) => a.index - b.index)) {
@@ -229,6 +241,9 @@ export function startBackground(): void {
   browser.tabs.onRemoved.addListener((tabId, { windowId, isWindowClosing }) => {
     if (isWindowClosing) pins.onWindowClosing(windowId);
     suspender.onRemoved(tabId);
+    void detachedReady.then(async () => {
+      if (detachedTabs.delete(tabId)) await saveDetached();
+    });
     pending.removed.add(tabId);
     pending.upserts.delete(tabId);
     logOp({ kind: 'remove', windowId, tabId });
@@ -482,8 +497,20 @@ export function startBackground(): void {
           : isSyncMessage(msg)
             ? await runSyncCommand(msg, syncDeps)
             : await runCommand(msg, deps);
+        // Chrome retains a moved tab's opener, so edge drops explicitly detach it.
+        if (msg.type === 'move') {
+          await detachedReady;
+          for (const id of msg.tabIds) detachedTabs.add(id);
+          await saveDetached();
+          markResync(msg.target.windowId);
+        }
         // Chrome does not emit onUpdated for an opener-only change.
-        if (msg.type === 'nestTab') markResync((await browser.tabs.get(msg.tabId)).windowId);
+        if (msg.type === 'nestTab') {
+          await detachedReady;
+          detachedTabs.delete(msg.tabId);
+          await saveDetached();
+          markResync((await browser.tabs.get(msg.tabId)).windowId);
+        }
         if (text) port.postMessage({ type: 'notice', level: 'info', text } satisfies WorkerMessage);
       } catch (err) {
         // Tabs can vanish between the click and the call; those failures are expected
@@ -535,7 +562,7 @@ export function startBackground(): void {
         ? { active: true, lastFocusedWindow: true }
         : { active: true, windowId },
     );
-    return t ? (toTabInfo(t) ?? undefined) : undefined;
+    return t ? (browserTabInfo(t) ?? undefined) : undefined;
   }
 
   async function suspendFrom(tab: TabInfo | undefined, others: boolean): Promise<void> {

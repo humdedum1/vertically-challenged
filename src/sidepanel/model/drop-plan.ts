@@ -155,7 +155,9 @@ export function planDrop(
     !crossWindow &&
     ids.every((id) => {
       const t = ctx.tabs.find((x) => x.id === id) as TabInfo;
-      return t.pinned === pinned && (pinned || t.groupId === groupId);
+      return (
+        t.openerTabId === undefined && t.pinned === pinned && (pinned || t.groupId === groupId)
+      );
     }) &&
     isContiguousBefore(ctx.tabs, ids, before);
   if (unchanged) return null;

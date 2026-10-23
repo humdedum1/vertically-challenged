@@ -298,3 +298,12 @@ it('refuses nesting a tab under one of its descendants', () => {
   const tabs = [tab(1), tab(2, { openerTabId: 1 }), tab(3, { openerTabId: 2 })];
   expect(planDrop({ windowId: 1, tabs }, buildRows(tabs, []), tabsDrag(1), 2, 'inside')).toBeNull();
 });
+
+it('plans an edge drop that detaches a child without changing its strip position', () => {
+  const tabs = [tab(1), tab(2, { openerTabId: 1 })];
+  expect(planDrop({ windowId: 1, tabs }, buildRows(tabs, []), tabsDrag(2), 0, 'after')).toEqual({
+    type: 'move',
+    tabIds: [2],
+    target: { windowId: 1, beforeTabId: null, groupId: -1, pinned: false },
+  });
+});

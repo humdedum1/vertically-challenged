@@ -206,7 +206,7 @@ function muteClick(e: MouseEvent): void {
 
 <style>
   .row {
-    --tab-inset: 12px;
+    --tab-inset: 20px;
     position: relative;
     display: flex;
     align-items: center;
@@ -220,15 +220,15 @@ function muteClick(e: MouseEvent): void {
   }
 
   .row.nested {
-    --tab-inset: 28px;
-  }
-
-  .row.indent {
     --tab-inset: 36px;
   }
 
+  .row.indent {
+    --tab-inset: 44px;
+  }
+
   .row.nested.indent {
-    --tab-inset: 52px;
+    --tab-inset: 60px;
   }
 
   .branch-toggle {

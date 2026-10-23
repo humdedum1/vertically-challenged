@@ -83,6 +83,25 @@ try {
     'child tabs do not create native browser groups',
   );
 
+  await panel.evaluate((id) => chrome.tabs.update(id, { active: true }), ids['/main']);
+  await panel.waitForFunction(
+    (id) => document.getElementById(`vc-row-t${id}`)?.getAttribute('aria-current') === 'page',
+    ids['/main'],
+  );
+  check(
+    await row('/main').evaluate((element) => {
+      const row = element.getBoundingClientRect();
+      const arrow = element.querySelector('.branch-toggle').getBoundingClientRect();
+      const icon = element.querySelector('.icon').getBoundingClientRect();
+      const bar = getComputedStyle(element, '::before');
+      return (
+        arrow.left >= row.left + parseFloat(bar.left) + parseFloat(bar.width) + 2 &&
+        arrow.right <= icon.left
+      );
+    }),
+    'the collapse arrow clears the active bar and favicon',
+  );
+
   await row('/main')
     .getByRole('button', { name: 'Collapse children of /main', exact: true })
     .click();

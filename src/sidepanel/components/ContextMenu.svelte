@@ -24,7 +24,15 @@ interface View {
 // which keeps the menu inside the narrow side panel and keyboard flow linear.
 let stack = $state.raw<View[]>([]);
 const view = $derived(stack[stack.length - 1]);
-const list = $derived(view ? (view.items ?? []) : items);
+const list: MenuItem[] = $derived(
+  view
+    ? (view.items ?? [])
+    : [
+        ...items,
+        { type: 'separator' },
+        { type: 'item', label: 'Reload panel', onselect: () => window.location.reload() },
+      ],
+);
 
 let el: HTMLDivElement | undefined = $state();
 let width = $state(0);

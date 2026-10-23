@@ -73,6 +73,11 @@ export function tabMenu(c: TabMenuContext): MenuItem[] {
     },
     {
       type: 'item',
+      label: `Reload${plural}`,
+      onselect: () => c.send({ type: 'reload', tabIds: ids }),
+    },
+    {
+      type: 'item',
       label: `Duplicate${plural}`,
       onselect: () => {
         for (const id of ids) c.send({ type: 'duplicate', tabId: id });
@@ -335,6 +340,14 @@ function launcherItems(c: {
   const current = tab?.url ?? item.lastUrl;
   return [
     { type: 'item', label: 'Open', onselect: () => c.send({ type: 'pinOpen', windowId, itemId }) },
+    {
+      type: 'item',
+      label: 'Reload',
+      disabled: tab === null,
+      onselect: () => {
+        if (tab) c.send({ type: 'reload', tabIds: [tab.id] });
+      },
+    },
     {
       type: 'item',
       label: 'Back to home URL',

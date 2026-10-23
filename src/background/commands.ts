@@ -58,6 +58,9 @@ export async function runCommand(
       }
       return;
     }
+    case 'reload':
+      await Promise.all(msg.tabIds.map((id) => browser.tabs.reload(id)));
+      return;
     case 'close':
       await browser.tabs.remove(msg.tabIds);
       return;

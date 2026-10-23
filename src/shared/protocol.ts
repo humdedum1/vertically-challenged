@@ -39,6 +39,8 @@ export type PanelMessage =
    * kind. `surface` says where the panel is shown (absent: Chrome's side panel).
    */
   | { type: 'subscribe'; windowId: number; surface?: Surface }
+  | { type: 'ping' }
+  | { type: 'reload'; tabIds: number[] }
   | { type: 'activate'; tabId: number }
   | { type: 'close'; tabIds: number[] }
   | { type: 'closeOthers'; tabId: number }
@@ -195,6 +197,7 @@ export const isPinMessage = (m: PanelMessage): m is PinMessage => PIN_TYPES.has(
 
 /** Service worker → panel. */
 export type WorkerMessage =
+  | { type: 'pong' }
   | {
       type: 'snapshot';
       windowId: number;
@@ -395,6 +398,8 @@ export function parsePanelMessage(raw: unknown): PanelMessage | null {
         ? { type: 'subscribe', windowId: m.windowId, surface }
         : { type: 'subscribe', windowId: m.windowId };
     }
+    case 'ping':
+      return { type: 'ping' };
     case 'activate':
     case 'closeOthers':
     case 'closeBelow':
@@ -402,6 +407,7 @@ export function parsePanelMessage(raw: unknown): PanelMessage | null {
       return isId(m.tabId) ? { type: m.type, tabId: m.tabId } : null;
     case 'autoGroup':
       return isId(m.windowId) ? { type: 'autoGroup', windowId: m.windowId } : null;
+    case 'reload':
     case 'close':
     case 'ungroup':
       return isIds(m.tabIds) ? { type: m.type, tabIds: m.tabIds } : null;

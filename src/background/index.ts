@@ -419,6 +419,14 @@ export function startBackground(): void {
     port.onMessage.addListener(async (raw) => {
       const msg = parsePanelMessage(raw);
       if (!msg) return;
+      if (msg.type === 'ping') {
+        try {
+          port.postMessage({ type: 'pong' } satisfies WorkerMessage);
+        } catch {
+          // Panel closed before the reply.
+        }
+        return;
+      }
       if (msg.type === 'subscribe') {
         // Re-subscribing keeps a known kind (it can't change for a window); a new port is
         // unknown, hence sent nothing, until the window list has loaded.

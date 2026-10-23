@@ -89,6 +89,7 @@ describe('pinMenu', () => {
     const { items } = build(item(), tab(7, { pinned: true }));
     expect(labels(items)).toEqual([
       'Open',
+      'Reload',
       'Back to home URL',
       'Set this page as home',
       '—',
@@ -112,6 +113,7 @@ describe('pinMenu', () => {
     );
     for (const l of [
       'Open',
+      'Reload',
       'Back to home URL',
       'Set this page as home',
       'Unmute',
@@ -125,6 +127,7 @@ describe('pinMenu', () => {
     const itemId = 'iaaaaaaaaaa';
     expect(sent).toEqual([
       { type: 'pinOpen', windowId: 1, itemId },
+      { type: 'reload', tabIds: [7] },
       { type: 'pinHome', windowId: 1, itemId },
       { type: 'pinSetHome', windowId: 1, itemId },
       { type: 'setMuted', tabIds: [7], muted: false },

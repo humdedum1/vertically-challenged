@@ -8,6 +8,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPTS = [
   'tab-sync.mjs',
   'reconnect.mjs',
+  'panel-recovery.mjs',
   'drag.mjs',
   'essentials-keys.mjs',
   'pin-transfer.mjs',

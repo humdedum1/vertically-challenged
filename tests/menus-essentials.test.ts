@@ -51,6 +51,7 @@ describe('essentialMenu', () => {
     const { items } = menuFor(item(), tab(7, { pinned: true }));
     expect([...items.keys()]).toEqual([
       'Open',
+      'Reload',
       'Back to home URL',
       'Set this page as home',
       'Mute',
@@ -84,6 +85,7 @@ describe('essentialMenu', () => {
     expect(items.get('Open')?.disabled).toBeFalsy();
     expect(items.get('Back to home URL')?.disabled).toBe(true);
     expect(items.get('Set this page as home')?.disabled).toBe(false);
+    expect(items.get('Reload')?.disabled).toBe(true);
     expect(items.get('Mute')?.disabled).toBe(true);
     expect(items.get('Suspend')?.disabled).toBe(true);
     expect(items.get('Unpin')?.disabled).toBeFalsy();
@@ -100,6 +102,7 @@ describe('essentialMenu', () => {
     expect(items.has('Unmute')).toBe(true);
     for (const label of [
       'Open',
+      'Reload',
       'Unmute',
       'Suspend',
       'Remove from Essentials',
@@ -110,6 +113,7 @@ describe('essentialMenu', () => {
     }
     expect(sent).toEqual([
       { type: 'pinOpen', windowId: 1, itemId: 'iaaaaaaaaaa' },
+      { type: 'reload', tabIds: [7] },
       { type: 'setMuted', tabIds: [7], muted: false },
       { type: 'pinClose', windowId: 1, itemIds: ['iaaaaaaaaaa'] },
       {

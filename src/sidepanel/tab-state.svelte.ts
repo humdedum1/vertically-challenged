@@ -12,6 +12,8 @@ import type { GroupInfo, TabInfo, WindowInfo, WindowPatch } from '../shared/type
 export type ConnectionStatus = 'connecting' | 'ready' | 'error';
 
 const LAYOUT_WAIT_MS = 500;
+const HEARTBEAT_MS = 20_000;
+const REPLY_WAIT_MS = 5_000;
 
 export interface WindowView {
   info: WindowInfo;
@@ -72,6 +74,9 @@ export class TabState {
   private homeArrived = false;
   private port: Browser.runtime.Port | null = null;
   private retries = 0;
+  private heartbeat: ReturnType<typeof setTimeout> | undefined;
+  private replyTimer: ReturnType<typeof setTimeout> | undefined;
+  private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   private disposed = false;
 
   async start(): Promise<void> {
@@ -92,17 +97,44 @@ export class TabState {
   dispose(): void {
     this.disposed = true;
     clearTimeout(this.layoutTimer);
+    clearTimeout(this.heartbeat);
+    clearTimeout(this.replyTimer);
+    clearTimeout(this.reconnectTimer);
     this.port?.disconnect();
     this.port = null;
   }
 
   send(msg: PanelMessage): void {
+    if (this.disposed) return;
     try {
-      this.port?.postMessage(msg);
+      if (!this.port) throw new Error('Disconnected');
+      this.port.postMessage(msg);
     } catch {
-      // Port is reconnecting; user actions during that gap are dropped, which is
-      // preferable to replaying stale clicks.
+      this.reconnect();
+      if (msg.type !== 'subscribe' && msg.type !== 'ping') {
+        this.onNotice?.({ level: 'error', text: 'Reconnecting to the browser. Please try again.' });
+      }
     }
+  }
+
+  private reconnect(): void {
+    if (this.disposed) return;
+    clearTimeout(this.heartbeat);
+    clearTimeout(this.replyTimer);
+    clearTimeout(this.reconnectTimer);
+    const port = this.port;
+    this.port = null;
+    port?.disconnect();
+    this.status = 'connecting';
+    const delay = Math.min(1000, 50 * 2 ** this.retries++);
+    this.reconnectTimer = setTimeout(() => this.connect(), delay);
+  }
+
+  private checkConnection(): void {
+    this.heartbeat = setTimeout(() => {
+      this.replyTimer = setTimeout(() => this.reconnect(), REPLY_WAIT_MS);
+      this.send({ type: 'ping' });
+    }, HEARTBEAT_MS);
   }
 
   private subscribe(): void {
@@ -119,23 +151,27 @@ export class TabState {
     if (this.disposed || this.windowId === null) return;
     const port = browser.runtime.connect({ name: PANEL_PORT_NAME });
     this.port = port;
-    port.onMessage.addListener((msg: WorkerMessage) => this.receive(msg));
-    // The worker is suspended after ~30s idle (or restarted on update). Reconnecting
-    // wakes it, and the fresh snapshots it sends resynchronise us.
+    port.onMessage.addListener((msg: WorkerMessage) => {
+      if (this.port === port && !this.disposed) this.receive(msg);
+    });
+    // Worker shutdown or an extension update can disconnect the port. Reconnecting
+    // wakes the worker, whose fresh snapshots resynchronise the panel.
     port.onDisconnect.addListener(() => {
       // Reading lastError marks it handled; the worker not being up yet is expected.
       void browser.runtime.lastError;
       if (this.port !== port || this.disposed) return;
-      this.port = null;
-      this.status = 'connecting';
-      const delay = Math.min(1000, 50 * 2 ** this.retries++);
-      setTimeout(() => this.connect(), delay);
+      this.reconnect();
     });
     this.subscribe();
+    if (this.port === port) this.checkConnection();
   }
 
   private receive(msg: WorkerMessage): void {
     switch (msg.type) {
+      case 'pong':
+        clearTimeout(this.replyTimer);
+        this.checkConnection();
+        return;
       case 'snapshot': {
         const m: Mirror = {
           byId: new Map(msg.tabs.map((t) => [t.id, t])),

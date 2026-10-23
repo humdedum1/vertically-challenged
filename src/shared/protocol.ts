@@ -50,6 +50,7 @@ export type PanelMessage =
   | { type: 'setMuted'; tabIds: number[]; muted: boolean }
   | { type: 'newTab'; windowId: number; afterTabId: number | null }
   | { type: 'move'; tabIds: number[]; target: MoveTarget }
+  | { type: 'nestTab'; tabId: number; parentTabId: number }
   | { type: 'moveGroup'; groupId: number; windowId: number; beforeTabId: number | null }
   | { type: 'group'; tabIds: number[]; groupId: number | null; title?: string; color?: GroupColor }
   | { type: 'ungroup'; tabIds: number[] }
@@ -422,6 +423,10 @@ export function parsePanelMessage(raw: unknown): PanelMessage | null {
     case 'newTab':
       return isId(m.windowId) && isIdOrNull(m.afterTabId)
         ? { type: 'newTab', windowId: m.windowId, afterTabId: m.afterTabId }
+        : null;
+    case 'nestTab':
+      return isId(m.tabId) && isId(m.parentTabId) && m.tabId !== m.parentTabId
+        ? { type: 'nestTab', tabId: m.tabId, parentTabId: m.parentTabId }
         : null;
     case 'move': {
       const target = parseTarget(m.target);

@@ -22,8 +22,7 @@ export type GridTarget = { kind: 'grid'; windowId: number; index: number }; // i
 export type RowTarget = { index: number; zone: DropZone };
 
 /**
- * Where the pointer is relative to the target row. Tab rows use before/after (top/bottom
- * half); group headers also have `inside` (join the group).
+ * Row edges reorder; the center joins a group or nests under a tab.
  */
 export type DropZone = 'before' | 'after' | 'inside';
 
@@ -50,6 +49,25 @@ export function planDrop(
 ): PanelMessage | null {
   const target = rows[index];
   if (!target || (target.kind !== 'tab' && target.kind !== 'group')) return null;
+  if (target.kind === 'tab' && zone === 'inside') {
+    if (
+      drag.kind !== 'tabs' ||
+      drag.tabIds.length !== 1 ||
+      target.tab.pinned ||
+      target.tab.url.startsWith('chrome-extension:')
+    )
+      return null;
+    const tabId = drag.tabIds[0] as number;
+    if (tabId === target.tab.id || ctx.tabs.find((t) => t.id === tabId)?.pinned) return null;
+    const seen = new Set<number>([tabId]);
+    let ancestor: TabInfo | undefined = target.tab;
+    while (ancestor) {
+      if (seen.has(ancestor.id)) return null;
+      seen.add(ancestor.id);
+      ancestor = ctx.tabs.find((t) => t.id === ancestor?.openerTabId);
+    }
+    return { type: 'nestTab', tabId, parentTabId: target.tab.id };
+  }
   // Pins need the layouts to plan; planPinDrop (via planDropMulti) handles them.
   if (drag.kind === 'node') return null;
 

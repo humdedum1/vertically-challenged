@@ -274,3 +274,27 @@ describe('planDrop: resulting windows keep invariants', () => {
     ]);
   });
 });
+
+describe('nesting tabs by dropping on their center', () => {
+  it('plans nesting even when the tab already sits immediately after the target', () => {
+    const { drop } = makeWindow(false);
+    expect(drop(tabsDrag(4), 't3', 'inside')).toEqual({
+      type: 'nestTab',
+      tabId: 4,
+      parentTabId: 3,
+    });
+  });
+
+  it('rejects self, pinned targets, whole groups and multiple selected tabs', () => {
+    const { drop } = makeWindow(false);
+    expect(drop(tabsDrag(3), 't3', 'inside')).toBeNull();
+    expect(drop(tabsDrag(3), 't1', 'inside')).toBeNull();
+    expect(drop({ kind: 'group', groupId: 10 }, 't3', 'inside')).toBeNull();
+    expect(drop(tabsDrag(3, 4), 't11', 'inside')).toBeNull();
+  });
+});
+
+it('refuses nesting a tab under one of its descendants', () => {
+  const tabs = [tab(1), tab(2, { openerTabId: 1 }), tab(3, { openerTabId: 2 })];
+  expect(planDrop({ windowId: 1, tabs }, buildRows(tabs, []), tabsDrag(1), 2, 'inside')).toBeNull();
+});

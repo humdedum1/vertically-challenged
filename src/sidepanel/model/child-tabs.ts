@@ -21,7 +21,7 @@ export function buildChildRows(source: readonly Row[], collapsed: ReadonlySet<nu
     )
       trim(0);
     const at = row.tab.openerTabId === undefined ? undefined : positions.get(row.tab.openerTabId);
-    trim(at === undefined || !/^https?:/i.test(branch[at]?.tab.url ?? '') ? 0 : at + 1);
+    trim(at === undefined || branch[at]?.tab.url.startsWith('chrome-extension:') ? 0 : at + 1);
     const parent = branch.at(-1);
     const next: TabRow = {
       ...row,

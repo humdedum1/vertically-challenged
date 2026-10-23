@@ -482,6 +482,8 @@ export function startBackground(): void {
           : isSyncMessage(msg)
             ? await runSyncCommand(msg, syncDeps)
             : await runCommand(msg, deps);
+        // Chrome does not emit onUpdated for an opener-only change.
+        if (msg.type === 'nestTab') markResync((await browser.tabs.get(msg.tabId)).windowId);
         if (text) port.postMessage({ type: 'notice', level: 'info', text } satisfies WorkerMessage);
       } catch (err) {
         // Tabs can vanish between the click and the call; those failures are expected

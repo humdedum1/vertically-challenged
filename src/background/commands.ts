@@ -97,6 +97,48 @@ export async function runCommand(
       }
       return;
     }
+    case 'nestTab': {
+      const moving = await browser.tabs.get(msg.tabId);
+      const parent = await browser.tabs.get(msg.parentTabId);
+      if (
+        moving.id === parent.id ||
+        moving.pinned ||
+        parent.pinned ||
+        moving.incognito !== parent.incognito ||
+        parent.url?.startsWith('chrome-extension:')
+      )
+        return;
+      const tabs = (await browser.tabs.query({ windowId: parent.windowId })).sort(
+        (a, b) => a.index - b.index,
+      );
+      const seen = new Set([moving.id]);
+      let ancestor: typeof parent | undefined = parent;
+      while (ancestor) {
+        if (seen.has(ancestor.id)) return;
+        seen.add(ancestor.id);
+        ancestor = tabs.find((t) => t.id === ancestor?.openerTabId);
+      }
+      if (moving.openerTabId === parent.id && moving.index === parent.index + 1) return;
+      const beforeTabId = tabs.slice(parent.index + 1).find((t) => t.id !== moving.id)?.id ?? null;
+      // A real move clears children's openers; an adjacent drop otherwise makes no move.
+      if (
+        moving.windowId === parent.windowId &&
+        moving.index === parent.index + 1 &&
+        beforeTabId === tabs[moving.index + 1]?.id &&
+        tabs.some((t) => t.openerTabId === moving.id)
+      )
+        await browser.tabs.move(msg.tabId, { index: parent.index });
+      await moveTabs([msg.tabId], {
+        windowId: parent.windowId,
+        beforeTabId,
+        groupId: moving.windowId === parent.windowId ? parent.groupId : -1,
+        pinned: false,
+      });
+      if (moving.windowId !== parent.windowId && parent.groupId !== -1)
+        await browser.tabs.group({ groupId: parent.groupId, tabIds: [msg.tabId] });
+      await browser.tabs.update(msg.tabId, { openerTabId: msg.parentTabId });
+      return;
+    }
     case 'move':
       await moveTabs(msg.tabIds, msg.target);
       return;

@@ -73,3 +73,13 @@ describe('subscribe surface', () => {
       });
   });
 });
+
+it('validates nesting commands and refuses self-parenting', () => {
+  expect(parsePanelMessage({ type: 'nestTab', tabId: 2, parentTabId: 1 })).toEqual({
+    type: 'nestTab',
+    tabId: 2,
+    parentTabId: 1,
+  });
+  for (const parentTabId of [2, -1, '1', undefined])
+    expect(parsePanelMessage({ type: 'nestTab', tabId: 2, parentTabId })).toBeNull();
+});

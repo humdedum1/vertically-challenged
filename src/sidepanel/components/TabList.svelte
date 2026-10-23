@@ -1047,7 +1047,18 @@ const dnd = new PointerDrag<Drag>({
   rowCount: () => view.length,
   isGroup: (i) => {
     const k = view[i]?.kind;
-    return k === 'group' || k === 'window' || k === 'folder';
+    const r = view[i];
+    return (
+      k === 'group' ||
+      k === 'window' ||
+      k === 'folder' ||
+      (childTabs &&
+        dragPayload?.kind === 'tabs' &&
+        dragPayload.tabIds.length === 1 &&
+        r?.kind === 'tab' &&
+        !r.tab.pinned &&
+        !r.tab.url.startsWith('chrome-extension:'))
+    );
   },
   begin: dragOf,
   elsewhere: (x, y) => (grid?.targetAt(x, y) ?? null) !== null,
@@ -1117,7 +1128,7 @@ function onPointerDown(e: PointerEvent): void {
 // Keeps focus on the tree instead of letting a click land on a row, and stops the
 // middle-click autoscroll cursor; the rename input needs the default behaviour.
 function onMouseDown(e: MouseEvent): void {
-  if ((e.target as Element).closest('input')) return;
+  if ((e.target as Element).closest('input, .new-page')) return;
   e.preventDefault();
   tree()?.focus();
 }
@@ -1225,6 +1236,7 @@ function parentIndex(i: number): number | undefined {
 }
 
 function onkeydown(e: KeyboardEvent): void {
+  if ((e.target as Element).closest('.new-page')) return;
   const row = focusedRow;
   const action = actionFor(shortcuts, e);
   if (action !== null && runAction(action, row)) {
@@ -1591,6 +1603,16 @@ $effect(() => {
               />
             {/if}
           {/snippet}
+          {#snippet footer()}
+            {#if !searching && tabState.windowId !== null}
+              <button type="button" class="new-page" onclick={() => {
+                if (tabState.windowId !== null) send({ type: 'newTab', windowId: tabState.windowId, afterTabId: null });
+              }}>
+                <Icon name="plus" size={14} />
+                New page
+              </button>
+            {/if}
+          {/snippet}
           {#snippet overlay()}
             {#if tilesBar}
               <div class="tiles-bar" style:top="{tilesBar.top}px" style:left="{tilesBar.left}px" style:height="{tilesBar.height}px"></div>
@@ -1622,6 +1644,24 @@ $effect(() => {
 </div>
 
 <style>
+  .new-page {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: var(--row-height);
+    padding: 0 20px;
+    border: 0;
+    border-radius: var(--radius-row);
+    background: transparent;
+    color: var(--mOnSurfaceVariant);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .new-page:hover { background: var(--state-hover); }
+  .new-page:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
   .wrap {
     position: relative;
     display: flex;

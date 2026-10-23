@@ -9,11 +9,12 @@ interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'onscr
   key: (item: T) => string | number;
   /** Rendered inside the scrolling content (e.g. a drop indicator), in content coordinates. */
   overlay?: Snippet;
+  footer?: Snippet;
   row: Snippet<[T, number]>;
 }
 
 // Remaining attributes land on the scroll container so the parent can make it the listbox.
-let { items, rowHeight, key, row, overlay, ...rest }: Props = $props();
+let { items, rowHeight, key, row, overlay, footer, ...rest }: Props = $props();
 
 let el: HTMLDivElement | undefined = $state();
 let scrollTop = $state(0);
@@ -57,6 +58,7 @@ function onscroll(e: Event & { currentTarget: HTMLDivElement }): void {
     </div>
     {@render overlay?.()}
   </div>
+  {@render footer?.()}
 </div>
 
 <style>

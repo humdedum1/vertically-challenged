@@ -208,6 +208,7 @@ export interface GroupMenuContext {
 
 export function groupMenu(c: GroupMenuContext): MenuItem[] {
   const ids = c.tabs.filter((t) => t.groupId === c.group.id).map((t) => t.id);
+  const suspendable = c.tabs.filter((t) => t.groupId === c.group.id && !t.active).map((t) => t.id);
   const lastId = ids[ids.length - 1] ?? null;
   return [
     { type: 'item', label: 'Rename', onselect: c.onRename },
@@ -233,6 +234,12 @@ export function groupMenu(c: GroupMenuContext): MenuItem[] {
       label: 'Ungroup',
       disabled: ids.length === 0,
       onselect: () => c.send({ type: 'ungroup', tabIds: ids }),
+    },
+    {
+      type: 'item',
+      label: 'Suspend all',
+      disabled: suspendable.length === 0,
+      onselect: () => c.send({ type: 'discard', tabIds: suspendable }),
     },
     SEP,
     {

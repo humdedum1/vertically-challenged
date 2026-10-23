@@ -9,6 +9,7 @@ const SCRIPTS = [
   'tab-sync.mjs',
   'reconnect.mjs',
   'panel-recovery.mjs',
+  'child-tabs.mjs',
   'drag.mjs',
   'essentials-keys.mjs',
   'pin-transfer.mjs',

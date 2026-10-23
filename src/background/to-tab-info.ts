@@ -16,6 +16,7 @@ export function toTabInfo(tab: Browser.tabs.Tab): TabInfo | null {
     discarded: tab.discarded,
     loading: tab.status === 'loading',
     groupId: tab.groupId ?? -1,
+    ...(tab.openerTabId === undefined ? {} : { openerTabId: tab.openerTabId }),
     incognito: tab.incognito,
   };
 }

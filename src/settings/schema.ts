@@ -1,7 +1,7 @@
 import { DEFAULT_THEME_ID } from '../themes/builtin';
 
 /** Bump when the stored shape changes, and add a step to MIGRATIONS in migrate.ts. */
-export const SETTINGS_VERSION = 6;
+export const SETTINGS_VERSION = 7;
 
 export type ColorMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'comfortable';
@@ -94,6 +94,7 @@ export interface DisplaySettings {
 }
 
 export interface TabRowSettings {
+  childTabs: boolean;
   layout: RowLayout;
   actions: ActionVisibility;
   showClose: boolean;
@@ -150,6 +151,7 @@ export const DEFAULT_SETTINGS: Settings = {
     accent: null,
   },
   tabs: {
+    childTabs: true,
     layout: 'single',
     actions: 'hover',
     showClose: true,

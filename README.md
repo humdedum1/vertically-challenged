@@ -158,7 +158,7 @@ In the tab list (the Tabs panel):
 | Key | Action |
 | --- | --- |
 | Up / Down, Home / End | Move focus |
-| Left / Right | Collapse or expand a group; go to the parent group or first child |
+| Left / Right | Collapse or expand a tab branch or group; go to its parent or first child |
 | Enter | Switch to the tab, or toggle the group |
 | Space, Shift+Up/Down, Ctrl+A | Select tabs |
 | Delete | Close the selected or focused tabs |
@@ -244,6 +244,8 @@ Choose **Reload** from a tab context menu to reload that page normally, like F5.
 
 Choose **Group tabs by website** from a tab or window header's context menu, or by right-clicking the divider above normal tabs. It creates native groups for websites with at least two ungrouped HTTP(S) tabs, ignoring a leading `www.`. Pinned tabs, existing groups and single tabs are preserved. Grouping runs on demand, entirely locally, with no AI provider or API key. **Add to Essentials** in a tab context menu applies to the selected range when the clicked tab is selected; otherwise it adds only the clicked tab. This works for pinned and regular tabs.
 
+**Child tabs** is enabled by default in Settings → Tab rows. Ctrl+click or middle-click a link to open an indented child beneath its browsing tab; children can have their own children. Use the arrow beside a parent, or Left/Right, to collapse and expand its branch. New link tabs join their opener's branch even when the browser normally puts new tabs at the end. Search stays flat. Closing a parent or moving a tab outside its branch promotes surviving tabs; pinned tabs and Essentials keep their existing layout. Relationships use the opener information supplied by the browser, so links opened without an opener remain separate. Turning the setting off restores the flat list.
+
 - Collapse state is per panel: collapsing window B in A's panel does not change B's own panel. The worker remembers each panel's choice.
 - Drag tabs between windows, including onto another window's Essentials row or folders, or use "Move to window".
 - Incognito and normal windows are kept apart: an incognito panel lists only incognito windows and a normal panel only normal ones, tabs can't move between them, incognito layouts live only in `chrome.storage.session`, and an incognito panel keeps its Essentials' site colours in memory only, so no incognito URL or site is written to disk.
@@ -277,7 +279,7 @@ so other sites can't frame the panel.
 Settings (the Settings panel) apply live and sync through your Chrome profile:
 
 - **Appearance:** colour mode, theme, density, row layout (single line or title + URL), corner radius, font family and size, accent colour.
-- **Tab rows:** actions on hover or always visible; show or hide the close, mute and new-tab buttons and the tab count.
+- **Tab rows:** child-tab nesting (on by default); actions on hover or always visible; show or hide the close, mute and new-tab buttons and the tab count.
 - **Layout:** order and visibility of panels and of the sections in the Tabs panel.
 - **Themes:** duplicate any theme and edit all 16 roles for dark and light in the colour editor, with live preview and a WCAG contrast check. Import a Noctalia palette JSON file (including community palettes); export any theme back to Noctalia format.
 - **Backup:** export settings and custom themes to one JSON file and import it on another machine.

@@ -10,8 +10,7 @@ import type { GroupInfo, TabInfo, WindowInfo } from '../../shared/types';
 
 interface TreePos {
   /**
-   * aria-level: 1 for top-level items, 2 for tabs inside a group; one deeper for each
-   * when nested under a window header in the multi-window view.
+   * aria-level: 1 for top-level items; groups, windows and child-tab branches add depth.
    */
   level: number;
   /** aria-posinset / aria-setsize among siblings at that level. */
@@ -25,6 +24,11 @@ export type TabRow = TreePos & {
   tab: TabInfo;
   /** Last pinned row, so the UI can draw the pinned/unpinned separator. */
   pinnedEnd: boolean;
+  /** Opener-based branch, present only when child tabs are enabled. */
+  parentTabId?: number;
+  childDepth?: number;
+  hasChildren?: boolean;
+  collapsed?: boolean;
   /** Search highlights; absent outside search. */
   highlight?: { title: Range[]; url: Range[] };
 };

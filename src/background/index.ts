@@ -12,6 +12,7 @@ import { SESSIONS_KEY } from '../shared/sessions';
 import type { Surface } from '../shared/surface';
 import type { GroupInfo, TabInfo, WindowInfo } from '../shared/types';
 import { createBatcher } from './batcher';
+import { placeChildTab } from './child-tabs';
 import { type CommandDeps, runCommand } from './commands';
 import { registerContextMenus } from './context-menus';
 import { createDisplay, POPUP_WINDOW, type TargetTab } from './display';
@@ -212,6 +213,9 @@ export function startBackground(): void {
     const info = toTabInfo(tab);
     if (info) logOp({ kind: 'create', windowId: tab.windowId, tab: info, index: tab.index });
     else markResync(tab.windowId);
+    void placeChildTab(tab).catch((err: unknown) =>
+      console.debug('[vc] child tab placement failed', err),
+    );
   });
   browser.tabs.onUpdated.addListener((_id, changeInfo, tab) => {
     const info = toTabInfo(tab);
@@ -484,6 +488,7 @@ export function startBackground(): void {
         // noise and the panel converges through events. Session restores are reported.
         console.debug('[vc] command failed', msg.type, err);
         if (
+          msg.type === 'reload' ||
           msg.type === 'restoreSession' ||
           msg.type === 'saveSession' ||
           msg.type === 'moveToNewWindow' ||

@@ -9,8 +9,7 @@ describe('v5 -> v6 migration', () => {
       appearance: { mode: 'dark' },
       sync: { workspaces: false, sessions: true },
     });
-    expect(SETTINGS_VERSION).toBe(6);
-    expect(r.version).toBe(6);
+    expect(r.version).toBe(SETTINGS_VERSION);
     expect(r.display).toEqual({ mode: 'sidebar' });
     expect(r.appearance.mode).toBe('dark');
     expect(r.sync.workspaces).toBe(false);

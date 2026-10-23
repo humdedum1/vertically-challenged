@@ -197,6 +197,7 @@ const count = $derived(tabState.tabs.length);
             twoLine={settings.value.tabs.layout === 'double'}
             showClose={settings.value.tabs.showClose}
             showMute={settings.value.tabs.showMute}
+            childTabs={settings.value.tabs.childTabs}
           />
         {/if}
       </SegmentCard>

@@ -55,6 +55,7 @@ const FIELDS: readonly (keyof TabInfo)[] = [
   'discarded',
   'loading',
   'groupId',
+  'openerTabId',
   'incognito',
 ];
 

@@ -1,10 +1,10 @@
 // Reload actions and command recovery against a live Chromium extension.
 import http from 'node:http';
-import { check, extensionDir, finish, launch } from './harness.mjs';
+import { check, extensionDir, finish, launch, sleep } from './harness.mjs';
 
 let requests = 0;
-const server = http.createServer((_req, res) => {
-  requests++;
+const server = http.createServer((req, res) => {
+  if (req.url === '/') requests++;
   res.end('<title>Reload test</title>');
 });
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -25,12 +25,61 @@ try {
   const before = requests;
   await row.click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Reload', exact: true }).click();
-  await page.waitForFunction(
-    async (id) => (await chrome.tabs.get(id)).status === 'complete',
-    tab.id,
-  );
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  for (let i = 0; i < 100 && requests === before; i++) await sleep(50);
   check(requests > before, 'Reload requests the tab page again');
+
+  {
+    const [worker] = ctx.serviceWorkers();
+    await worker.evaluate(() => {
+      const api = globalThis.browser?.runtime?.id ? globalThis.browser : chrome;
+      globalThis.savedReload = api.tabs.reload;
+      globalThis.reloadCalls = 0;
+      api.tabs.reload = (...args) =>
+        ++globalThis.reloadCalls === 1
+          ? Promise.resolve()
+          : globalThis.savedReload.apply(api.tabs, args);
+    });
+    try {
+      const beforeRetry = requests;
+      await row.click({ button: 'right' });
+      await page.getByRole('menuitem', { name: 'Reload', exact: true }).click();
+      for (let i = 0; i < 100 && requests === beforeRetry; i++) await sleep(50);
+      check(requests > beforeRetry, 'Reload recovers after a silently ignored first attempt');
+      check(await worker.evaluate(() => globalThis.reloadCalls === 2), 'Reload retries only once');
+    } finally {
+      await worker.evaluate(() => {
+        const api = globalThis.browser?.runtime?.id ? globalThis.browser : chrome;
+        api.tabs.reload = globalThis.savedReload;
+      });
+    }
+  }
+
+  {
+    const [worker] = ctx.serviceWorkers();
+    await worker.evaluate(() => {
+      const api = globalThis.browser?.runtime?.id ? globalThis.browser : chrome;
+      globalThis.savedReload = api.tabs.reload;
+      api.tabs.reload = () => Promise.reject(new Error('Reload blocked by browser'));
+    });
+    try {
+      await row.click({ button: 'right' });
+      await page.getByRole('menuitem', { name: 'Reload', exact: true }).click();
+      const visible = await page
+        .getByRole('alert')
+        .filter({ hasText: 'Reload blocked by browser' })
+        .waitFor({ timeout: 1500 })
+        .then(
+          () => true,
+          () => false,
+        );
+      check(visible, 'a rejected Reload shows the browser error');
+    } finally {
+      await worker.evaluate(() => {
+        const api = globalThis.browser?.runtime?.id ? globalThis.browser : chrome;
+        api.tabs.reload = globalThis.savedReload;
+      });
+    }
+  }
 
   await row.click({ button: 'right' });
   await Promise.all([

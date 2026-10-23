@@ -146,5 +146,20 @@ check(
   JSON.stringify(pinnedOrder),
 );
 
+// Group suspend keeps the active tab and tabs outside the group loaded.
+const grouped = await Promise.all([make('group-active'), make('group-idle')]);
+const outside = await make('outside-group');
+const groupId = await api((ids) => chrome.tabs.group({ tabIds: ids }), grouped);
+await api((id) => chrome.tabs.update(id, { active: true }), grouped[0]);
+const header = page.locator(`#vc-row-g${groupId}`);
+await header.click({ button: 'right' });
+await page.getByRole('menuitem', { name: 'Suspend all', exact: true }).click();
+await waitFor(
+  'group suspend discards its inactive tab',
+  async () => (await tabOf(grouped[1]))?.discarded === true,
+);
+check(!(await tabOf(grouped[0]))?.discarded, 'group suspend keeps its active tab loaded');
+check(!(await tabOf(outside))?.discarded, 'group suspend leaves other tabs loaded');
+
 await close();
 finish();

@@ -45,6 +45,8 @@ const MIGRATIONS: readonly ((s: Raw) => Raw)[] = [
   (s) => s,
   // v5 → v6: new `display` group (side panel or in-page popup); default-filled.
   (s) => s,
+  // v6 → v7: opener-based child tabs, enabled by default.
+  (s) => s,
 ];
 
 const isObj = (v: unknown): v is Raw => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -132,6 +134,7 @@ function sanitize(raw: Raw): Settings {
 
   const t = isObj(raw.tabs) ? raw.tabs : {};
   const tabs: TabRowSettings = {
+    childTabs: bool(t.childTabs, d.tabs.childTabs),
     layout: oneOf(t.layout, ['single', 'double'] as const, d.tabs.layout),
     actions: oneOf(t.actions, ['hover', 'always'] as const, d.tabs.actions),
     showClose: bool(t.showClose, d.tabs.showClose),

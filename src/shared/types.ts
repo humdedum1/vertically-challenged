@@ -16,6 +16,8 @@ export interface TabInfo {
   loading: boolean;
   /** -1 when ungrouped, mirroring chrome.tabGroups.TAB_GROUP_ID_NONE. */
   groupId: number;
+  /** Browser-reported opener; absent once the opener no longer exists. */
+  openerTabId?: number;
   incognito: boolean;
 }
 

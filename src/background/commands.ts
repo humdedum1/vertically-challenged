@@ -59,7 +59,7 @@ export async function runCommand(
       return;
     }
     case 'reload':
-      await Promise.all(msg.tabIds.map((id) => browser.tabs.reload(id)));
+      await Promise.all(msg.tabIds.map(reloadTab));
       return;
     case 'close':
       await browser.tabs.remove(msg.tabIds);
@@ -222,6 +222,39 @@ export async function runCommand(
         await deps.restoreDiscarded(),
         deps.layouts,
       );
+  }
+}
+
+/** An accepted API call can be a silent no-op; allow one retry only if no load was reported. */
+async function reloadTab(tabId: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let markStarted!: (started: boolean) => void;
+  const started = new Promise<boolean>((resolve) => {
+    markStarted = resolve;
+  });
+  const onUpdated = (id: number, change: { status?: string }): void => {
+    if (id === tabId && (change.status === 'loading' || change.status === 'complete')) {
+      markStarted(true);
+    }
+  };
+  browser.tabs.onUpdated.addListener(onUpdated);
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const timeout = new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(false), 2000);
+      });
+      const observed = await Promise.race([
+        started,
+        browser.tabs.reload(tabId).then(() => started),
+        timeout,
+      ]);
+      clearTimeout(timer);
+      if (observed) return;
+    }
+    throw new Error('The browser did not report a reload after two attempts. Try F5 in the tab.');
+  } finally {
+    clearTimeout(timer);
+    browser.tabs.onUpdated.removeListener(onUpdated);
   }
 }
 

@@ -24,6 +24,12 @@ function patch(p: Partial<TabRowSettings>): void {
 <SegmentCard title="Tab rows">
   {#snippet icon()}<Icon name="list" size={12} />{/snippet}
   <div class="fields">
+    <Toggle
+      label="Child tabs"
+      hint="Nest tabs opened from links under their parent tab."
+      checked={t.childTabs}
+      onchange={(childTabs) => patch({ childTabs })}
+    />
     <Field label="Row buttons">
       <SegmentedControl
         label="Show row buttons"

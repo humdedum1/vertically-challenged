@@ -27,6 +27,7 @@ import type { Keymap, ShortcutAction } from '../../settings/schema';
 import { flattenItems, type PinItem, type PinNode, type WindowLayout } from '../../shared/layout';
 import type { PanelMessage } from '../../shared/protocol';
 import type { GroupInfo, TabInfo } from '../../shared/types';
+import { buildChildRows } from '../model/child-tabs';
 import {
   type Drag,
   type DropZone,
@@ -79,6 +80,7 @@ interface Props {
   search?: 'top' | 'bottom' | 'hidden';
   /** Title + URL rows. */
   twoLine?: boolean;
+  childTabs?: boolean;
   showClose?: boolean;
   showMute?: boolean;
   shortcuts: Keymap;
@@ -92,6 +94,7 @@ let {
   rowHeight,
   search = 'top',
   twoLine = false,
+  childTabs = true,
   showClose = true,
   showMute = true,
   shortcuts,
@@ -158,17 +161,22 @@ $effect.pre(() => {
 });
 // The previous rows, so unchanged ones keep their objects (see reuseRows).
 let lastTree: Row[] = [];
-const treeRows: Row[] = $derived.by(
-  () =>
-    (lastTree = reuseRows(
-      lastTree,
-      buildPanelRows(
-        tabState.windows.map((w) => ({ ...w, layout: tabState.layoutOf(w.info.id) })),
-        tabState.windowId,
-        { tilesPerRow },
-      ),
-    )),
-);
+let collapsedTabs = $state.raw<ReadonlySet<number>>(new Set());
+function setTabCollapsed(id: number, collapsed: boolean): void {
+  const next = new Set(collapsedTabs);
+  if (collapsed) next.add(id);
+  else next.delete(id);
+  collapsedTabs = next;
+}
+const treeRows: Row[] = $derived.by(() => {
+  const rows = buildPanelRows(
+    tabState.windows.map((w) => ({ ...w, layout: tabState.layoutOf(w.info.id) })),
+    tabState.windowId,
+    { tilesPerRow },
+  );
+  lastTree = reuseRows(lastTree, childTabs ? buildChildRows(rows, collapsedTabs) : rows);
+  return lastTree;
+});
 const view: Row[] = $derived(searching ? buildSearchRows(fedTabs, index.search(needle)) : treeRows);
 const keyIndex = $derived(new Map(view.map((r, i) => [r.key, i])));
 /** Row index of each live tab, whether it renders as a tab row or a pinned row. */
@@ -1203,6 +1211,8 @@ function runAction(action: ShortcutAction, row: Row | undefined): boolean {
 function parentIndex(i: number): number | undefined {
   const row = view[i];
   if (!row || searching) return undefined;
+  if (row.kind === 'tab' && row.parentTabId !== undefined)
+    return keyIndex.get(`t${row.parentTabId}`);
   if (row.kind === 'tab' && isGroupedTab(row.tab)) return keyIndex.get(`g${row.tab.groupId}`);
   if ((row.kind === 'pin' || row.kind === 'folder') && row.depth > 1) {
     for (let k = i - 1; k >= 0; k--) {
@@ -1251,7 +1261,9 @@ function onkeydown(e: KeyboardEvent): void {
       break;
     case 'ArrowLeft':
       if (searching || !row) return;
-      if (row.kind === 'window' && !row.collapsed) setWindowCollapsed(row.info.id, true);
+      if (row.kind === 'tab' && row.hasChildren && !row.collapsed)
+        setTabCollapsed(row.tab.id, true);
+      else if (row.kind === 'window' && !row.collapsed) setWindowCollapsed(row.info.id, true);
       else if (row.kind === 'group' && !row.group.collapsed) {
         send({ type: 'updateGroup', groupId: row.group.id, collapsed: true });
       } else if (row.kind === 'folder' && !row.folder.collapsed) {
@@ -1270,13 +1282,16 @@ function onkeydown(e: KeyboardEvent): void {
             ? row.group.collapsed
             : row.kind === 'folder'
               ? row.folder.collapsed
-              : null;
+              : row.kind === 'tab' && row.hasChildren
+                ? row.collapsed
+                : null;
       if (collapsed === null) return;
       if (collapsed) {
         if (row.kind === 'window') setWindowCollapsed(row.info.id, false);
         else if (row.kind === 'group')
           send({ type: 'updateGroup', groupId: row.group.id, collapsed: false });
         else if (row.kind === 'folder') setFolderCollapsed(row.windowId, row.folder.id, false);
+        else if (row.kind === 'tab') setTabCollapsed(row.tab.id, false);
       } else if (parentIndex(focusedIndex + 1) === focusedIndex) {
         setFocus(focusedIndex + 1);
       }
@@ -1546,6 +1561,14 @@ $effect(() => {
                 tab={r.tab}
                 level={r.level}
                 {grouped}
+                childDepth={r.childDepth}
+                hasChildren={r.hasChildren}
+                collapsed={r.collapsed}
+                ontoggle={() => {
+                  setFocus(i, false);
+                  tree()?.focus();
+                  setTabCollapsed(r.tab.id, !r.collapsed);
+                }}
                 nested={isNested(r)}
                 windowTag={searching && r.tab.windowId !== tabState.windowId
                   ? windowName(r.tab.windowId)

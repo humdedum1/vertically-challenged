@@ -4,11 +4,16 @@ import { displayUrl } from '../../lib/search/search-index';
 import { faviconUrl } from '../../shared/favicon';
 import type { TabInfo } from '../../shared/types';
 import { segments } from '../model/highlight';
+import Icon from './Icon.svelte';
 
 interface Props {
   tab: TabInfo;
-  /** aria-level; the indent derives from `grouped` and `nested`, not from this number. */
+  /** aria-level; visual indentation combines the group, window and child depth. */
   level: number;
+  childDepth?: number;
+  hasChildren?: boolean;
+  collapsed?: boolean;
+  ontoggle?: () => void;
   /** Inside a tab group (indent + colour guide). */
   grouped: boolean;
   /** Under a window header in the multi-window view. */
@@ -39,6 +44,10 @@ interface Props {
 let {
   tab,
   level,
+  childDepth = 0,
+  hasChildren = false,
+  collapsed = false,
+  ontoggle,
   grouped,
   nested,
   windowTag,
@@ -99,9 +108,11 @@ function muteClick(e: MouseEvent): void {
   class:pinned-end={pinnedEnd}
   class:two-line={showUrl}
   style:--gc={groupColor}
+  style:--child-depth={Math.min(childDepth, 8)}
   role="treeitem"
   tabindex="-1"
   aria-level={level}
+  aria-expanded={hasChildren ? !collapsed : undefined}
   aria-posinset={pos}
   aria-setsize={size}
   aria-selected={selected}
@@ -112,6 +123,17 @@ function muteClick(e: MouseEvent): void {
   {onauxclick}
 >
   {#if grouped}<span class="guide" aria-hidden="true"></span>{/if}
+  {#if hasChildren}
+    <button
+      class="branch-toggle"
+      class:expanded={!collapsed}
+      type="button"
+      tabindex="-1"
+      aria-label="{collapsed ? 'Expand' : 'Collapse'} children of {label}"
+      onpointerdown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+      onclick={(e) => { e.stopPropagation(); ontoggle?.(); }}
+    ><Icon name="chevron" size={12} /></button>
+  {/if}
 
   <span class="icon">
     {#if tab.loading}
@@ -184,12 +206,13 @@ function muteClick(e: MouseEvent): void {
 
 <style>
   .row {
+    --tab-inset: 12px;
     position: relative;
     display: flex;
     align-items: center;
     gap: 8px;
     height: var(--row-height);
-    padding: 0 6px 0 12px;
+    padding: 0 6px 0 calc(var(--tab-inset) + var(--child-depth, 0) * 16px);
     border-radius: var(--radius-row);
     cursor: default;
     user-select: none;
@@ -197,16 +220,32 @@ function muteClick(e: MouseEvent): void {
   }
 
   .row.nested {
-    padding-left: 28px;
+    --tab-inset: 28px;
   }
 
   .row.indent {
-    padding-left: 36px;
+    --tab-inset: 36px;
   }
 
   .row.nested.indent {
-    padding-left: 52px;
+    --tab-inset: 52px;
   }
+
+  .branch-toggle {
+    position: absolute;
+    left: calc(var(--tab-inset) + var(--child-depth, 0) * 16px - 13px);
+    display: grid;
+    place-items: center;
+    width: 12px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--mOnSurfaceVariant);
+    cursor: pointer;
+  }
+
+  .branch-toggle.expanded :global(svg) { transform: rotate(90deg); }
 
   .row.nested .guide {
     left: 40px;

@@ -267,9 +267,37 @@ export class PinManager {
       this.lastMoving = JSON.stringify(Array.isArray(moving) ? moving : []);
       this.resumeLate(lt[LATE_KEY]);
     } else {
+      // Updates clear storage.session too; live tab IDs can still identify their windows.
+      for (const b of saved.bindings) {
+        const x = this.layouts.get(b.layoutId);
+        if (!x || this.bindings.has(b.windowId) || [...this.bindings.values()].includes(x.id))
+          continue;
+        const items = flattenItems(x);
+        const tabs = this.deps.store.snapshot(b.windowId).tabs;
+        if (
+          !tabs.some(
+            (t) =>
+              t.pinned &&
+              t.incognito === x.incognito &&
+              items.some((i) => i.tabId === t.id && (i.lastUrl === t.url || i.homeUrl === t.url)),
+          )
+        )
+          continue;
+        this.bindMatch(b.windowId, {
+          layoutId: x.id,
+          bind: new Map(
+            items.flatMap((i) =>
+              i.tabId !== null && tabs.some((t) => t.id === i.tabId)
+                ? [[i.id, i.tabId] as const]
+                : [],
+            ),
+          ),
+        });
+      }
+      const bound = new Set(this.bindings.values());
       for (const [id, x] of this.layouts) {
         if (x.incognito) this.layouts.delete(id);
-        else
+        else if (!bound.has(id))
           this.layouts.set(
             id,
             withTabIds(x, () => null),

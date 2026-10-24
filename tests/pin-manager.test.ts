@@ -157,6 +157,74 @@ afterEach(() => {
 });
 
 describe('PinManager loading', () => {
+  it('preserves window associations after an update clears session storage', async () => {
+    // Identical URLs cannot distinguish these windows after their tab IDs are discarded.
+    const a = layout(1, [], {
+      name: 'Work',
+      tabUrls: ['https://a.com/'],
+      essentials: [item('ia', 'https://a.com/', 10)],
+      pinned: [
+        {
+          kind: 'folder',
+          id: 'fa',
+          name: 'Work folder',
+          icon: 'folder',
+          collapsed: false,
+          children: [],
+        },
+      ],
+    });
+    const b = layout(2, [item('ib', 'https://a.com/', 20)], {
+      name: 'Home',
+      tabUrls: ['https://a.com/'],
+    });
+    const t = setup({
+      windows: {
+        1: [pinned(10, 1, 'https://a.com/', { title: 'ia' })],
+        2: [pinned(20, 2, 'https://a.com/', { title: 'ib' })],
+      },
+      local: {
+        [LAYOUTS_KEY]: stored(
+          [a, b],
+          [
+            { windowId: 1, layoutId: a.id },
+            { windowId: 2, layoutId: b.id },
+          ],
+        ),
+      },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    expect(pins.layoutOf(1)).toEqual(a);
+    expect(pins.layoutOf(2)).toEqual(b);
+    expect(pins.setups()).toEqual([]);
+    expect(t.session.data.get(ALIVE_KEY)).toBe(true);
+    expect((t.local.data.get(LAYOUTS_KEY) as LayoutStore).bindings).toEqual([
+      { windowId: 1, layoutId: a.id },
+      { windowId: 2, layoutId: b.id },
+    ]);
+  });
+
+  it('does not trust reused IDs with different URLs after a browser restart', async () => {
+    const saved = layout(1, [item('ia', 'https://a.com/', 10)]);
+    const t = setup({
+      windows: {
+        1: [pinned(10, 1, 'https://unrelated.com/')],
+        2: [pinned(20, 2, 'https://a.com/')],
+      },
+      local: { [LAYOUTS_KEY]: stored([saved], [{ windowId: 1, layoutId: saved.id }]) },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    expect(pins.layoutOf(1).id).not.toBe(saved.id);
+    expect(pins.layoutOf(2).id).toBe(saved.id);
+    expect(flattenItems(pins.layoutOf(2))[0]?.tabId).toBe(20);
+  });
+
   it('matches stored layouts to windows by URL after a browser restart', async () => {
     const saved = layout(1, [item('ia', 'https://a.com/'), item('ib', 'https://b.com/')]);
     const t = setup({

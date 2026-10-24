@@ -10,7 +10,7 @@ describe('v4 -> v5 migration', () => {
       sessions: { restoreDiscarded: false },
     });
     expect(r.version).toBe(SETTINGS_VERSION);
-    expect(r.sync).toEqual({ workspaces: true, sessions: true });
+    expect(r.sync).toEqual({ workspaces: true, sessions: true, intervalMinutes: 1 });
     expect(r.appearance.mode).toBe('dark');
     expect(r.sessions.restoreDiscarded).toBe(false);
   });
@@ -21,6 +21,7 @@ describe('v4 -> v5 migration', () => {
     ).toEqual({
       workspaces: false,
       sessions: true,
+      intervalMinutes: 1,
     });
     expect(migrateSettings({ version: 5, sync: 7 }).sync).toEqual(DEFAULT_SETTINGS.sync);
   });

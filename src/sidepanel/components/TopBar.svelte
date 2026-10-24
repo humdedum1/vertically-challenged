@@ -24,6 +24,9 @@ const next = $derived(ORDER[(ORDER.indexOf(mode) + 1) % ORDER.length] as ColorMo
     <button type="button" class="round" aria-label="Back" onclick={onback}><Icon name="back" /></button>
   {/if}
   <h1>{title}</h1>
+  <button type="button" class="round" aria-label="Reload panel" title="Reload panel" onclick={() => window.location.reload()}>
+    <Icon name="sync" />
+  </button>
   <button
     type="button"
     class="round"

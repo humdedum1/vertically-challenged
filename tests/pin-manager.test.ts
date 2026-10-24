@@ -157,6 +157,26 @@ afterEach(() => {
 });
 
 describe('PinManager loading', () => {
+  it('syncs ordinary tabs in windows without pins and excludes incognito and extension pages', async () => {
+    const t = setup({
+      windows: {
+        1: [
+          tab(1, { windowId: 1, url: 'https://ordinary.test/' }),
+          tab(2, { windowId: 1, url: 'chrome-extension://self/sidepanel.html' }),
+        ],
+        2: [tab(3, { windowId: 2, url: 'https://private.test/', incognito: true })],
+      },
+      incognito: [2],
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    const workspaces = pins.syncWorkspaces();
+    expect(workspaces).toHaveLength(1);
+    expect(workspaces[0]?.window.tabs.map((t) => t.url)).toEqual(['https://ordinary.test/']);
+    expect(JSON.stringify(workspaces)).not.toContain('private.test');
+  });
+
   it('preserves window associations after an update clears session storage', async () => {
     // Identical URLs cannot distinguish these windows after their tab IDs are discarded.
     const a = layout(1, [], {

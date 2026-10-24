@@ -1,7 +1,7 @@
 import { DEFAULT_THEME_ID } from '../themes/builtin';
 
 /** Bump when the stored shape changes, and add a step to MIGRATIONS in migrate.ts. */
-export const SETTINGS_VERSION = 7;
+export const SETTINGS_VERSION = 8;
 
 export type ColorMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'comfortable';
@@ -79,7 +79,11 @@ export interface SyncSettings {
   workspaces: boolean;
   /** Saved sessions, as far as the space allows. */
   sessions: boolean;
+  /** Minimum automatic publish interval; zero means manual only. */
+  intervalMinutes: number;
 }
+
+export const SYNC_INTERVALS = [0, 1, 5, 15, 30, 60] as const;
 
 /** Where the toolbar button, the shortcuts and the toolbar menu open the panel. */
 export type DisplayMode = 'sidebar' | 'popup';
@@ -165,7 +169,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   suspend: { auto: false, minutes: 30, skipPinned: true, skipAudible: true, whitelist: [] },
   sessions: { restoreDiscarded: true },
-  sync: { workspaces: true, sessions: true },
+  sync: { workspaces: true, sessions: true, intervalMinutes: 1 },
   display: { mode: 'sidebar' },
   shortcuts: {
     focusSearch: ['/', 'Ctrl+F'],

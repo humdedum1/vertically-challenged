@@ -3,6 +3,7 @@
  * device, renaming this one. Another device's document is re-read from sync storage, so a
  * command acts on what is published now, not on what the panel last showed.
  */
+
 import type { SyncMessage } from '../../shared/protocol';
 import { layoutFromSaved, type SyncDoc } from '../../shared/sync';
 import { readSync } from '../../shared/sync-store';
@@ -47,16 +48,42 @@ export async function runSyncCommand(
       );
       if (!ws) return GONE;
       await deps.pins.loaded;
+      const ordinary = ws.window.tabs.filter((t) => !t.pinned);
+      const snapshot = {
+        id: ws.id,
+        name: ws.name,
+        createdAt: Date.now(),
+        windows: [ws.window],
+      };
+      const restoreOrdinary = async (windowId: number): Promise<void> => {
+        if (ordinary.length)
+          await deps.restoreSession(
+            { ...snapshot, windows: [{ tabs: ordinary, groups: ws.window.groups }] },
+            'currentWindow',
+            windowId,
+            await deps.restoreDiscarded(),
+            deps.pins,
+          );
+      };
       const setupId = await deps.pins.importSetup(layoutFromSaved(ws.window, ws.name));
       if (!setupId) return `“${ws.name}” has nothing that can be opened here`;
-      if (msg.action === 'keep') return `Kept “${ws.name}” in Window setups`;
+      if (msg.action === 'keep') {
+        if (ordinary.length) await deps.keepSession(snapshot);
+        return `Kept “${ws.name}” in Window setups${ordinary.length ? ' and Saved sessions' : ''}`;
+      }
       if (msg.action === 'open') {
         const win = await deps.createWindow();
-        if (win.id !== undefined) await deps.pins.bindSetup(setupId, win.id);
+        if (win.id !== undefined) {
+          await deps.pins.bindSetup(setupId, win.id);
+          await restoreOrdinary(win.id);
+        }
         return null;
       }
       const refused = await deps.pins.applySetup(setupId, msg.windowId);
-      if (refused === null) return `Added “${ws.name}” to this window`;
+      if (refused === null) {
+        await restoreOrdinary(msg.windowId);
+        return `Added “${ws.name}” to this window`;
+      }
       // Not applied: don't leave the copy behind as a setup the user didn't ask for.
       await deps.pins.deleteSetup(setupId);
       return refused === 'full'

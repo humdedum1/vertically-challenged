@@ -2,6 +2,8 @@
  * Publishes this device's sync document (see shared/sync.ts) into chrome.storage.sync and
  * keeps a status for the Settings card. The worker is its only writer.
  */
+
+import type { SyncSettings } from '../../settings/schema';
 import type { Session } from '../../shared/sessions';
 import {
   chunk,
@@ -38,7 +40,7 @@ export interface PublisherDeps {
   workspaces: () => Promise<SyncWorkspace[]>;
   /** Saved sessions, newest first. */
   sessions: () => Promise<Session[]>;
-  settings: () => Promise<{ workspaces: boolean; sessions: boolean }>;
+  settings: () => Promise<SyncSettings>;
   platform: () => Promise<string>;
   now?: () => number;
 }
@@ -179,10 +181,40 @@ export function createSyncPublisher(deps: PublisherDeps) {
 
   return {
     /** Something this device publishes changed: publish soon, within the rate limits. */
-    schedule(): void {
-      if (timer !== null) clearTimeout(timer);
-      const wait = Math.max(DEBOUNCE_MS, lastRun + MIN_INTERVAL_MS - now());
-      timer = setTimeout(() => void run(), wait);
+    async schedule(reset = false): Promise<void> {
+      try {
+        const prefs = await deps.settings();
+        if (reset && timer !== null) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        if (prefs.intervalMinutes === 0) {
+          if (timer !== null) clearTimeout(timer);
+          timer = null;
+          return;
+        }
+        if (timer !== null) return;
+        const interval = Math.max(MIN_INTERVAL_MS, prefs.intervalMinutes * 60_000);
+        const status = (await deps.local.get(SYNC_STATUS_KEY))[SYNC_STATUS_KEY] as
+          | Partial<SyncStatus>
+          | undefined;
+        const previous = Math.max(lastRun, Math.min(now(), status?.publishedAt ?? 0));
+        if (timer !== null) return;
+        const wait = Math.max(DEBOUNCE_MS, previous + interval - now());
+        timer = setTimeout(() => void run(), wait);
+      } catch (err) {
+        console.warn('[vc] scheduling sync failed', err);
+      }
+    },
+    /** Alarm wake-up: unchanged snapshots aren't rewritten and manual mode is respected. */
+    async auto(): Promise<void> {
+      const prefs = await deps.settings();
+      if (prefs.intervalMinutes === 0) return;
+      const status = (await deps.local.get(SYNC_STATUS_KEY))[SYNC_STATUS_KEY] as
+        | Partial<SyncStatus>
+        | undefined;
+      const previous = Math.max(lastRun, Math.min(now(), status?.publishedAt ?? 0));
+      if (now() - previous >= prefs.intervalMinutes * 60_000) await run();
     },
     /** Resolves when the publish under way (if any) is done. */
     settled: (): Promise<void> => running,

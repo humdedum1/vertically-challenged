@@ -13,7 +13,14 @@ import {
   type PinNode,
   type WindowLayout,
 } from './layout';
-import { parseSessions, type SavedPinNode, type SavedWindow, type Session } from './sessions';
+import {
+  captureWindow,
+  parseSessions,
+  type SavedPinNode,
+  type SavedWindow,
+  type Session,
+} from './sessions';
+import type { GroupInfo, TabInfo } from './types';
 
 export const SYNC_VERSION = 1;
 
@@ -53,12 +60,23 @@ const MAX_WORKSPACES = 100;
 // --- Layout <-> saved window ---------------------------------------------------------------
 
 /**
- * The layout as a saved window of pinned tabs (home URLs and titles), in the saved-session
- * format so restoring reuses tested code. Live tab ids and last URLs are left out: they
- * change as you browse, and publishing them would rewrite the document constantly.
+ * A saved window with the complete pinned tree, including dormant items, followed by
+ * ordinary tabs and native groups. Live pins use their current URL; dormant pins use
+ * their home URL. Browser IDs are replaced by indices for restoration on other devices.
  */
-export function savedFromLayout(layout: WindowLayout): SavedWindow {
+export function savedFromLayout(
+  layout: WindowLayout,
+  tabs: readonly TabInfo[] = [],
+  groups: readonly GroupInfo[] = [],
+): SavedWindow {
   const items = flattenItems(layout);
+  const live = new Map(tabs.filter((t) => !t.incognito).map((t) => [t.id, t]));
+  const bound = new Set(items.map((i) => i.tabId));
+  const extra = captureWindow(
+    tabs.filter((t) => !t.incognito && !bound.has(t.id)),
+    groups,
+    'chrome-extension://',
+  );
   const index = new Map(items.map((i, n) => [i.id, n]));
   const tree = (nodes: readonly PinNode[]): SavedPinNode[] =>
     nodes.map((n) =>
@@ -73,8 +91,16 @@ export function savedFromLayout(layout: WindowLayout): SavedWindow {
           },
     );
   return {
-    tabs: items.map((i) => ({ url: i.homeUrl, title: i.title, pinned: true, group: null })),
-    groups: [],
+    tabs: [
+      ...items.map((i) => ({
+        url: (i.tabId === null ? undefined : live.get(i.tabId)?.url) ?? i.homeUrl,
+        title: i.title,
+        pinned: true,
+        group: null,
+      })),
+      ...extra.tabs,
+    ],
+    groups: extra.groups,
     layout: {
       essentials: layout.essentials.map((i) => index.get(i.id) as number),
       pinned: tree(layout.pinned),
@@ -161,7 +187,7 @@ export function parseSyncDoc(raw: unknown): SyncDoc | null {
   for (const w of Array.isArray(raw.workspaces) ? raw.workspaces.slice(0, MAX_WORKSPACES) : []) {
     if (!isObj(w) || typeof w.id !== 'string' || !/^l[a-z0-9]{10}$/.test(w.id)) continue;
     const win = parseWindow(w.window);
-    if (!win?.layout) continue;
+    if (!win) continue;
     workspaces.push({
       id: w.id,
       name: text(w.name, MAX_NAME) || 'Workspace',

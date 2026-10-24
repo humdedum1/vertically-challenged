@@ -1,6 +1,7 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import { browser } from 'wxt/browser';
+import { SYNC_INTERVALS } from '../../../settings/schema';
 import { SYNC_QUOTA } from '../../../shared/sync';
 import {
   DEVICE_KEY,
@@ -11,6 +12,7 @@ import {
 } from '../../../shared/sync-store';
 import Button from '../../components/controls/Button.svelte';
 import Field from '../../components/controls/Field.svelte';
+import Select from '../../components/controls/Select.svelte';
 import TextInput from '../../components/controls/TextInput.svelte';
 import Toggle from '../../components/controls/Toggle.svelte';
 import Icon from '../../components/Icon.svelte';
@@ -103,10 +105,19 @@ function setPref(key: 'workspaces' | 'sessions', value: boolean): void {
 
     <Toggle
       label="Sync workspaces"
-      hint="Each window’s Essentials, pinned tabs and folders, and window setups"
+      hint="Each window’s tabs, groups, Essentials, pinned tabs and folders, and window setups"
       checked={prefs.workspaces}
       onchange={(v) => setPref('workspaces', v)}
     />
+
+    <Field label="Automatic sync" for="vc-sync-interval">
+      <Select id="vc-sync-interval" value={String(prefs.intervalMinutes)} onchange={(v) => settings.update((s) => ({ ...s, sync: { ...s.sync, intervalMinutes: Number(v) } }))}>
+        {#each SYNC_INTERVALS as minutes}
+          <option value={String(minutes)}>{minutes === 0 ? 'Manual only' : `Every ${minutes} minute${minutes === 1 ? '' : 's'}`}</option>
+        {/each}
+      </Select>
+      <p class="muted">Applies to workspace and session snapshots. Chrome controls delivery to other devices; settings and themes sync whenever changed. Synced tabs open only when you choose to restore them.</p>
+    </Field>
     <Toggle
       label="Sync saved sessions"
       hint="As many as fit in Chrome’s sync storage, newest first"

@@ -4,6 +4,8 @@
 // the Sessions panel's "Other devices" card, opening, applying and keeping another device's
 // workspace and session, and the switches in Settings.
 //   node tests/e2e/sync.mjs [extension dir]
+
+import fs from 'node:fs';
 import http from 'node:http';
 import zlib from 'node:zlib';
 import { check, extensionDir, finish, launch, sleep } from './harness.mjs';
@@ -23,7 +25,7 @@ await page.waitForSelector('[role=treeitem]');
 const api = (fn, arg) => page.evaluate(fn, arg);
 const win = await api(async () => (await chrome.windows.getCurrent()).id);
 const tabs = [];
-for (const n of ['mail', 'cal', 'docs'])
+for (const n of ['mail', 'cal', 'docs', 'ordinary'])
   tabs.push(
     await api(
       (u) => chrome.tabs.create({ url: u, active: false }).then((t) => t.id),
@@ -51,7 +53,7 @@ await send({
 });
 await send({
   type: 'pinTabs',
-  tabIds: tabs.slice(2),
+  tabIds: tabs.slice(2, 3),
   windowId: win,
   dest: { zone: 'pinned', folderId: null, index: 0 },
 });
@@ -90,6 +92,14 @@ check(
   'with its Essentials',
 );
 check(!JSON.stringify(mine).includes('"tabId"'), 'without live tab ids');
+check(
+  ws?.window.tabs.some((t) => t.url === `${SITE}/ordinary` && !t.pinned),
+  'ordinary tabs are published too',
+);
+check(
+  !ws?.window.tabs.some((t) => t.url.startsWith('chrome-extension://')),
+  'extension pages are excluded',
+);
 
 // A saved session joins it.
 await send({ type: 'saveSession', scope: 'window', windowId: win, name: 'Research' });
@@ -119,8 +129,9 @@ const other = {
           { url: `${SITE}/figma`, title: 'Figma', pinned: true, group: null },
           { url: `${SITE}/linear`, title: 'Linear', pinned: true, group: null },
           { url: `${SITE}/notion`, title: 'Notion', pinned: true, group: null },
+          { url: `${SITE}/remote-ordinary`, title: 'Remote ordinary', pinned: false, group: 0 },
         ],
-        groups: [],
+        groups: [{ title: 'Remote group', color: 'blue', collapsed: false }],
         layout: {
           essentials: [0],
           pinned: [
@@ -197,6 +208,22 @@ const l = await api((w) => globalThis.__layouts[w], newWin);
 check(l?.name === 'Design', 'the new window has the workspace’s layout', JSON.stringify(l));
 check(l?.essentials?.[0]?.homeUrl === `${SITE}/figma`, 'with its Essential');
 check(l?.pinned?.[0]?.kind === 'folder' && l.pinned[0].children.length === 2, 'and its folder');
+check(
+  await api(
+    async ([windowId, url]) =>
+      (await chrome.tabs.query({ windowId })).some((t) => t.url === url && !t.pinned),
+    [newWin, `${SITE}/remote-ordinary`],
+  ),
+  'opening a workspace restores its ordinary tabs',
+);
+check(
+  await api(
+    async (windowId) =>
+      (await chrome.tabGroups.query({ windowId })).some((g) => g.title === 'Remote group'),
+    newWin,
+  ),
+  'and their native groups',
+);
 
 // --- 4. Add it to this window instead; and keep a copy as a setup.
 await card.getByRole('button', { name: 'Add to this window' }).click();
@@ -212,6 +239,13 @@ check(
 check(
   here.essentials[0]?.homeUrl === `${SITE}/mail`,
   'and keeps this window’s own Essentials first',
+);
+check(
+  await api(
+    async ([windowId, url]) => (await chrome.tabs.query({ windowId })).some((t) => t.url === url),
+    [win, `${SITE}/remote-ordinary`],
+  ),
+  'adding a workspace also restores its ordinary tabs',
 );
 await card.getByRole('button', { name: 'Keep here' }).first().click();
 await sleep(1200);
@@ -236,6 +270,13 @@ await card.getByRole('button', { name: 'Keep here' }).nth(1).click();
 await sleep(1200);
 const local = await api(() => chrome.storage.local.get('sessions'));
 check(
+  local.sessions?.some(
+    (s) =>
+      s.name === 'Design' && s.windows[0].tabs.some((t) => t.url === `${SITE}/remote-ordinary`),
+  ),
+  'keeping a workspace saves its full snapshot, including ordinary tabs',
+);
+check(
   local.sessions?.some((s) => s.name === 'Reading list'),
   'keeping it adds it to Saved sessions',
 );
@@ -251,12 +292,111 @@ check(
 // --- 7. Settings: status, and switching both off removes this device's document.
 await page.getByRole('tab', { name: 'Settings' }).click();
 await page.waitForSelector('#vc-device-name');
-const statusText = (await page.locator('text=Synced').first().textContent()) ?? '';
+check(
+  (await page.locator('#vc-sync-interval').inputValue()) === '1',
+  'automatic sync displays its default interval',
+);
+const statusText =
+  (await page
+    .locator('[role="status"]')
+    .filter({ hasText: /Synced.*100 KB/s })
+    .first()
+    .textContent()) ?? '';
 check(
   /Synced[\s\S]* of 100 KB/.test(statusText),
   'Settings shows when it synced and the space used',
   statusText,
 );
+await page.selectOption('#vc-sync-interval', '5');
+await sleep(500);
+check(
+  await api(async () => (await chrome.alarms.get('vc-auto-sync'))?.periodInMinutes === 5),
+  'automatic sync uses the selected persistent alarm interval',
+);
+await page.selectOption('#vc-sync-interval', '0');
+await sleep(500);
+check(
+  await api(async () => !(await chrome.alarms.get('vc-auto-sync'))),
+  'manual-only sync removes its alarm',
+);
+check(
+  await api(
+    async () => (await chrome.storage.sync.get('settings')).settings.sync.intervalMinutes === 0,
+  ),
+  'sync timing preference is stored in Chrome Sync',
+);
+await page.selectOption('#vc-sync-interval', '1');
+await sleep(500);
+check(
+  await api(async () => (await chrome.alarms.get('vc-auto-sync'))?.periodInMinutes === 1),
+  'automatic sync can be re-enabled',
+);
+const publishedBeforeWake = (await docs())[myId].updatedAt;
+await api(async (url) => {
+  await chrome.tabs.create({ url, active: false });
+  const stored = await chrome.storage.local.get('vc:syncStatus');
+  await chrome.storage.local.set({
+    'vc:syncStatus': { ...stored['vc:syncStatus'], publishedAt: Date.now() - 61_000 },
+  });
+  await chrome.alarms.create('vc-auto-sync', { when: Date.now() + 1500, periodInMinutes: 1 });
+}, `${SITE}/after-worker-stop`);
+const cdp = await ctx.newCDPSession(page);
+await cdp.send('ServiceWorker.enable');
+await cdp.send('ServiceWorker.stopAllWorkers');
+await page.waitForFunction(
+  async (previous) =>
+    (await chrome.storage.local.get('vc:syncStatus'))['vc:syncStatus']?.publishedAt > previous,
+  publishedBeforeWake,
+  { timeout: 8000 },
+);
+let wokeWithTabs = false;
+for (let attempt = 0; attempt < 30 && !wokeWithTabs; attempt++) {
+  wokeWithTabs = Object.values(await docs()).some((d) =>
+    d?.workspaces.some((w) => w.window.tabs.some((t) => t.url === `${SITE}/after-worker-stop`)),
+  );
+  if (!wokeWithTabs) await sleep(200);
+}
+check(
+  wokeWithTabs,
+  'automatic alarm publishes current tabs after the worker is stopped',
+  JSON.stringify(await docs()),
+);
+
+const navigation = page.waitForEvent('load');
+await page.getByRole('button', { name: 'Reload panel', exact: true }).click();
+await navigation;
+await page.getByRole('tab', { name: 'Settings' }).click();
+await page.waitForSelector('#vc-device-name');
+check(
+  (await page.getByRole('button', { name: 'Reload panel', exact: true }).count()) === 1,
+  'header reload reconnects the panel',
+);
+await api(async () => {
+  const { settings } = await chrome.storage.sync.get('settings');
+  await chrome.storage.sync.set({
+    settings: { ...settings, appearance: { ...settings.appearance, mode: 'dark' } },
+  });
+});
+await page.waitForFunction(() => document.documentElement.dataset.mode === 'dark');
+check(true, 'incoming synced settings update the live panel');
+const custom = JSON.parse(
+  fs.readFileSync(new URL('../../src/themes/abyss.json', import.meta.url), 'utf8'),
+);
+custom.dark.mPrimary = '#123456';
+await api(async (theme) => {
+  await chrome.storage.sync.set({
+    'theme:custom-synctest': { ...theme, name: 'Synced test theme' },
+  });
+  const { settings } = await chrome.storage.sync.get('settings');
+  await chrome.storage.sync.set({
+    settings: { ...settings, appearance: { ...settings.appearance, themeId: 'custom-synctest' } },
+  });
+}, custom);
+await page.waitForFunction(
+  () =>
+    getComputedStyle(document.documentElement).getPropertyValue('--mPrimary').trim() === '#123456',
+);
+check(true, 'incoming custom themes and theme selection apply to the panel');
 await page.getByRole('switch', { name: 'Sync workspaces' }).click();
 await page.getByRole('switch', { name: 'Sync saved sessions' }).click();
 await sleep(2500);

@@ -167,6 +167,14 @@ describe('parseSyncDoc', () => {
 });
 
 describe('encoding', () => {
+  it('retains ordinary-only windows when validating a received snapshot', () => {
+    const window = {
+      tabs: [{ url: 'https://ordinary.test/', title: 'Ordinary', pinned: false, group: null }],
+      groups: [],
+    };
+    const received = parseSyncDoc(doc({ workspaces: [{ ...workspace('laaaaaaaaaa'), window }] }));
+    expect(received?.workspaces[0]?.window).toEqual(window);
+  });
   it('round-trips through deflate and base64', async () => {
     const d = doc({ sessions: [session('s1', 300)] });
     const e = await encodeDoc(d);

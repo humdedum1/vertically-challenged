@@ -573,15 +573,17 @@ export class PinManager {
     const out: SyncWorkspace[] = [];
     for (const w of this.deps.windows()) {
       if (w.incognito) continue;
-      const id = this.bindings.get(w.id);
-      const l = id === undefined ? undefined : this.layouts.get(id);
-      if (!l || l.incognito || isEmptyLayout(l)) continue;
+      const l = this.layoutOf(w.id);
+      const snapshot = this.deps.store.snapshot(w.id);
+      if (!l || l.incognito || snapshot.tabs.some((t) => t.incognito)) continue;
+      const window = savedFromLayout(l, snapshot.tabs, snapshot.groups);
+      if (window.tabs.length === 0 && isEmptyLayout(l)) continue;
       out.push({
         id: l.id,
         name: setupName(l),
         kind: 'window',
         lastUsed: l.lastUsed,
-        window: savedFromLayout(l),
+        window,
       });
     }
     for (const s of this.setups()) {

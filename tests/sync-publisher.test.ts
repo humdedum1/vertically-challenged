@@ -78,7 +78,7 @@ function setup(
   o: {
     workspaces?: SyncWorkspace[];
     sessions?: Session[];
-    prefs?: { workspaces: boolean; sessions: boolean };
+    prefs?: { workspaces: boolean; sessions: boolean; intervalMinutes?: number };
     sync?: Record<string, unknown>;
   } = {},
 ) {
@@ -95,7 +95,7 @@ function setup(
     local,
     workspaces: async () => state.workspaces,
     sessions: async () => state.sessions,
-    settings: async () => state.prefs,
+    settings: async () => ({ intervalMinutes: 1, ...state.prefs }),
     platform: async () => 'linux',
     now: () => clock,
   });
@@ -108,6 +108,61 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('sync publisher', () => {
+  it('does not let an alarm bypass the configured interval after Sync now', async () => {
+    const { p, sync, state, tick } = setup();
+    await p.now();
+    state.workspaces = [ws('laaaaaaaaaa', 5)];
+    tick(59_000);
+    await p.auto();
+    expect(sync.writes()).toBe(1);
+    tick(1000);
+    await p.auto();
+    expect(sync.writes()).toBe(2);
+  });
+
+  it('uses the persisted publication time after a worker wake', async () => {
+    const { p, sync, local } = setup({
+      prefs: { workspaces: true, sessions: true, intervalMinutes: 5 },
+    });
+    local.data.set(SYNC_STATUS_KEY, { publishedAt: 1_000_000_000_000 });
+    await p.schedule();
+    await vi.advanceTimersByTimeAsync(60_000);
+    await p.settled();
+    expect(sync.writes()).toBe(0);
+    await vi.advanceTimersByTimeAsync(240_000);
+    await p.settled();
+    expect(sync.writes()).toBe(1);
+  });
+
+  it('honors manual-only sync while keeping Sync now available', async () => {
+    const { p, sync } = setup({ prefs: { workspaces: true, sessions: true, intervalMinutes: 0 } });
+    p.schedule();
+    await vi.advanceTimersByTimeAsync(120_000);
+    await p.settled();
+    expect(sync.writes()).toBe(0);
+    await p.now();
+    expect(sync.writes()).toBe(1);
+  });
+
+  it('waits the configured interval and does not postpone indefinitely during changes', async () => {
+    const { p, sync, state, tick } = setup({
+      prefs: { workspaces: true, sessions: true, intervalMinutes: 5 },
+    });
+    await p.now();
+    const writes = sync.writes();
+    state.workspaces = [ws('laaaaaaaaaa', 5)];
+    p.schedule();
+    await vi.advanceTimersByTimeAsync(60_000);
+    await p.settled();
+    expect(sync.writes()).toBe(writes);
+    await vi.advanceTimersByTimeAsync(180_000);
+    tick(240_000);
+    p.schedule();
+    await vi.advanceTimersByTimeAsync(60_000);
+    await p.settled();
+    expect(sync.writes()).toBe(writes + 1);
+  });
+
   it('creates a device identity and publishes a document others can read', async () => {
     const { p, sync, local } = setup();
     await p.now();

@@ -169,6 +169,7 @@ export function startBackground(): void {
     }
     // Layouts follow the store; awaiting keeps the next flush from moving it underneath.
     await pins.afterFlush(patches.map((p) => p.windowId));
+    if (patches.some((p) => !windowIncognito(p.windowId))) void publisher.schedule();
   });
 
   /** Whether a window is incognito: the window list first, then its tabs; unknown = yes. */
@@ -389,6 +390,24 @@ export function startBackground(): void {
     settings: async () => (await settingsNow()).sync,
     platform: async () => (await browser.runtime.getPlatformInfo()).os,
   });
+  const syncAlarm = 'vc-auto-sync';
+  async function configureSyncAlarm(): Promise<void> {
+    const prefs = (await settingsNow()).sync;
+    const minutes = prefs.workspaces || prefs.sessions ? prefs.intervalMinutes : 0;
+    const existing = await browser.alarms.get(syncAlarm);
+    if (minutes === 0) {
+      if (existing) await browser.alarms.clear(syncAlarm);
+    } else if (existing?.periodInMinutes !== minutes) {
+      await browser.alarms.create(syncAlarm, { periodInMinutes: minutes });
+    }
+  }
+  browser.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === syncAlarm)
+      void pins.loaded
+        .then(() => publisher.auto())
+        .catch((err: unknown) => console.warn('[vc] automatic sync failed', err));
+  });
+  void configureSyncAlarm().catch((err: unknown) => console.warn('[vc] sync alarm failed', err));
   // Saved sessions and the sync switches live outside the layouts. Other settings aren't
   // part of the document; a switch takes effect at once (off removes what was shared).
   let syncPrefs = '';
@@ -403,8 +422,20 @@ export function startBackground(): void {
       if (settings.display.mode !== display.mode) display.setMode(settings.display.mode);
       const next = JSON.stringify(settings.sync);
       if (next === syncPrefs) return;
+      const previous = syncPrefs
+        ? (JSON.parse(syncPrefs) as { workspaces: boolean; sessions: boolean })
+        : null;
       syncPrefs = next;
-      void publisher.now();
+      void configureSyncAlarm().catch((err: unknown) =>
+        console.warn('[vc] sync alarm failed', err),
+      );
+      if (
+        previous &&
+        (previous.workspaces !== settings.sync.workspaces ||
+          previous.sessions !== settings.sync.sessions)
+      )
+        void publisher.now();
+      else void publisher.schedule(true);
     }
   });
   void pins.loaded.then(() => publisher.schedule());

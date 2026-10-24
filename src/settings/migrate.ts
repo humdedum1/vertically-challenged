@@ -17,6 +17,7 @@ import {
   type Settings,
   SHORTCUT_ACTIONS,
   type SuspendSettings,
+  SYNC_INTERVALS,
   type SyncSettings,
   type TabRowSettings,
   UNHIDEABLE_PANELS,
@@ -46,6 +47,8 @@ const MIGRATIONS: readonly ((s: Raw) => Raw)[] = [
   // v5 → v6: new `display` group (side panel or in-page popup); default-filled.
   (s) => s,
   // v6 → v7: opener-based child tabs, enabled by default.
+  (s) => s,
+  // v7 → v8: automatic sync interval, default-filled.
   (s) => s,
 ];
 
@@ -166,6 +169,9 @@ function sanitize(raw: Raw): Settings {
   const sync: SyncSettings = {
     workspaces: bool(sy.workspaces, d.sync.workspaces),
     sessions: bool(sy.sessions, d.sync.sessions),
+    intervalMinutes: SYNC_INTERVALS.some((n) => n === sy.intervalMinutes)
+      ? (sy.intervalMinutes as number)
+      : d.sync.intervalMinutes,
   };
 
   const di = isObj(raw.display) ? raw.display : {};

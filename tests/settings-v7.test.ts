@@ -3,7 +3,7 @@ import { migrateSettings } from '../src/settings/migrate';
 import { DEFAULT_SETTINGS, SETTINGS_VERSION } from '../src/settings/schema';
 
 it('enables child tabs for new installs and upgrades without resetting preferences', () => {
-  expect(SETTINGS_VERSION).toBe(7);
+  expect(SETTINGS_VERSION).toBeGreaterThanOrEqual(7);
   expect(DEFAULT_SETTINGS.tabs.childTabs).toBe(true);
   const settings = migrateSettings({
     version: 6,

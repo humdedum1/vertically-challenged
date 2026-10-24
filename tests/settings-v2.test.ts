@@ -44,7 +44,7 @@ describe('migration to v2/v3', () => {
   it('current-version round-trip is identity for a customised object', () => {
     const s: Settings = {
       version: SETTINGS_VERSION,
-      sync: { workspaces: false, sessions: true },
+      sync: { workspaces: false, sessions: true, intervalMinutes: 1 },
       appearance: { ...v1.appearance, mode: 'dark', density: 'compact', accent: '#aabbcc' },
       tabs: {
         childTabs: false,

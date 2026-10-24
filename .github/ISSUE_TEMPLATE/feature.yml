@@ -3,6 +3,9 @@ description: Suggest an improvement or a new capability.
 title: '[Feature]: '
 labels: [enhancement]
 body:
+  - type: markdown
+    attributes:
+      value: This is a vibecoded personal project. Focused improvements and contributions are welcome; a request does not imply a delivery date. Search existing requests first.
   - type: textarea
     id: problem
     attributes:

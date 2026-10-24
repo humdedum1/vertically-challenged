@@ -21,6 +21,21 @@ body:
     validations:
       required: true
   - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method
+      options:
+        - Unpacked build
+        - Signed CRX from a release
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: sync
+    attributes:
+      label: Sync details (if relevant)
+      description: Which tabs/settings are missing? Include device count, automatic interval, Chrome Sync state, Settings sync status/error, and whether Sync now helps. Do not include private URLs or account details.
+  - type: dropdown
     id: display
     attributes:
       label: Display mode

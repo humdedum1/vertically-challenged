@@ -21,6 +21,7 @@ import {
   type PinDest,
   type PinItem,
   type PinNode,
+  parseBackupLayouts,
   parseLayoutStore,
   type WindowLayout,
 } from '../../shared/layout';
@@ -612,6 +613,43 @@ export class PinManager {
       this.markDirty(false);
       this.publishSetups();
       return this.layouts.has(layout.id) ? layout.id : null;
+    });
+  }
+
+  backupLayouts(): Promise<WindowLayout[]> {
+    return this.exclusive(() => parseBackupLayouts(this.storeFor(false).layouts));
+  }
+
+  /** Add portable layouts as dormant setups; never evict existing user data. */
+  restoreBackupLayouts(raw: unknown): Promise<number> {
+    return this.exclusive(async () => {
+      const layouts = parseBackupLayouts(raw);
+      if (this.setups().length + layouts.length > MAX_SETUPS)
+        throw new Error(
+          `Not enough room: at most ${MAX_SETUPS} saved window setups. Remove some setups and try again.`,
+        );
+      if (!layouts.length) return 0;
+      if (this.noPersist)
+        throw new Error('Browser is closing; try importing the backup again after restarting');
+      const restored = layouts.map((source) => {
+        const l = appendLayout(emptyLayout(false), source);
+        l.name = source.name;
+        return l;
+      });
+      // Flush older snapshots first, then save before reporting a successful restore.
+      if (this.persistTimer !== null) {
+        clearTimeout(this.persistTimer);
+        this.persist();
+      }
+      const data = this.storeFor(false);
+      data.layouts.push(...restored);
+      const write = this.writes.then(() => this.deps.storage.local.set({ [LAYOUTS_KEY]: data }));
+      this.writes = write.catch(() => {});
+      await write;
+      for (const l of restored) this.layouts.set(l.id, l);
+      this.deps.onChange?.();
+      this.publishSetups();
+      return layouts.length;
     });
   }
 

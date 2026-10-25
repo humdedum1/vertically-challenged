@@ -1303,3 +1303,69 @@ it('keeps the full named-window fingerprint when shutdown removes tabs in separa
   await settle();
   expect(recovered.layoutOf(7).name).toBe('Work');
 });
+
+describe('layout backups', () => {
+  it('exports normal layouts, imports fresh dormant setups and leaves live windows alone', async () => {
+    const t = setup({ windows: { 1: [pinned(1, 1, 'https://mail.test/')] } });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    const live = structuredClone(pins.layoutOf(1)) as WindowLayout;
+    const exported = await pins.backupLayouts();
+    expect(exported).toHaveLength(1);
+    expect(flattenItems(exported[0] as WindowLayout)[0]?.tabId).toBeNull();
+    expect(await pins.restoreBackupLayouts(exported)).toBe(1);
+    expect(pins.layoutOf(1)).toEqual(live);
+    const saved = pins.setups();
+    expect(saved).toHaveLength(1);
+    expect(saved[0]?.id).not.toBe(live?.id);
+    await settle();
+    const data = t.local.data.get(LAYOUTS_KEY) as LayoutStore;
+    const restored = data.layouts.find((l) => l.id === saved[0]?.id) as WindowLayout;
+    expect(flattenItems(restored)[0]?.tabId).toBeNull();
+    expect(flattenItems(restored)[0]?.id).not.toBe(flattenItems(live)[0]?.id);
+  });
+
+  it('refuses an import that would evict existing setups', async () => {
+    const setups = Array.from({ length: MAX_SETUPS }, (_, i) =>
+      layout(i + 1, [item(`i${i}`, 'https://saved.test/')]),
+    );
+    const t = setup({ windows: {}, local: { [LAYOUTS_KEY]: stored(setups) } });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    const before = pins.setups();
+    await expect(
+      pins.restoreBackupLayouts([layout(99, [item('new', 'https://new.test/')])]),
+    ).rejects.toThrow(/room|limit|50/i);
+    expect(pins.setups()).toEqual(before);
+  });
+});
+
+it('does not report a successful backup restore or add setups when storage fails', async () => {
+  const t = setup({ windows: {} });
+  const pins = new PinManager(t.deps);
+  await pins.loaded;
+  await settle();
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(t.deps.storage.local, 'set').mockRejectedValueOnce(new Error('Disk full'));
+  await expect(
+    pins.restoreBackupLayouts([layout(99, [item('new', 'https://new.test/')])]),
+  ).rejects.toThrow('Disk full');
+  expect(pins.setups()).toEqual([]);
+});
+
+it('excludes private windows from file backups', async () => {
+  const t = setup({
+    windows: {
+      1: [pinned(1, 1, 'https://public.test/')],
+      2: [pinned(2, 2, 'https://secret.test/', { incognito: true })],
+    },
+    incognito: [2],
+  });
+  const pins = new PinManager(t.deps);
+  await pins.loaded;
+  await settle();
+  const layouts = await pins.backupLayouts();
+  expect(layouts).toHaveLength(1);
+  expect(JSON.stringify(layouts)).not.toContain('secret.test');
+});

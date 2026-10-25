@@ -19,6 +19,7 @@ const SCRIPTS = [
   'auto-group.mjs',
   'incognito.mjs',
   'sync.mjs',
+  'backup.mjs',
   'popup.mjs',
 ];
 const results = [];

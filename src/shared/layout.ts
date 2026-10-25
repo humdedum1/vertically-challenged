@@ -323,3 +323,20 @@ export function parseLayoutStore(raw: unknown): LayoutStore {
     }));
   return { v: 1, layouts, bindings };
 }
+
+/** Portable layouts only: no incognito content, browser IDs or ordinary-tab history. */
+export function parseBackupLayouts(raw: unknown): WindowLayout[] {
+  const out: WindowLayout[] = [];
+  const seen = new Set<string>();
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (!isObj(r)) continue;
+    const l = parseLayout(r);
+    if (!l || l.incognito || isEmptyLayout(l) || seen.has(l.id)) continue;
+    seen.add(l.id);
+    for (const item of flattenItems(l)) item.tabId = null;
+    delete l.tabUrls;
+    l.collapsed = [];
+    out.push(l);
+  }
+  return out;
+}

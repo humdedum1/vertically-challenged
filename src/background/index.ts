@@ -463,6 +463,30 @@ export function startBackground(): void {
   });
   suspender.register();
 
+  browser.runtime.onMessage.addListener((raw, sender, respond) => {
+    if (
+      sender.id !== browser.runtime.id ||
+      !sender.url ||
+      new URL(sender.url).protocol !== 'chrome-extension:' ||
+      new URL(sender.url).pathname !== '/sidepanel.html'
+    )
+      return;
+    if (raw?.type !== 'backupLayouts' && raw?.type !== 'restoreBackupLayouts') return;
+    void (async () => {
+      try {
+        await pins.loaded;
+        if (raw.type === 'backupLayouts') return { ok: true, layouts: await pins.backupLayouts() };
+        return { ok: true, count: await pins.restoreBackupLayouts(raw.layouts) };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : 'Couldn’t back up or restore layouts',
+        };
+      }
+    })().then(respond);
+    return true;
+  });
+
   browser.runtime.onConnect.addListener((port) => {
     if (port.name !== PANEL_PORT_NAME || port.sender?.id !== browser.runtime.id) return;
 

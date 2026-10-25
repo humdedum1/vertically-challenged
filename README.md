@@ -68,6 +68,8 @@ Sign in to the same Google account in Chrome on each computer and enable Chrome 
 - Published data appears under **Sessions → Other devices**. It does not automatically open or close tabs on another computer. Open or add a workspace when you want it; pinned tiles remain available to open on demand.
 - **Keep here** saves a workspace's pinned layout as a setup. When it includes ordinary tabs, a full snapshot is also saved in Saved sessions.
 - Incognito tabs are excluded. Extension pages are excluded from ordinary-tab capture. Device snapshots do not share browser tab IDs.
+- **File backups** include settings, custom themes, Staples, pinned tabs, nested pinned folders, and saved Window setups. Import adds layouts to Sessions → Window setups without replacing open windows or existing setups. Incognito layouts are excluded. Older settings-only backups remain supported.
+
 - Chrome Sync has about **100 KB total storage**, shared by settings, themes, and compressed device snapshots. Large collections may not fit. Settings shows storage errors and omitted snapshots; this is not an unlimited or complete backup service.
 
 Updates and reloads preserve saved layouts when their live tabs can be identified. **Uninstalling removes the extension's local data.** Reinstalling is not a recovery method. Settings/theme export backs up settings and themes, not every tab, session, or folder.

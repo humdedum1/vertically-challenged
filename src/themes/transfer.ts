@@ -1,10 +1,11 @@
 import { migrateSettings } from '../settings/migrate';
 import type { Settings } from '../settings/schema';
+import { parseBackupLayouts, type WindowLayout } from '../shared/layout';
 import { type ParseResult, parseTheme, ROLES, type Theme } from './palette';
 
 export const BACKUP_FORMAT = 'vertically-challenged';
 export const BACKUP_VERSION = 1;
-/** Far above any real file (a theme is ~1 KB); stops a wrong file from freezing the panel. */
+/** Maximum theme or backup file size accepted by the panel. */
 export const MAX_IMPORT_BYTES = 1_000_000;
 export const MAX_NAME = 60;
 
@@ -15,6 +16,7 @@ export interface Backup {
   exportedAt: string;
   settings: Settings;
   themes: { id: string; name: string; dark: Theme['dark']; light: Theme['light'] }[];
+  layouts: WindowLayout[];
 }
 
 export function cleanName(raw: unknown, fallback: string): string {
@@ -65,6 +67,7 @@ export function createBackup(
   settings: Settings,
   themes: readonly Theme[],
   now = new Date(),
+  layouts: readonly WindowLayout[] = [],
 ): string {
   const backup: Backup = {
     format: BACKUP_FORMAT,
@@ -73,6 +76,7 @@ export function createBackup(
     exportedAt: now.toISOString(),
     settings,
     themes: themes.map(({ id, name, dark, light }) => ({ id, name, dark, light })),
+    layouts: parseBackupLayouts(layouts),
   };
   return `${JSON.stringify(backup, null, 2)}\n`;
 }
@@ -80,6 +84,7 @@ export function createBackup(
 export interface RestoredBackup {
   settings: Settings;
   themes: Theme[];
+  layouts: WindowLayout[];
 }
 
 /**
@@ -120,5 +125,8 @@ export function parseBackup(
     seen.add(id);
     themes.push(r.value);
   }
-  return { ok: true, value: { settings: migrateSettings(b.settings), themes }, warnings };
+  const layouts = parseBackupLayouts(b.layouts);
+  if (Array.isArray(b.layouts) && layouts.length !== b.layouts.length)
+    warnings.push('Invalid, empty, duplicate or incognito layouts were skipped');
+  return { ok: true, value: { settings: migrateSettings(b.settings), themes, layouts }, warnings };
 }

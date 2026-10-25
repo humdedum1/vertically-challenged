@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { migrateSettings } from '../src/settings/migrate';
 import { DEFAULT_SETTINGS, SETTINGS_VERSION, type Settings } from '../src/settings/schema';
+import type { WindowLayout } from '../src/shared/layout';
 import { BUILTIN_THEMES } from '../src/themes/builtin';
 import { type Palette, parseTheme, ROLES, type Theme } from '../src/themes/palette';
 import {
@@ -285,4 +286,95 @@ describe('createBackup / parseBackup', () => {
       }
     }
   });
+});
+
+it('backs up Staples, nested folders, dormant pins and home URLs without browser bindings', () => {
+  const layouts: WindowLayout[] = [
+    {
+      id: 'laaaaaaaaaa',
+      name: 'Work',
+      incognito: false,
+      lastUsed: 1,
+      collapsed: [],
+      tabUrls: ['https://ordinary.test/'],
+      essentials: [
+        {
+          kind: 'item',
+          id: 'mail',
+          homeUrl: 'https://mail.test/',
+          lastUrl: 'https://mail.test/inbox',
+          title: 'Mail',
+          tabId: 42,
+        },
+      ],
+      pinned: [
+        {
+          kind: 'folder',
+          id: 'work',
+          name: 'Work',
+          icon: 'work',
+          collapsed: true,
+          children: [
+            {
+              kind: 'folder',
+              id: 'nested',
+              name: 'Nested',
+              icon: 'code',
+              collapsed: false,
+              children: [
+                {
+                  kind: 'item',
+                  id: 'docs',
+                  homeUrl: 'https://docs.test/',
+                  lastUrl: 'https://docs.test/page',
+                  title: 'Docs',
+                  tabId: null,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ];
+  const privateLayout = {
+    ...(layouts[0] as WindowLayout),
+    id: 'lbbbbbbbbbb',
+    incognito: true,
+    name: 'Private',
+  };
+  const text = createBackup(DEFAULT_SETTINGS, [], new Date(), [...layouts, privateLayout]);
+  const r = parseBackup(text, isCustom);
+  expect(r.ok).toBe(true);
+  if (!r.ok) return;
+  expect(r.value.layouts).toHaveLength(1);
+  expect(r.value.layouts[0]?.essentials[0]).toMatchObject({
+    homeUrl: 'https://mail.test/',
+    lastUrl: 'https://mail.test/inbox',
+    tabId: null,
+  });
+  expect(r.value.layouts[0]?.pinned).toEqual(layouts[0]?.pinned);
+  expect(text).not.toContain('ordinary.test');
+  expect(text).not.toContain('Private');
+});
+
+it('keeps older settings-only backups compatible and validates imported layout URLs', () => {
+  const old = parseBackup(createBackup(DEFAULT_SETTINGS, []), isCustom);
+  expect(old.ok && old.value.layouts).toEqual([]);
+  const r = parseBackup(
+    JSON.stringify({
+      format: BACKUP_FORMAT,
+      layouts: [
+        {
+          id: 'laaaaaaaaaa',
+          essentials: [{ kind: 'item', id: 'bad', homeUrl: 'javascript:alert(1)', tabId: 42 }],
+          pinned: [],
+        },
+        null,
+        { id: 'invalid' },
+      ],
+    }),
+    isCustom,
+  );
+  expect(r.ok && r.value.layouts).toEqual([]);
 });

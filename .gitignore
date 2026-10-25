@@ -3,6 +3,7 @@ node_modules
 .wxt
 stats.html
 web-ext.config.ts
+*.pem
 *.log
 .DS_Store
 .idea

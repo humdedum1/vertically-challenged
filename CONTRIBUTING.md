@@ -46,6 +46,10 @@ GitHub Actions checks PRs with lint, type checking, tests, builds, and real-brow
 
 The existing release workflow runs on `main` and creates Semantic Versioning releases from Conventional Commits. Release publishing and signing are maintainer responsibilities. `npm run zip` creates an unpacked-extension ZIP; signed CRX archives are a separate release artifact. Keep the signing key private and reuse it for compatible extension updates.
 
+Every new release automatically receives `vertically-challenged-<version>-crx.zip`, containing the signed CRX. Maintainers must configure the `CRX_PRIVATE_KEY` Actions secret with the existing PEM signing key; never generate a replacement for an update. Dry runs do not sign or upload packages.
+
+For local packaging, run `npm run pack:crx`. It uses `.output/chrome-mv3.pem` by default; set `CRX_KEY_PATH` for another location and `CHROME_BIN` if Chrome is not available as `google-chrome`. Chrome/Chromium, `zip`, and `unzip` must be installed. The signing key stays outside the package.
+
 ## Branch protection
 
 The intended `main` protection is: require PRs and one approval, dismiss stale approvals, require the `check` CI job with the branch up to date, resolve conversations, and disallow force pushes and deletion. Administrator bypass remains available for maintainer recovery.

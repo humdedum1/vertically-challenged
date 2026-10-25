@@ -8,6 +8,7 @@
     "dev": "wxt",
     "build": "wxt build",
     "zip": "wxt zip",
+    "pack:crx": "npm run build && node scripts/pack-crx.mjs",
     "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

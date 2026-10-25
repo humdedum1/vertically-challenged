@@ -89,6 +89,7 @@ Built with TypeScript, Svelte 5, WXT, Vitest, and Biome. No new runtime service 
 | `npm run dev` | Development browser and hot reload |
 | `npm run build` | Production extension in `.output/chrome-mv3` |
 | `npm run zip` | Package the unpacked extension as a ZIP, not a signed CRX |
+| `npm run pack:crx` | Build and package a signed CRX inside a release ZIP |
 | `npm run lint` | Formatting and lint checks |
 | `npm run check` | Svelte and TypeScript checks |
 | `npm test` | Unit and integration tests |

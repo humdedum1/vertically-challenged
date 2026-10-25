@@ -6,7 +6,7 @@
  *   Left               collapse group / folder / window, or go to the parent header
  *   Right              expand group / folder / window, or go to its first child
  *   Enter              activate tab, open pinned tab / toggle group, folder or window /
- *                      list another window's Essentials (tiles row)
+ *                      list another window's Staples (tiles row)
  *   Space              toggle selection of the focused tab (group, folder, window: toggle)
  *   Shift+Up / Down    extend selection
  *   Escape             clear selection, then clear the search
@@ -136,7 +136,7 @@ function setWindowCollapsed(otherWindowId: number, collapsed: boolean): void {
   send({ type: 'setWindowCollapsed', windowId, otherWindowId, collapsed });
 }
 
-// Other windows' Essentials are chunked into fixed-height rows; how many fit depends on
+// Other windows' Staples are chunked into fixed-height rows; how many fit depends on
 // the list width (36px minimum per tile, 4px gaps).
 let listWidth = $state(0);
 const tilesPerRow = $derived(Math.max(1, Math.floor((listWidth - TILES_ROW_INSET + 4) / (36 + 4))));
@@ -204,7 +204,7 @@ const windowViewName = (id: number): string => {
 };
 const showUrl = $derived(twoLine || (rowHeight >= 34 && searching));
 
-// The home window's Essentials sit above the list as a grid; other windows' render as rows.
+// The home window's Staples sit above the list as a grid; other windows' render as rows.
 const homeLayout = $derived(
   tabState.windowId === null ? undefined : tabState.layoutOf(tabState.windowId),
 );
@@ -212,12 +212,12 @@ const essentials = $derived(homeLayout?.essentials ?? []);
 const layoutOf = (windowId: number): WindowLayout | undefined => tabState.layoutOf(windowId);
 const homeTabById = $derived(new Map(tabState.tabs.map((t) => [t.id, t])));
 const showGrid = $derived(!searching && essentials.length > 0);
-/** A running drag that could become an Essential: an empty grid then shows a drop area. */
+/** A running drag that could become a Staple: an empty grid then shows a drop area. */
 let dragWantsGrid = $state(false);
 /**
  * The empty grid's drop area lies over the search field instead of taking room in the
  * flow, which would push the list down under the pointer mid-drag. Without a top search
- * field there is nowhere to put it; Essentials then start from the menus.
+ * field there is nowhere to put it; Staples then start from the menus.
  */
 const dropArea = $derived(
   !showGrid && dragWantsGrid && !searching && search === 'top' && homeLayout !== undefined,
@@ -504,7 +504,7 @@ let menu = $state.raw<{
   y: number;
   label: string;
   items: MenuItem[];
-  /** Opened on an Essentials tile: focus goes back to the grid, not the tree. */
+  /** Opened on a Staples tile: focus goes back to the grid, not the tree. */
   fromGrid?: boolean;
 } | null>(null);
 
@@ -524,7 +524,7 @@ function openEssentialMenu(x: number, y: number, item: PinItem): void {
   menu = {
     x,
     y,
-    label: 'Essential actions',
+    label: 'Staple actions',
     fromGrid: true,
     items: essentialItems(windowId, item),
   };
@@ -536,11 +536,11 @@ function openTilesMenu(i: number, x: number, y: number, item: PinItem | null): v
   if (row?.kind !== 'tiles') return;
   setFocus(i, false);
   menu = item
-    ? { x, y, label: 'Essential actions', items: essentialItems(row.windowId, item) }
+    ? { x, y, label: 'Staple actions', items: essentialItems(row.windowId, item) }
     : {
         x,
         y,
-        label: 'Essentials',
+        label: 'Staples',
         items: tilesMenu({ windowId: row.windowId, tiles: row.tiles, send }),
       };
 }
@@ -700,7 +700,7 @@ function rowName(r: Row): string {
     case 'divider':
       return 'the pinned tabs';
     case 'tiles':
-      return 'Essentials';
+      return 'Staples';
   }
 }
 
@@ -1248,7 +1248,7 @@ function onkeydown(e: KeyboardEvent): void {
   switch (e.key) {
     case 'ArrowDown':
     case 'ArrowUp': {
-      // Up from the first row climbs into the Essentials grid.
+      // Up from the first row climbs into the Staples grid.
       if (e.key === 'ArrowUp' && !e.shiftKey && focusedIndex === 0 && showGrid && grid) {
         grid.focus();
         break;

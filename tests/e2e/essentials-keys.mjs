@@ -1,4 +1,4 @@
-// Real-Chrome keyboard checks for the Essentials grid: Up/Down keep the column across a
+// Real-Chrome keyboard checks for the Staples grid: Up/Down keep the column across a
 // run (Down to a lone full-width tile, then Up, returns where you started), and any other
 // way of focusing a tile starts a new column.
 //   node tests/e2e/essentials-keys.mjs [extension dir]
@@ -39,7 +39,7 @@ await page.evaluate(
 await page.waitForFunction(() => document.querySelectorAll('[role=option]').length === 5);
 await sleep(500);
 
-// Widen the panel until the five Essentials lay out as 4 + 1 (tiles grow from 64px, so
+// Widen the panel until the five Staples lay out as 4 + 1 (tiles grow from 64px, so
 // the exact width depends on the theme's paddings).
 const topsNow = () =>
   page.evaluate(() => [...document.querySelectorAll('[role=option]')].map((e) => e.offsetTop));
@@ -52,7 +52,7 @@ for (let w = 300; w <= 500; w += 5) {
 }
 check(
   new Set(tops.slice(0, 4)).size === 1 && tops[4] > tops[0],
-  'five Essentials lay out as 4 + 1',
+  'five Staples lay out as 4 + 1',
   JSON.stringify(tops),
 );
 const tile = (i) => page.locator(`[role=option][data-index="${i}"]`);
@@ -119,7 +119,7 @@ const pinRow = (i) => page.locator(`#vc-row-p${pinItems[i]}`);
 const normalRow = (i) => page.locator(`#vc-row-t${added.normal[i]}`);
 const addEssentials = async (row) => {
   await row.click({ button: 'right' });
-  await page.getByRole('menuitem', { name: 'Add to Essentials', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Add to Staples', exact: true }).click();
 };
 await pinRow(0).click({ modifiers: ['Control'] });
 await pinRow(2).click({ modifiers: ['Shift'] });
@@ -131,7 +131,7 @@ check(
       ids.every((id) => globalThis.__rangeLayout.essentials.some((item) => item.tabId === id)),
     added.pinned,
   ),
-  'Add to Essentials moves the whole pinned range',
+  'Add to Staples moves the whole pinned range',
 );
 await normalRow(0).click({ modifiers: ['Control'] });
 await normalRow(1).click({ modifiers: ['Shift'] });
@@ -152,7 +152,7 @@ check(
       ids.every((id) => globalThis.__rangeLayout.essentials.some((item) => item.tabId === id)),
     added.normal,
   ),
-  'Add to Essentials moves the whole regular-tab range',
+  'Add to Staples moves the whole regular-tab range',
 );
 
 await close();

@@ -89,7 +89,7 @@ check(ws?.kind === 'window', 'its open window is published as a workspace', JSON
 check(
   JSON.stringify(ws?.window.layout.essentials.map((i) => ws.window.tabs[i].url)) ===
     JSON.stringify([`${SITE}/mail`, `${SITE}/cal`]),
-  'with its Essentials',
+  'with its Staples',
 );
 check(!JSON.stringify(mine).includes('"tabId"'), 'without live tab ids');
 check(
@@ -184,7 +184,7 @@ const card = page.locator('section[aria-label="Work laptop"]');
 check((await card.count()) === 1, 'the other device shows in the Sessions panel');
 const text = (await card.textContent()) ?? '';
 check(
-  text.includes('Design') && text.includes('1 Essential') && text.includes('1 folder'),
+  text.includes('Design') && text.includes('1 Staple') && text.includes('1 folder'),
   'with its workspace and what it holds',
   text,
 );
@@ -206,7 +206,7 @@ check(winsAfter.length === windowsBefore + 1, 'opening it makes a new window');
 const newWin = winsAfter.find((id) => id !== win);
 const l = await api((w) => globalThis.__layouts[w], newWin);
 check(l?.name === 'Design', 'the new window has the workspace’s layout', JSON.stringify(l));
-check(l?.essentials?.[0]?.homeUrl === `${SITE}/figma`, 'with its Essential');
+check(l?.essentials?.[0]?.homeUrl === `${SITE}/figma`, 'with its Staple');
 check(l?.pinned?.[0]?.kind === 'folder' && l.pinned[0].children.length === 2, 'and its folder');
 check(
   await api(
@@ -236,10 +236,7 @@ check(
   'adding it puts its pinned tabs into this window, after what was there',
   JSON.stringify(here.essentials.map((i) => i.homeUrl)),
 );
-check(
-  here.essentials[0]?.homeUrl === `${SITE}/mail`,
-  'and keeps this window’s own Essentials first',
-);
+check(here.essentials[0]?.homeUrl === `${SITE}/mail`, 'and keeps this window’s own Staples first');
 check(
   await api(
     async ([windowId, url]) => (await chrome.tabs.query({ windowId })).some((t) => t.url === url),

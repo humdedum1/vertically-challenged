@@ -1,6 +1,6 @@
 # Vertically Challenged
 
-Vertical tabs for Chrome, in the side panel or a popup over your current page. Organize windows with Essentials, pinned folders, tab groups, saved sessions, and themes.
+Vertical tabs for Chrome, in the side panel or a popup over your current page. Organize windows with Staples, pinned folders, tab groups, saved sessions, and themes.
 
 **This is a vibecoded project.** AI coding tools have been used extensively to build it. It is a personal, experimental project: bugs happen, tests do not cover everything, and releases may need follow-up fixes. Reports, code review, and focused PRs are welcome. Keep backups of anything you cannot afford to lose.
 
@@ -33,14 +33,14 @@ The repository is currently private; GitHub links require access until it is mad
 | Feature | What it does |
 | --- | --- |
 | All-window tab list | Shows your normal windows together, with window names and active tabs. Incognito windows are kept separate. |
-| Essentials | A compact grid for frequently used pages, with persistent home URLs and dormant tiles you can reopen. |
+| Staples | A compact grid for frequently used pages, with persistent home URLs and dormant tiles you can reopen. |
 | Pinned tabs and folders | Arrange pins into nested folders, change folder icons, and drag items between sections or windows. |
 | Child tabs | New tabs opened from another page can appear beneath their opener. Drag to nest or unnest tabs. |
 | Native tab groups | Create, rename, recolor, collapse, and move Chrome groups. |
 | Search | Find tabs by title and URL with fuzzy matching and keyboard navigation. |
 | Multiple selection | Select ranges or individual tabs and act on them together. |
-| Clear | Close ordinary tabs while keeping your Essentials and pinned layout. |
-| Window setups | Save window names, Essentials, pins, and folder structures for reuse. |
+| Clear | Close ordinary tabs while keeping your Staples and pinned layout. |
+| Window setups | Save window names, Staples, pins, and folder structures for reuse. |
 | Saved sessions | Save windows or all windows and restore their tabs, groups, and live pinned layouts. |
 | Other devices | Browse published workspaces and sessions, open or add them locally, and keep copies. |
 | Suspend tabs | Discard tabs manually or after an idle interval, with pinned, audible, and site exclusions. Chrome reloads them when activated. |
@@ -62,7 +62,7 @@ Choose the Chrome side panel or an in-page popup. On pages where Chrome disallow
 Sign in to the same Google account in Chrome on each computer and enable Chrome Sync for extensions. Install Vertically Challenged on each device. Chrome's own remote-tab list additionally needs its **Open tabs** sync setting.
 
 - **Settings and custom themes** are stored directly in Chrome Sync and update when changed.
-- **Open workspaces** publish ordinary tabs, groups, Essentials, pinned tabs, folders, and window names. Saved setups and sessions can also be shared.
+- **Open workspaces** publish ordinary tabs, groups, Staples, pinned tabs, folders, and window names. Saved setups and sessions can also be shared.
 - Choose **Manual only**, **1**, **5**, **15**, **30**, or **60 minutes** in Settings → Sync. This controls workspace/session publication; it does not control Google's delivery timing or settings/theme sync.
 - **Sync now** publishes immediately. Automatic publication uses Chrome alarms so the extension's idle background worker can wake to sync. Alarms can run late when the computer sleeps.
 - Published data appears under **Sessions → Other devices**. It does not automatically open or close tabs on another computer. Open or add a workspace when you want it; pinned tiles remain available to open on demand.

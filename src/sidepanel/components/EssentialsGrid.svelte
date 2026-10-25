@@ -225,7 +225,7 @@ function onkeydown(e: KeyboardEvent): void {
 <div
   class="grid"
   role="listbox"
-  aria-label="Essentials"
+  aria-label="Staples"
   aria-orientation="horizontal"
   tabindex="-1"
   bind:this={el}
@@ -234,7 +234,7 @@ function onkeydown(e: KeyboardEvent): void {
   ondragstart={(e) => e.preventDefault()}
 >
   {#if items.length === 0 && dropping}
-    <div class="empty" class:target={dropIndex !== null}>Drop here to add to Essentials</div>
+    <div class="empty" class:target={dropIndex !== null}>Drop here to add to Staples</div>
   {/if}
   {#each items as item, i (item.id)}
     {@const tab = tabOf(item)}

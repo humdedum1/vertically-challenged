@@ -105,7 +105,7 @@ function setPref(key: 'workspaces' | 'sessions', value: boolean): void {
 
     <Toggle
       label="Sync workspaces"
-      hint="Each window’s tabs, groups, Essentials, pinned tabs and folders, and window setups"
+      hint="Each window’s tabs, groups, Staples, pinned tabs and folders, and window setups"
       checked={prefs.workspaces}
       onchange={(v) => setPref('workspaces', v)}
     />

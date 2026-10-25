@@ -74,10 +74,10 @@ describe('pinMenu', () => {
     return { items, ...r, onNewFolder };
   };
 
-  it('adds the selected range to Essentials and groups the clicked window', () => {
+  it('adds the selected range to Staples and groups the clicked window', () => {
     const selected = [tab(7, { pinned: true }), tab(8, { pinned: true }), tab(9)];
     const { items, sent } = build(item(), selected[0] ?? null, 2, selected);
-    find(items, 'Add to Essentials').onselect();
+    find(items, 'Add to Staples').onselect();
     find(items, 'Group tabs by website').onselect();
     expect(sent).toEqual([
       { type: 'pinTabs', tabIds: [7, 8, 9], windowId: 1, dest: { zone: 'essentials', index: 5 } },
@@ -96,7 +96,7 @@ describe('pinMenu', () => {
       'Mute',
       'Suspend',
       '—',
-      'Add to Essentials',
+      'Add to Staples',
       'Group tabs by website',
       'New folder',
       'Unpin',
@@ -118,7 +118,7 @@ describe('pinMenu', () => {
       'Set this page as home',
       'Unmute',
       'Suspend',
-      'Add to Essentials',
+      'Add to Staples',
       'New folder',
       'Unpin',
       'Close tab',
@@ -152,14 +152,14 @@ describe('pinMenu', () => {
     expect(onNewFolder).toHaveBeenCalledTimes(1);
   });
 
-  it('a dormant item: only open, re-home from its last URL, add to Essentials, folder, unpin', () => {
+  it('a dormant item: only open, re-home from its last URL, add to Staples, folder, unpin', () => {
     const { items } = build(item({ tabId: null, lastUrl: 'https://mail.example.com/x' }), null);
     expect(find(items, 'Open').disabled).toBeFalsy();
     expect(find(items, 'Back to home URL').disabled).toBe(true);
     expect(find(items, 'Set this page as home').disabled).toBe(false);
     expect(find(items, 'Mute').disabled).toBe(true);
     expect(find(items, 'Suspend').disabled).toBe(true);
-    expect(find(items, 'Add to Essentials').disabled).toBeFalsy();
+    expect(find(items, 'Add to Staples').disabled).toBeFalsy();
     expect(find(items, 'New folder').disabled).toBeFalsy();
     expect(find(items, 'Unpin').disabled).toBeFalsy();
     expect(find(items, 'Close tab').disabled).toBe(true);

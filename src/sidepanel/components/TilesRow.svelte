@@ -45,7 +45,7 @@ let {
 const titleOf = (t: { item: PinItem; tab: TabInfo | null }): string =>
   t.tab?.title || t.item.title || t.item.homeUrl;
 // The tiles themselves are hidden from assistive tech; the row names them in order.
-const label = $derived(`Essentials of ${windowName}: ${tiles.map(titleOf).join(', ')}`);
+const label = $derived(`Staples of ${windowName}: ${tiles.map(titleOf).join(', ')}`);
 </script>
 
 <!-- Keys are handled on the owning tree via aria-activedescendant (Enter / menu key list the tiles). -->

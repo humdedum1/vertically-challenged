@@ -138,7 +138,7 @@ async function openTab(url: string): Promise<void> {
 function setupCounts(u: SetupSummary): string {
   const pinned = u.itemCount - u.essentials.length;
   return [
-    u.essentials.length ? pluralize(u.essentials.length, 'Essential') : '',
+    u.essentials.length ? pluralize(u.essentials.length, 'Staple') : '',
     u.folderCount ? pluralize(u.folderCount, 'folder') : '',
     pinned > 0 ? `${pinned} pinned` : '',
   ]
@@ -251,7 +251,7 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
     {/snippet}
 
     {#if setups.length === 0}
-      <p class="message">No saved window setups — closing a window that has Essentials or folders saves it here.</p>
+      <p class="message">No saved window setups — closing a window that has Staples or folders saves it here.</p>
     {:else}
       <ul class="list setups" aria-label="Window setups">
         {#each setups as u (u.id)}

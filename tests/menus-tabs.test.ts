@@ -3,7 +3,7 @@ import type { PanelMessage } from '../src/shared/protocol';
 import { groupMenu, tabMenu } from '../src/sidepanel/model/menus';
 import { group, tab } from './helpers';
 
-it('offers grouping and adds the whole normal-tab selection to Essentials', () => {
+it('offers grouping and adds the whole normal-tab selection to Staples', () => {
   const sent: PanelMessage[] = [];
   const tabs = [tab(7), tab(8), tab(9)];
   const items = tabMenu({
@@ -19,7 +19,7 @@ it('offers grouping and adds the whole normal-tab selection to Essentials', () =
     onNewGroup: () => {},
     onWhitelist: () => {},
   });
-  for (const label of ['Add to Essentials', 'Group tabs by website']) {
+  for (const label of ['Add to Staples', 'Group tabs by website']) {
     const entry = items.find((item) => item.type === 'item' && item.label === label);
     expect(entry?.type).toBe('item');
     if (entry?.type === 'item') entry.onselect();

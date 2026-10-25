@@ -81,7 +81,7 @@ function workspaceCounts(w: SyncWorkspace): string {
   const folders = countFolders(w.window.layout?.pinned ?? []);
   const pinned = w.window.tabs.length - essentials;
   return [
-    essentials ? pluralize(essentials, 'Essential') : '',
+    essentials ? pluralize(essentials, 'Staple') : '',
     folders ? pluralize(folders, 'folder') : '',
     pinned > 0 ? `${pinned} pinned` : '',
   ]

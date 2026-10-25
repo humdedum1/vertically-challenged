@@ -96,7 +96,7 @@ export function tabMenu(c: TabMenuContext): MenuItem[] {
     SEP,
     {
       type: 'item',
-      label: 'Add to Essentials',
+      label: 'Add to Staples',
       onselect: () =>
         c.send({
           type: 'pinTabs',
@@ -326,13 +326,13 @@ export interface EssentialMenuContext {
   /** The live tab, or null while the item is dormant. */
   tab: TabInfo | null;
   windowId: number;
-  /** Root nodes of the window's pinned tree: "Remove from Essentials" lands after them. */
+  /** Root nodes of the window's pinned tree: "Remove from Staples" lands after them. */
   pinnedCount: number;
   send: (msg: PanelMessage) => void;
 }
 
 /**
- * The entries Essentials and pinned rows share: both are launchers with a home URL, and
+ * The entries Staples and pinned rows share: both are launchers with a home URL, and
  * closing either only suspends it.
  */
 function launcherItems(c: {
@@ -394,7 +394,7 @@ export function essentialMenu(c: EssentialMenuContext): MenuItem[] {
     SEP,
     {
       type: 'item',
-      label: 'Remove from Essentials',
+      label: 'Remove from Staples',
       onselect: () =>
         c.send({
           type: 'pinMove',
@@ -433,7 +433,7 @@ export interface PinMenuContext {
   index: number;
   /** 1 at the pinned root, +1 per enclosing folder. */
   depth: number;
-  /** "Add to Essentials" appends to the grid. */
+  /** "Add to Staples" appends to the grid. */
   essentialsCount: number;
   send: (msg: PanelMessage) => void;
   /** Called after "New folder" so the UI can open the name field once the folder appears. */
@@ -450,7 +450,7 @@ export function pinMenu(c: PinMenuContext): MenuItem[] {
     SEP,
     {
       type: 'item',
-      label: 'Add to Essentials',
+      label: 'Add to Staples',
       onselect: () => {
         if (tab && c.tabs.length > 1) {
           c.send({
@@ -634,7 +634,7 @@ export interface TilesMenuContext {
   send: (msg: PanelMessage) => void;
 }
 
-/** Keyboard route to another window's mini Essentials: one entry per tile. */
+/** Keyboard route to another window's mini Staples: one entry per tile. */
 export function tilesMenu(c: TilesMenuContext): MenuItem[] {
   return c.tiles.map(({ item, tab }) => ({
     type: 'item',

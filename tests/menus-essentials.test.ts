@@ -56,7 +56,7 @@ describe('essentialMenu', () => {
       'Set this page as home',
       'Mute',
       'Suspend',
-      'Remove from Essentials',
+      'Remove from Staples',
       'Unpin',
       'Close tab',
     ]);
@@ -105,7 +105,7 @@ describe('essentialMenu', () => {
       'Reload',
       'Unmute',
       'Suspend',
-      'Remove from Essentials',
+      'Remove from Staples',
       'Unpin',
       'Close tab',
     ]) {

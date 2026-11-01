@@ -77,6 +77,11 @@ export class TabState {
   private heartbeat: ReturnType<typeof setTimeout> | undefined;
   private replyTimer: ReturnType<typeof setTimeout> | undefined;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  private lastRetryable: Extract<
+    PanelMessage,
+    { type: 'activate' | 'renameWindow' }
+  > | null = null;
+  private retryable: Extract<PanelMessage, { type: 'activate' | 'renameWindow' }> | null = null;
   private disposed = false;
 
   async start(): Promise<void> {
@@ -108,6 +113,7 @@ export class TabState {
     if (this.disposed) return;
     try {
       if (!this.port) throw new Error('Disconnected');
+      if (msg.type === 'activate' || msg.type === 'renameWindow') this.lastRetryable = msg;
       this.port.postMessage(msg);
     } catch {
       this.reconnect();
@@ -123,6 +129,7 @@ export class TabState {
     clearTimeout(this.replyTimer);
     clearTimeout(this.reconnectTimer);
     const port = this.port;
+    this.retryable = this.lastRetryable;
     this.port = null;
     port?.disconnect();
     this.status = 'connecting';
@@ -167,6 +174,7 @@ export class TabState {
   }
 
   private receive(msg: WorkerMessage): void {
+    if (msg.type !== 'pong') this.lastRetryable = null;
     switch (msg.type) {
       case 'pong':
         clearTimeout(this.replyTimer);
@@ -252,6 +260,9 @@ export class TabState {
       this.retries = 0;
       this.status = 'ready';
       this.error = null;
+      const retryable = this.retryable;
+      this.retryable = null;
+      if (retryable) this.send(retryable);
     }
     this.publish();
   }

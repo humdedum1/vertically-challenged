@@ -62,17 +62,17 @@ export async function runCommand(
       await Promise.all(msg.tabIds.map(reloadTab));
       return;
     case 'close':
-      await browser.tabs.remove(msg.tabIds);
+      await closeTabs(msg.tabIds);
       return;
     case 'closeOthers': {
       const ids = await windowTabs(msg.tabId, (t) => !t.pinned && t.id !== msg.tabId);
-      if (ids.length) await browser.tabs.remove(ids);
+      if (ids.length) await closeTabs(ids);
       return;
     }
     case 'closeBelow': {
       const self = await browser.tabs.get(msg.tabId);
       const ids = await windowTabs(msg.tabId, (t) => !t.pinned && t.index > self.index);
-      if (ids.length) await browser.tabs.remove(ids);
+      if (ids.length) await closeTabs(ids);
       return;
     }
     case 'duplicate':
@@ -86,7 +86,8 @@ export async function runCommand(
       return;
     case 'newTab': {
       if (msg.afterTabId === null) {
-        await browser.tabs.create({ windowId: msg.windowId });
+        const tabs = await browser.tabs.query({ windowId: msg.windowId });
+        await browser.tabs.create({ windowId: msg.windowId, index: tabs.length });
         return;
       }
       const after = await browser.tabs.get(msg.afterTabId);
@@ -218,7 +219,7 @@ export async function runCommand(
     case 'closeGroup': {
       const tabs = await browser.tabs.query({ groupId: msg.groupId });
       const ids = tabs.map((t) => t.id).filter((id): id is number => id !== undefined);
-      if (ids.length) await browser.tabs.remove(ids);
+      if (ids.length) await closeTabs(ids);
       return;
     }
     case 'discard':
@@ -265,6 +266,23 @@ export async function runCommand(
         deps.layouts,
       );
   }
+}
+
+/** Choose a loaded survivor before Chrome can activate an unloaded neighbour. */
+async function closeTabs(tabIds: number[]): Promise<void> {
+  const closing = new Set(tabIds);
+  const tabs = await Promise.all(tabIds.map((id) => browser.tabs.get(id)));
+  for (const windowId of new Set(tabs.map((t) => t.windowId))) {
+    const windowTabs = await browser.tabs.query({ windowId });
+    if (!windowTabs.some((t) => t.active && t.id !== undefined && closing.has(t.id))) continue;
+    const next = windowTabs
+      .filter(
+        (t) => t.id !== undefined && !closing.has(t.id) && !t.discarded && t.status !== 'unloaded',
+      )
+      .sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))[0];
+    if (next?.id !== undefined) await browser.tabs.update(next.id, { active: true });
+  }
+  await browser.tabs.remove(tabIds);
 }
 
 /** An accepted API call can be a silent no-op; allow one retry only if no load was reported. */

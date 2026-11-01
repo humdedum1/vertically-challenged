@@ -13,7 +13,7 @@ export function toTabInfo(tab: Browser.tabs.Tab): TabInfo | null {
     active: tab.active,
     audible: tab.audible ?? false,
     muted: tab.mutedInfo?.muted ?? false,
-    discarded: tab.discarded,
+    discarded: tab.discarded || tab.status === 'unloaded',
     loading: tab.status === 'loading',
     groupId: tab.groupId ?? -1,
     ...(tab.openerTabId === undefined ? {} : { openerTabId: tab.openerTabId }),

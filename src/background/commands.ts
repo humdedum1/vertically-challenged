@@ -5,7 +5,6 @@ import type { GroupColor, GroupInfo, TabInfo } from '../shared/types';
 import { planGroupMove, planMoves } from './move-plan';
 import type { SessionLayouts } from './sessions';
 import { deleteSession, renameSession, restoreSession, saveSession } from './sessions';
-import { canDiscardManually } from './suspend/eligibility';
 
 export interface CommandDeps {
   /** Store contents for windows, in strip order. */
@@ -318,11 +317,20 @@ async function reloadTab(tabId: number): Promise<void> {
   }
 }
 
-/** Manual suspend: ignores the idle timer and whitelist, but Chrome can't discard active tabs. */
+/** Switch away before discarding; never select another tab in the suspension batch. */
 async function discardTabs(tabs: readonly TabInfo[]): Promise<void> {
-  await Promise.all(
-    tabs.filter(canDiscardManually).map((t) => browser.tabs.discard(t.id).catch(() => {})),
-  );
+  const targets = tabs.filter((t) => !t.discarded);
+  const ids = new Set(targets.map((t) => t.id));
+  for (const windowId of new Set(targets.map((t) => t.windowId))) {
+    const live = await browser.tabs.query({ windowId });
+    if (!live.some((t) => t.active && t.id !== undefined && ids.has(t.id))) continue;
+    const next = live
+      .filter((t) => t.id !== undefined && !ids.has(t.id))
+      .sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))[0];
+    if (next?.id !== undefined) await browser.tabs.update(next.id, { active: true });
+    else await browser.tabs.create({ windowId, active: true });
+  }
+  await Promise.all(targets.map((t) => browser.tabs.discard(t.id).catch(() => {})));
 }
 
 /**

@@ -111,6 +111,7 @@ it('offers reload for the tab selection', () => {
     homeWindowId: 1,
     whitelist: [],
     essentialsCount: 0,
+    pinned: [],
     send,
     onNewGroup: () => {},
     onWhitelist: () => {},

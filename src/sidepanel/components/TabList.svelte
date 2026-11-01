@@ -642,6 +642,7 @@ function openMenu(i: number, x: number, y: number): void {
       target: row.tab,
       tabs: targetTabs(row.tab),
       essentialsCount: layoutOf(winId)?.essentials.length ?? 0,
+      pinned: layoutOf(winId)?.pinned ?? [],
       allTabs: tabsOfWindow(winId),
       groups: allGroups.filter((g) => g.windowId === winId),
       send,
@@ -1206,9 +1207,9 @@ function runAction(action: ShortcutAction, row: Row | undefined): boolean {
     case 'suspendTab': {
       if (row?.kind !== 'tab') return false;
       const ids = targetTabs(row.tab)
-        .filter((t) => !t.active)
+        .filter((t) => !t.discarded)
         .map((t) => t.id);
-      if (ids.length === 0) announcement = 'The active tab can’t be suspended';
+      if (ids.length === 0) announcement = 'Selected tabs are already suspended';
       else send({ type: 'discard', tabIds: ids });
       return true;
     }

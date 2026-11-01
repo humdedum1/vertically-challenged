@@ -124,6 +124,7 @@ try {
   );
 
   await panel.getByRole('tab', { name: 'Settings', exact: true }).click();
+  await panel.locator('summary').filter({ hasText: 'Panel & tabs' }).click();
   const toggle = panel.getByRole('switch', { name: 'Child tabs', exact: true });
   check(
     (await toggle.getAttribute('aria-checked')) === 'true',
@@ -147,6 +148,7 @@ try {
   check(true, 'the disabled setting survives panel reload');
 
   await panel.getByRole('tab', { name: 'Settings', exact: true }).click();
+  await panel.locator('summary').filter({ hasText: 'Panel & tabs' }).click();
   await panel.getByRole('switch', { name: 'Child tabs', exact: true }).click();
   await panel.getByRole('tab', { name: 'Tabs', exact: true }).click();
   await row('/grandchild').waitFor();

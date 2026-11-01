@@ -288,6 +288,7 @@ check(
 
 // --- 7. Settings: status, and switching both off removes this device's document.
 await page.getByRole('tab', { name: 'Settings' }).click();
+await page.locator('summary').filter({ hasText: 'Data' }).click();
 await page.waitForSelector('#vc-device-name');
 check(
   (await page.locator('#vc-sync-interval').inputValue()) === '1',
@@ -363,6 +364,7 @@ const navigation = page.waitForEvent('load');
 await page.getByRole('button', { name: 'Reload panel', exact: true }).click();
 await navigation;
 await page.getByRole('tab', { name: 'Settings' }).click();
+await page.locator('summary').filter({ hasText: 'Data' }).click();
 await page.waitForSelector('#vc-device-name');
 check(
   (await page.getByRole('button', { name: 'Reload panel', exact: true }).count()) === 1,

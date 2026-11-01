@@ -1,5 +1,11 @@
 import { hostOf, matchesHostPattern } from '../../shared/host-pattern';
-import { FOLDER_ICONS, MAX_FOLDER_DEPTH, type PinFolder, type PinItem } from '../../shared/layout';
+import {
+  FOLDER_ICONS,
+  MAX_FOLDER_DEPTH,
+  type PinFolder,
+  type PinItem,
+  type PinNode,
+} from '../../shared/layout';
 import type { PanelMessage } from '../../shared/protocol';
 import type { GroupInfo, TabInfo, WindowInfo } from '../../shared/types';
 import type { MenuItem } from '../components/menu-types';
@@ -11,6 +17,7 @@ export interface TabMenuContext {
   tabs: TabInfo[];
   allTabs: readonly TabInfo[];
   essentialsCount: number;
+  pinned: readonly PinNode[];
   groups: readonly GroupInfo[];
   send: (msg: PanelMessage) => void;
   /** Called after "Add to new group" so the UI can open the rename field once it appears. */
@@ -49,8 +56,7 @@ export function tabMenu(c: TabMenuContext): MenuItem[] {
   };
   const n = ids.length;
   const plural = n > 1 ? ` (${n})` : '';
-  // The active tab of a window can't be discarded.
-  const suspendable = c.tabs.filter((t) => !t.active).map((t) => t.id);
+  const suspendable = c.tabs.filter((t) => !t.discarded).map((t) => t.id);
   const host = hostOf(c.target.url);
   const listed = host !== null && c.whitelist.includes(host);
   const covered = host !== null && !listed && matchesHostPattern(c.target.url, c.whitelist);
@@ -64,6 +70,27 @@ export function tabMenu(c: TabMenuContext): MenuItem[] {
       target: { windowId, beforeTabId: null, groupId: -1, pinned: null },
     });
 
+  const folders: MenuItem[] = [];
+  const visitFolders = (nodes: readonly PinNode[], path = ''): void => {
+    for (const node of nodes) {
+      if (node.kind !== 'folder') continue;
+      const label = path ? `${path} / ${node.name}` : node.name;
+      folders.push({
+        type: 'item',
+        label,
+        icon: node.icon,
+        onselect: () =>
+          c.send({
+            type: 'pinTabs',
+            tabIds: ids,
+            windowId: c.target.windowId,
+            dest: { zone: 'pinned', folderId: node.id, index: node.children.length },
+          }),
+      });
+      visitFolders(node.children, label);
+    }
+  };
+  visitFolders(c.pinned);
   const items: MenuItem[] = [
     {
       type: 'item',
@@ -105,6 +132,9 @@ export function tabMenu(c: TabMenuContext): MenuItem[] {
           dest: { zone: 'essentials', index: c.essentialsCount },
         }),
     },
+    ...(folders.length
+      ? [{ type: 'submenu' as const, label: 'Pin to folder', items: folders }]
+      : []),
     {
       type: 'item',
       label: 'Group tabs by website',
@@ -208,7 +238,9 @@ export interface GroupMenuContext {
 
 export function groupMenu(c: GroupMenuContext): MenuItem[] {
   const ids = c.tabs.filter((t) => t.groupId === c.group.id).map((t) => t.id);
-  const suspendable = c.tabs.filter((t) => t.groupId === c.group.id && !t.active).map((t) => t.id);
+  const suspendable = c.tabs
+    .filter((t) => t.groupId === c.group.id && !t.discarded)
+    .map((t) => t.id);
   const lastId = ids[ids.length - 1] ?? null;
   return [
     { type: 'item', label: 'Rename', onselect: c.onRename },

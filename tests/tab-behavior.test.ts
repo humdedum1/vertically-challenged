@@ -5,10 +5,20 @@ import { toTabInfo } from '../src/background/to-tab-info';
 import { tab } from './helpers';
 
 const api = vi.hoisted(() => ({
-  tabs: { query: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn(), get: vi.fn() },
+  tabs: {
+    query: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    remove: vi.fn(),
+    get: vi.fn(),
+    discard: vi.fn(),
+  },
 }));
 vi.mock('wxt/browser', () => ({ browser: api }));
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  api.tabs.discard.mockResolvedValue(undefined);
+});
 
 it('appends a new tab at the bottom regardless of the active tab', async () => {
   api.tabs.query.mockResolvedValue([{ id: 1 }, { id: 2 }, { id: 3 }]);
@@ -68,4 +78,54 @@ it('excludes every tab in a bulk close when selecting a survivor', async () => {
   await runCommand({ type: 'close', tabIds: [2, 3] }, {} as CommandDeps);
   expect(api.tabs.update).toHaveBeenCalledWith(1, { active: true });
   expect(api.tabs.remove).toHaveBeenCalledWith([2, 3]);
+});
+
+it('switches to the last selected tab before suspending the active tab', async () => {
+  api.tabs.query.mockResolvedValue([
+    { id: 1, lastAccessed: 20 },
+    { id: 2, lastAccessed: 30 },
+    { id: 3, active: true, lastAccessed: 40 },
+  ]);
+  const current = tab(3, { active: true });
+  await runCommand({ type: 'discard', tabIds: [3] }, {
+    tab: () => current,
+  } as unknown as CommandDeps);
+  expect(api.tabs.update).toHaveBeenCalledWith(2, { active: true });
+  expect(api.tabs.discard).toHaveBeenCalledWith(3);
+  expect(api.tabs.update.mock.invocationCallOrder[0]).toBeLessThan(
+    api.tabs.discard.mock.invocationCallOrder[0] ?? 0,
+  );
+});
+
+it('opens a new tab before suspending the only tab', async () => {
+  api.tabs.query.mockResolvedValue([{ id: 3, active: true }]);
+  await runCommand({ type: 'discard', tabIds: [3] }, {
+    tab: () => tab(3, { active: true }),
+  } as unknown as CommandDeps);
+  expect(api.tabs.create).toHaveBeenCalledWith({ windowId: 1, active: true });
+  expect(api.tabs.discard).toHaveBeenCalledWith(3);
+});
+
+it('keeps every selected tab out of the suspension fallback', async () => {
+  api.tabs.query.mockResolvedValue([
+    { id: 1, lastAccessed: 10 },
+    { id: 2, lastAccessed: 30 },
+    { id: 3, active: true, lastAccessed: 40 },
+  ]);
+  await runCommand({ type: 'discard', tabIds: [2, 3] }, {
+    tab: (id: number) => tab(id, { active: id === 3 }),
+  } as unknown as CommandDeps);
+  expect(api.tabs.update).toHaveBeenCalledWith(1, { active: true });
+  expect(api.tabs.discard.mock.calls).toEqual([[2], [3]]);
+});
+
+it('does not discard the current tab if switching away fails', async () => {
+  api.tabs.query.mockResolvedValue([{ id: 1 }, { id: 3, active: true }]);
+  api.tabs.update.mockRejectedValue(new Error('Tab closed'));
+  await expect(
+    runCommand({ type: 'discard', tabIds: [3] }, {
+      tab: () => tab(3, { active: true }),
+    } as unknown as CommandDeps),
+  ).rejects.toThrow('Tab closed');
+  expect(api.tabs.discard).not.toHaveBeenCalled();
 });

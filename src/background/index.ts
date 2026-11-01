@@ -623,15 +623,7 @@ export function startBackground(): void {
   async function suspendFrom(tab: TabInfo | undefined, others: boolean): Promise<void> {
     if (!tab) return;
     if (others) await runCommand({ type: 'discardOthers', tabId: tab.id }, deps);
-    else {
-      // The active tab can't be discarded; switch away from it first, like closing would.
-      const [win] = deps.windows('window', tab.windowId);
-      const tabs = win?.tabs ?? [];
-      const i = tabs.findIndex((t) => t.id === tab.id);
-      const next = tabs[i + 1] ?? tabs[i - 1];
-      if (tab.active && next) await browser.tabs.update(next.id, { active: true });
-      await browser.tabs.discard(tab.id).catch(() => {});
-    }
+    else await runCommand({ type: 'discard', tabIds: [tab.id] }, deps);
   }
 
   browser.commands.onCommand.addListener((command, tab) => {

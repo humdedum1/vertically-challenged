@@ -89,17 +89,35 @@ $effect(() => () => {
     {/key}
   {:else}
     <div class="cards">
-      <DisplayCard {settings} />
-      <AppearanceCard {settings} {themes} />
-      <TabRowsCard {settings} />
-      <LayoutCard {settings} />
-      <SuspendCard {settings} {tabState} />
-      <SyncCard {settings} {tabState} />
-      <ShortcutsCard {settings} />
-      <!-- Focus fallback when the theme a flow started from no longer has a button. -->
-      <span id="vc-themes-anchor" tabindex="-1"></span>
-      <ThemesCard {settings} {themes} onedit={open} />
-      <BackupCard {settings} {themes} />
+      <details open>
+        <summary><span><strong>Appearance</strong><small>Colors, density and themes</small></span><Icon name="chevron" size={16} /></summary>
+        <div class="category-content">
+          <AppearanceCard {settings} {themes} />
+          <!-- Focus fallback when the theme a flow started from no longer has a button. -->
+          <span id="vc-themes-anchor" tabindex="-1"></span>
+          <ThemesCard {settings} {themes} onedit={open} />
+        </div>
+      </details>
+      <details>
+        <summary><span><strong>Panel &amp; tabs</strong><small>Display, layout, tab rows and suspension</small></span><Icon name="chevron" size={16} /></summary>
+        <div class="category-content">
+          <DisplayCard {settings} />
+          <LayoutCard {settings} />
+          <TabRowsCard {settings} />
+          <SuspendCard {settings} {tabState} />
+        </div>
+      </details>
+      <details>
+        <summary><span><strong>Shortcuts</strong><small>Keyboard controls</small></span><Icon name="chevron" size={16} /></summary>
+        <div class="category-content"><ShortcutsCard {settings} /></div>
+      </details>
+      <details>
+        <summary><span><strong>Data</strong><small>Sync, backups and restore</small></span><Icon name="chevron" size={16} /></summary>
+        <div class="category-content">
+          <SyncCard {settings} {tabState} />
+          <BackupCard {settings} {themes} />
+        </div>
+      </details>
     </div>
     <p class="saved" role="status">{saved}</p>
   {/if}
@@ -115,6 +133,30 @@ $effect(() => () => {
     flex-direction: column;
     gap: var(--gap);
   }
+
+  details {
+    border-bottom: 1px solid var(--border);
+  }
+
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gap);
+    padding: 12px var(--pad-card);
+    cursor: pointer;
+    list-style: none;
+    border-radius: var(--radius-card);
+  }
+
+  summary::-webkit-details-marker { display: none; }
+  summary:hover { background: var(--surface-1); }
+  summary:focus-visible { outline: 2px solid var(--mPrimary); outline-offset: -2px; }
+  summary span { display: grid; gap: 4px; min-width: 0; }
+  summary strong { font-size: 13px; font-weight: 600; }
+  summary small { color: var(--mOnSurfaceVariant); font-size: 12px; }
+  details[open] > summary :global(svg) { transform: rotate(90deg); }
+  .category-content { display: grid; gap: var(--gap); padding-bottom: var(--gap); }
 
   .saved {
     margin: var(--gap) 0 0;

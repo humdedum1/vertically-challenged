@@ -8,6 +8,7 @@ try {
   page.on('pageerror', (e) => check(false, 'no page errors', e.message));
   await page.goto(`chrome-extension://${extId}/sidepanel.html`);
   await page.getByRole('tab', { name: 'Settings', exact: true }).click();
+  await page.locator('summary').filter({ hasText: 'Data' }).click();
   const item = (id, host) => ({
     kind: 'item',
     id,

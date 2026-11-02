@@ -10,6 +10,7 @@ const SCRIPTS = [
   'reconnect.mjs',
   'panel-recovery.mjs',
   'child-tabs.mjs',
+  'new-tab-url.mjs',
   'nest-tabs.mjs',
   'drag.mjs',
   'essentials-keys.mjs',

@@ -1,7 +1,7 @@
 import { DEFAULT_THEME_ID } from '../themes/builtin';
 
 /** Bump when the stored shape changes, and add a step to MIGRATIONS in migrate.ts. */
-export const SETTINGS_VERSION = 8;
+export const SETTINGS_VERSION = 9;
 
 export type ColorMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'comfortable';
@@ -98,6 +98,8 @@ export interface DisplaySettings {
 }
 
 export interface TabRowSettings {
+  /** Empty keeps the browser’s default new-tab page. */
+  newTabUrl: string;
   childTabs: boolean;
   layout: RowLayout;
   actions: ActionVisibility;
@@ -155,6 +157,7 @@ export const DEFAULT_SETTINGS: Settings = {
     accent: null,
   },
   tabs: {
+    newTabUrl: '',
     childTabs: true,
     layout: 'single',
     actions: 'hover',

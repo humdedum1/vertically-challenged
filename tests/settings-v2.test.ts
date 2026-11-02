@@ -47,6 +47,7 @@ describe('migration to v2/v3', () => {
       sync: { workspaces: false, sessions: true, intervalMinutes: 1 },
       appearance: { ...v1.appearance, mode: 'dark', density: 'compact', accent: '#aabbcc' },
       tabs: {
+        newTabUrl: '',
         childTabs: false,
         layout: 'double',
         actions: 'always',

@@ -22,7 +22,9 @@ beforeEach(() => {
 
 it('appends a new tab at the bottom regardless of the active tab', async () => {
   api.tabs.query.mockResolvedValue([{ id: 1 }, { id: 2 }, { id: 3 }]);
-  await runCommand({ type: 'newTab', windowId: 1, afterTabId: null }, {} as CommandDeps);
+  await runCommand({ type: 'newTab', windowId: 1, afterTabId: null }, {
+    newTabUrl: async () => '',
+  } as CommandDeps);
   expect(api.tabs.create).toHaveBeenCalledWith({ windowId: 1, index: 3 });
 });
 
@@ -128,4 +130,29 @@ it('does not discard the current tab if switching away fails', async () => {
     } as unknown as CommandDeps),
   ).rejects.toThrow('Tab closed');
   expect(api.tabs.discard).not.toHaveBeenCalled();
+});
+
+it('opens the configured URL from the bottom new-tab button', async () => {
+  api.tabs.query.mockResolvedValue([{ id: 1 }]);
+  await runCommand({ type: 'newTab', windowId: 1, afterTabId: null }, {
+    newTabUrl: async () => 'https://example.com/start',
+  } as CommandDeps);
+  expect(api.tabs.create).toHaveBeenCalledWith({
+    windowId: 1,
+    index: 1,
+    url: 'https://example.com/start',
+  });
+});
+
+it('uses the configured URL while preserving new-tab-below placement', async () => {
+  api.tabs.get.mockResolvedValue({ windowId: 1, index: 2, groupId: -1 });
+  api.tabs.create.mockResolvedValue({ id: 10 });
+  await runCommand({ type: 'newTab', windowId: 1, afterTabId: 3 }, {
+    newTabUrl: async () => 'https://example.com/start',
+  } as CommandDeps);
+  expect(api.tabs.create).toHaveBeenCalledWith({
+    windowId: 1,
+    index: 3,
+    url: 'https://example.com/start',
+  });
 });

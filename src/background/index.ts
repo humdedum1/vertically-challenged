@@ -453,6 +453,7 @@ export function startBackground(): void {
       (scope === 'all' ? windowList.map((w) => w.id) : [windowId]).map((id) => store.snapshot(id)),
     tab: (id) => store.get(id),
     restoreDiscarded: async () => (await settingsNow()).sessions.restoreDiscarded,
+    newTabUrl: async () => (await settingsNow()).tabs.newTabUrl,
     layouts: pins,
     chrome: { tabs: browser.tabs, windows: browser.windows },
   };

@@ -11,6 +11,7 @@ export interface CommandDeps {
   windows(scope: 'window' | 'all', windowId: number): { tabs: TabInfo[]; groups: GroupInfo[] }[];
   tab(tabId: number): TabInfo | undefined;
   restoreDiscarded(): Promise<boolean>;
+  newTabUrl(): Promise<string>;
   /** Layouts to save into and rebuild from sessions; absent in tests that don't need them. */
   layouts?: SessionLayouts & { loaded: Promise<void> };
   /** The Chrome calls the pin commands make; injected so they run in unit tests. */
@@ -84,13 +85,19 @@ export async function runCommand(
       await Promise.all(msg.tabIds.map((id) => browser.tabs.update(id, { muted: msg.muted })));
       return;
     case 'newTab': {
+      const url = await deps.newTabUrl();
+      const destination = url ? { url } : {};
       if (msg.afterTabId === null) {
         const tabs = await browser.tabs.query({ windowId: msg.windowId });
-        await browser.tabs.create({ windowId: msg.windowId, index: tabs.length });
+        await browser.tabs.create({ windowId: msg.windowId, index: tabs.length, ...destination });
         return;
       }
       const after = await browser.tabs.get(msg.afterTabId);
-      const tab = await browser.tabs.create({ windowId: after.windowId, index: after.index + 1 });
+      const tab = await browser.tabs.create({
+        windowId: after.windowId,
+        index: after.index + 1,
+        ...destination,
+      });
       // Matches Chrome's "New tab to the right", which stays in the neighbour's group.
       if (tab.id !== undefined && after.groupId !== -1 && !after.pinned) {
         await browser.tabs.group({ groupId: after.groupId, tabIds: [tab.id] });

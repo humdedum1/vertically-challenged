@@ -187,6 +187,7 @@ function sim(opts: {
     windows: (_scope, windowId) => [store.snapshot(windowId)],
     tab: (id) => store.get(id),
     restoreDiscarded: async () => false,
+    newTabUrl: async () => '',
     chrome: api,
   };
 

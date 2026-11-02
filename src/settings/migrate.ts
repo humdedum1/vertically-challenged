@@ -1,5 +1,6 @@
 import { normalizeCombo } from '../lib/keymap';
 import { normalizeHostPattern } from '../shared/host-pattern';
+import { isRestorableUrl } from '../shared/sessions';
 import {
   type Appearance,
   DEFAULT_SETTINGS,
@@ -49,6 +50,8 @@ const MIGRATIONS: readonly ((s: Raw) => Raw)[] = [
   // v6 → v7: opener-based child tabs, enabled by default.
   (s) => s,
   // v7 → v8: automatic sync interval, default-filled.
+  (s) => s,
+  // v8 → v9: optional new-tab URL; empty preserves the browser default.
   (s) => s,
 ];
 
@@ -116,6 +119,18 @@ function sanitizeKeymap(raw: unknown): Keymap {
   return out;
 }
 
+/** Empty uses the browser default; null means the supplied URL is invalid. */
+export function normalizeNewTabUrl(value: string): string | null {
+  const url = value.trim();
+  if (!url) return '';
+  if (url.length > 2048 || !isRestorableUrl(url)) return null;
+  try {
+    return new URL(url).href;
+  } catch {
+    return null;
+  }
+}
+
 function sanitize(raw: Raw): Settings {
   const d = DEFAULT_SETTINGS;
   const a = isObj(raw.appearance) ? raw.appearance : {};
@@ -137,6 +152,7 @@ function sanitize(raw: Raw): Settings {
 
   const t = isObj(raw.tabs) ? raw.tabs : {};
   const tabs: TabRowSettings = {
+    newTabUrl: typeof t.newTabUrl === 'string' ? (normalizeNewTabUrl(t.newTabUrl) ?? '') : '',
     childTabs: bool(t.childTabs, d.tabs.childTabs),
     layout: oneOf(t.layout, ['single', 'double'] as const, d.tabs.layout),
     actions: oneOf(t.actions, ['hover', 'always'] as const, d.tabs.actions),

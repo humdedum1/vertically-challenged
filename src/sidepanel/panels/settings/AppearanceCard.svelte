@@ -102,7 +102,7 @@ function onFontText(v: string): void {
 const accentRatio = $derived(a.accent ? contrastRatio(a.accent, palette.mSurface) : null);
 </script>
 
-<SegmentCard title="Appearance">
+<SegmentCard title="Look">
   {#snippet icon()}<Icon name="palette" size={12} />{/snippet}
   <div class="fields">
     <Field label="Colour mode">

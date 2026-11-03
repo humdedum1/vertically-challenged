@@ -196,6 +196,21 @@ $effect(() => {
 
   details {
     border-bottom: 1px solid var(--border);
+    interpolate-size: allow-keywords;
+  }
+
+  /* Sections ease open. Browsers without ::details-content just open instantly, and the global
+     reduced-motion rule turns the transition off. */
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition:
+      block-size 0.2s ease,
+      content-visibility 0.2s allow-discrete;
+  }
+
+  details[open]::details-content {
+    block-size: auto;
   }
 
   summary {

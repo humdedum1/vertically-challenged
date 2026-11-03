@@ -11,24 +11,9 @@ import Button from '../../components/controls/Button.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
 import type { SettingsState } from '../../settings-state.svelte';
+import { SHORTCUT_LABELS as LABELS } from './shortcut-labels';
 
 let { settings }: { settings: SettingsState } = $props();
-
-const LABELS: Record<ShortcutAction, string> = {
-  focusSearch: 'Focus search',
-  commandPalette: 'Command palette',
-  closeTab: 'Close tab or group',
-  renameGroup: 'Rename group',
-  moveUp: 'Move up',
-  moveDown: 'Move down',
-  openMenu: 'Open context menu',
-  selectAll: 'Select all tabs',
-  newTab: 'New tab below',
-  duplicateTab: 'Duplicate tab',
-  togglePin: 'Pin or unpin tab',
-  toggleMute: 'Mute or unmute tab',
-  suspendTab: 'Suspend tab',
-};
 
 const keymap = $derived(settings.value.shortcuts);
 const conflicts = $derived(findConflicts(keymap));
@@ -151,7 +136,7 @@ function openChromeShortcuts(): void {
 }
 </script>
 
-<SegmentCard title="Shortcuts">
+<SegmentCard title="Key bindings">
   {#snippet icon()}<Icon name="settings" size={12} />{/snippet}
   <div class="fields">
     <p class="muted">

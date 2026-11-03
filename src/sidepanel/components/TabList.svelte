@@ -78,6 +78,7 @@ import Icon from './Icon.svelte';
 import type { MenuItem } from './menu-types';
 import PinRow from './PinRow.svelte';
 import SearchMore from './SearchMore.svelte';
+import ShortcutHelp from './ShortcutHelp.svelte';
 import TabRow from './TabRow.svelte';
 import TilesRow, { TILES_ROW_INSET } from './TilesRow.svelte';
 import VirtualList from './VirtualList.svelte';
@@ -1542,6 +1543,21 @@ export function focusSearch(): boolean {
   return true;
 }
 
+let helpOpen = $state(false);
+// "?" (outside text fields) shows what the keyboard can do.
+$effect(() => {
+  const onHelp = (e: KeyboardEvent) => {
+    if (e.key !== '?' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+    const t = e.target as HTMLElement | null;
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t?.isContentEditable)
+      return;
+    e.preventDefault();
+    helpOpen = true;
+  };
+  window.addEventListener('keydown', onHelp);
+  return () => window.removeEventListener('keydown', onHelp);
+});
+
 $effect(() => {
   const onKey = (e: KeyboardEvent) => {
     const action = actionFor(shortcuts, e);
@@ -1561,6 +1577,10 @@ $effect(() => {
   return () => window.removeEventListener('keydown', onKey);
 });
 </script>
+
+{#if helpOpen}
+  <ShortcutHelp {shortcuts} onclose={() => (helpOpen = false)} />
+{/if}
 
 {#snippet searchField()}
   <div class="search" class:bottom={search === 'bottom'}>

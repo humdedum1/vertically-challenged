@@ -285,6 +285,7 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
   }
 
   .strip span {
+    forced-color-adjust: none;
     display: block;
     width: 16px;
     height: 16px;

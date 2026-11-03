@@ -165,3 +165,26 @@ textarea {
   /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
   scroll-behavior: auto !important;
 }
+
+/* Windows high contrast and other forced-colour modes drop backgrounds, so anything shown only
+   by a fill needs a border or outline of its own. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 1px;
+  }
+  button,
+  select,
+  input,
+  textarea,
+  .card {
+    border: 1px solid ButtonText;
+  }
+  [aria-selected="true"],
+  [aria-pressed="true"],
+  [aria-current="true"],
+  [aria-checked="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}

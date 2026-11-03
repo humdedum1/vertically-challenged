@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import type { BackupTarget } from './scheduler';
+import type { BackupTarget } from '../../backup/targets';
 
 const FOLDER = 'Vertically Challenged Backups';
 

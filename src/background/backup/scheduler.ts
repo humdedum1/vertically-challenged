@@ -1,15 +1,26 @@
 import { encode } from '../../backup/codec';
 import { backupName, selectToDelete } from '../../backup/retention';
 import { buildFullBackup, type FullParts } from '../../backup/snapshot';
+import type { BackupTarget, S3Config, WebDavConfig } from '../../backup/targets';
+
+export type { BackupTarget };
 
 export const CONFIG_KEY = 'vc:backup:config';
 export const STATUS_KEY = 'vc:backup:status';
 export const BACKUP_ALARM = 'vc-auto-backup';
 
 export type Interval = 'off' | 'daily' | 'weekly';
-/** Per machine, in storage.local: never synced and never part of a backup. */
+export type TargetKind = 'downloads' | 'webdav' | 's3';
+/**
+ * Per machine, in storage.local: never synced and never part of a backup. Server credentials
+ * live here in plain form (the extension needs them unattended); use an app password or a
+ * bucket-scoped key.
+ */
 export interface BackupConfig {
   interval: Interval;
+  target: TargetKind;
+  webdav: WebDavConfig;
+  s3: S3Config;
   /** Empty = unencrypted. Stored locally so unattended runs can encrypt; see the design spec. */
   passphrase: string;
   keep: number;
@@ -21,12 +32,6 @@ export interface BackupStatus {
   error?: string;
   skipped?: boolean;
 }
-export interface BackupTarget {
-  put(name: string, bytes: Uint8Array): Promise<void>;
-  /** Present only when the target can enumerate and delete, which enables retention. */
-  list?(): Promise<string[]>;
-  delete?(name: string): Promise<void>;
-}
 export interface StorageLike {
   get(key: string): Promise<Record<string, unknown>>;
   set(items: Record<string, unknown>): Promise<void>;
@@ -34,19 +39,67 @@ export interface StorageLike {
 export interface SchedulerDeps {
   storage: StorageLike;
   collect(): Promise<FullParts>;
-  target(): BackupTarget;
+  target(cfg: BackupConfig): BackupTarget;
   version: string;
   device: () => Promise<string>;
   now?: () => Date;
 }
 
-export const DEFAULT_CONFIG: BackupConfig = { interval: 'off', passphrase: '', keep: 7 };
+export const DEFAULT_CONFIG: BackupConfig = {
+  interval: 'off',
+  target: 'downloads',
+  webdav: { url: '', user: '', password: '' },
+  s3: { endpoint: '', region: 'us-east-1', bucket: '', prefix: '', accessKey: '', secretKey: '' },
+  passphrase: '',
+  keep: 7,
+};
+
+const text = (v: unknown, max = 500): string =>
+  typeof v === 'string' ? v.trim().slice(0, max) : '';
+/** Only http(s) URLs are ever fetched. */
+const url = (v: unknown): string => {
+  const t = text(v, 2000);
+  try {
+    return ['http:', 'https:'].includes(new URL(t).protocol) ? t : '';
+  } catch {
+    return '';
+  }
+};
+const obj = (v: unknown): Record<string, unknown> =>
+  typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {};
+
+/** Host pattern to request at runtime for a server URL; null when it isn't a valid URL. */
+export function originPattern(raw: string): string | null {
+  const u = url(raw);
+  return u ? `${new URL(u).protocol}//${new URL(u).host}/*` : null;
+}
 
 export function parseConfig(raw: unknown): BackupConfig {
   const r = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
   const interval: Interval = r.interval === 'daily' || r.interval === 'weekly' ? r.interval : 'off';
   const keep = typeof r.keep === 'number' && r.keep >= 1 && r.keep <= 100 ? Math.floor(r.keep) : 7;
-  return { interval, keep, passphrase: typeof r.passphrase === 'string' ? r.passphrase : '' };
+  const w = obj(r.webdav);
+  const c = obj(r.s3);
+  const d = DEFAULT_CONFIG.s3;
+  return {
+    interval,
+    keep,
+    target: r.target === 'webdav' || r.target === 's3' ? r.target : 'downloads',
+    webdav: {
+      url: url(w.url),
+      user: text(w.user),
+      password: typeof w.password === 'string' ? w.password : '',
+    },
+    s3: {
+      endpoint: url(c.endpoint),
+      region: text(c.region, 60) || d.region,
+      bucket: text(c.bucket, 100),
+      prefix: text(c.prefix, 200),
+      accessKey: text(c.accessKey),
+      secretKey: typeof c.secretKey === 'string' ? c.secretKey : '',
+    },
+    passphrase: typeof r.passphrase === 'string' ? r.passphrase : '',
+  };
 }
 
 export const intervalMinutes = (i: Interval): number =>
@@ -72,7 +125,7 @@ export async function runBackup(deps: SchedulerDeps, force = false): Promise<Bac
       status = { ...prev, skipped: true };
     } else {
       const bytes = await encode(buildFullBackup(parts, deps.version, now), cfg.passphrase);
-      const target = deps.target();
+      const target = deps.target(cfg);
       const name = backupName(now, await deps.device());
       await target.put(name, bytes);
       if (target.list && target.delete) {

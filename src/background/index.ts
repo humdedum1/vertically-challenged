@@ -1,4 +1,5 @@
 import { type Browser, browser } from 'wxt/browser';
+import { s3Target, webdavTarget } from '../backup/targets';
 import { migrateSettings } from '../settings/migrate';
 import type { TabRule } from '../settings/schema';
 import { hostOf } from '../shared/host-pattern';
@@ -20,6 +21,8 @@ import { downloadsTarget } from './backup/downloads';
 import {
   BACKUP_ALARM,
   CONFIG_KEY as BACKUP_CONFIG_KEY,
+  type BackupConfig,
+  type BackupTarget,
   intervalMinutes,
   parseConfig,
   runBackup,
@@ -442,7 +445,12 @@ export function startBackground(): void {
   // --- Scheduled full backup (see backup/scheduler.ts) -------------------------------------
   const backupDeps = {
     storage: browser.storage.local,
-    target: downloadsTarget,
+    target: (cfg: BackupConfig): BackupTarget =>
+      cfg.target === 'webdav'
+        ? webdavTarget(cfg.webdav)
+        : cfg.target === 's3'
+          ? s3Target(cfg.s3)
+          : downloadsTarget(),
     version: browser.runtime.getManifest().version,
     device: async () =>
       String(

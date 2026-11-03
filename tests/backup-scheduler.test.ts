@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type BackupTarget,
   CONFIG_KEY,
+  originPattern,
   parseConfig,
   runBackup,
   STATUS_KEY,
@@ -113,8 +114,9 @@ describe('runBackup', () => {
 
 describe('parseConfig', () => {
   it('falls back to safe defaults', () => {
-    expect(parseConfig({ interval: 'hourly', keep: 9999, passphrase: 5 })).toEqual({
+    expect(parseConfig({ interval: 'hourly', keep: 9999, passphrase: 5 })).toMatchObject({
       interval: 'off',
+      target: 'downloads',
       keep: 7,
       passphrase: '',
     });
@@ -122,5 +124,32 @@ describe('parseConfig', () => {
       interval: 'weekly',
       keep: 3,
     });
+  });
+});
+
+describe('remote config', () => {
+  it('accepts only http(s) server URLs and derives the origin to request', () => {
+    const c = parseConfig({
+      target: 'webdav',
+      webdav: { url: 'javascript:alert(1)', user: ' me ', password: 'p' },
+      s3: { endpoint: 'ftp://x', bucket: 'b' },
+    });
+    expect(c.target).toBe('webdav');
+    expect(c.webdav).toEqual({ url: '', user: 'me', password: 'p' });
+    expect(c.s3.endpoint).toBe('');
+    expect(originPattern('https://cloud.example.com:8443/remote.php/dav')).toBe(
+      'https://cloud.example.com:8443/*',
+    );
+    expect(originPattern('nonsense')).toBeNull();
+  });
+
+  it('runs against the target chosen in the config', async () => {
+    const used: string[] = [];
+    const t: BackupTarget = { put: async (n) => void used.push(n) };
+    const { deps } = setup({ target: 's3' }, t);
+    let seen = '';
+    await runBackup({ ...deps, target: (cfg) => ((seen = cfg.target), t) });
+    expect(seen).toBe('s3');
+    expect(used).toHaveLength(1);
   });
 });

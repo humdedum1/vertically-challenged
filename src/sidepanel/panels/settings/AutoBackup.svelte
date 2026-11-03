@@ -19,8 +19,12 @@ import {
   newPkce,
 } from '../../../backup/dropbox';
 import Button from '../../components/controls/Button.svelte';
+import Field from '../../components/controls/Field.svelte';
 import Select from '../../components/controls/Select.svelte';
 import TextInput from '../../components/controls/TextInput.svelte';
+
+/** Shared with the manual backup in BackupCard; saved with these settings. */
+let { passphrase }: { passphrase: string } = $props();
 
 let cfg = $state<BackupConfig>(structuredClone(DEFAULT_CONFIG));
 let status = $state<BackupStatus>({});
@@ -51,7 +55,7 @@ async function save(next: BackupConfig): Promise<void> {
       if (!(await browser.permissions.request(requiredAccess(next) as never)))
         throw new Error('Permission was not granted, so nothing was saved');
     }
-    await browser.storage.local.set({ [CONFIG_KEY]: parseConfig(next) });
+    await browser.storage.local.set({ [CONFIG_KEY]: parseConfig({ ...next, passphrase }) });
     saved = true;
   } catch (err) {
     error = err instanceof Error ? err.message : 'Couldn’t save the backup settings';
@@ -116,62 +120,73 @@ const remote = $derived(cfg.target !== 'downloads');
 </script>
 
 <div class="auto">
-  <label for="vc-backup-target">Automatic backups: where</label>
-  <Select id="vc-backup-target" value={cfg.target} onchange={(v) => (cfg.target = v as TargetKind)}>
-    <option value="downloads">Downloads folder</option>
-    <option value="webdav">WebDAV (Nextcloud, ownCloud…)</option>
-    <option value="s3">S3-compatible (AWS, R2, B2, MinIO…)</option>
-    <option value="dropbox">Dropbox</option>
-  </Select>
+  <Field label="Where to save" for="vc-backup-target">
+    <Select id="vc-backup-target" value={cfg.target} onchange={(v) => (cfg.target = v as TargetKind)}>
+      <option value="downloads">Downloads folder</option>
+      <option value="webdav">WebDAV (Nextcloud, ownCloud…)</option>
+      <option value="s3">S3-compatible (AWS, R2, B2, MinIO…)</option>
+      <option value="dropbox">Dropbox</option>
+    </Select>
+  </Field>
 
   {#if cfg.target === 'webdav'}
-    <TextInput label="WebDAV folder URL" placeholder="https://cloud.example.com/remote.php/dav/files/me/Backups" mono value={cfg.webdav.url} oninput={(v) => (cfg.webdav.url = v)} />
-    <TextInput label="WebDAV user" placeholder="User" value={cfg.webdav.user} oninput={(v) => (cfg.webdav.user = v)} />
-    <TextInput secret label="WebDAV password" placeholder="Password (use an app password)" value={cfg.webdav.password} oninput={(v) => (cfg.webdav.password = v)} />
+    <Field label="Folder URL" for="vc-wd-url">
+      <TextInput id="vc-wd-url" label="WebDAV folder URL" placeholder="https://cloud.example.com/remote.php/dav/files/me/Backups" mono value={cfg.webdav.url} oninput={(v) => (cfg.webdav.url = v)} />
+    </Field>
+    <Field label="User" for="vc-wd-user">
+      <TextInput id="vc-wd-user" label="WebDAV user" value={cfg.webdav.user} oninput={(v) => (cfg.webdav.user = v)} />
+    </Field>
+    <Field label="Password (use an app password)" for="vc-wd-pass">
+      <TextInput id="vc-wd-pass" secret label="WebDAV password" value={cfg.webdav.password} oninput={(v) => (cfg.webdav.password = v)} />
+    </Field>
   {:else if cfg.target === 'dropbox'}
     <p class="hint">
-      Create an "App folder" app at dropbox.com/developers/apps (scoped access, permissions
-      files.content.write, files.content.read), add <code>{redirectUri}</code> as a redirect URI, then paste its app key.
-      Backups go to Apps/&lt;your app&gt; only.
+      Create an “App folder” app at dropbox.com/developers/apps (scoped access, permissions
+      files.content.write and files.content.read), add <code>{redirectUri}</code> as a redirect URI,
+      then paste its app key. Backups go to Apps/&lt;your app&gt; only.
     </p>
-    <TextInput label="Dropbox app key" placeholder="App key" mono value={cfg.dropbox.appKey} oninput={(v) => (cfg.dropbox.appKey = v)} />
+    <Field label="Dropbox app key" for="vc-db-key">
+      <TextInput id="vc-db-key" label="Dropbox app key" mono value={cfg.dropbox.appKey} oninput={(v) => (cfg.dropbox.appKey = v)} />
+    </Field>
     <div class="row">
       <Button onclick={connectDropbox}>{cfg.dropbox.refreshToken ? 'Reconnect Dropbox' : 'Connect Dropbox'}</Button>
       <span class="hint">{cfg.dropbox.refreshToken ? 'Connected' : 'Not connected'}</span>
     </div>
   {:else if cfg.target === 's3'}
-    <TextInput label="S3 endpoint" placeholder="https://s3.eu-west-1.amazonaws.com" mono value={cfg.s3.endpoint} oninput={(v) => (cfg.s3.endpoint = v)} />
-    <TextInput label="S3 region" placeholder="Region (us-east-1; auto for R2)" value={cfg.s3.region} oninput={(v) => (cfg.s3.region = v)} />
-    <TextInput label="S3 bucket" placeholder="Bucket" value={cfg.s3.bucket} oninput={(v) => (cfg.s3.bucket = v)} />
-    <TextInput label="S3 folder prefix" placeholder="Folder (optional)" value={cfg.s3.prefix} oninput={(v) => (cfg.s3.prefix = v)} />
-    <TextInput label="S3 access key" placeholder="Access key" mono value={cfg.s3.accessKey} oninput={(v) => (cfg.s3.accessKey = v)} />
-    <TextInput secret label="S3 secret key" placeholder="Secret key" mono value={cfg.s3.secretKey} oninput={(v) => (cfg.s3.secretKey = v)} />
+    <Field label="Endpoint" for="vc-s3-endpoint">
+      <TextInput id="vc-s3-endpoint" label="S3 endpoint" placeholder="https://s3.eu-west-1.amazonaws.com" mono value={cfg.s3.endpoint} oninput={(v) => (cfg.s3.endpoint = v)} />
+    </Field>
+    <Field label="Region (use auto for R2)" for="vc-s3-region">
+      <TextInput id="vc-s3-region" label="S3 region" value={cfg.s3.region} oninput={(v) => (cfg.s3.region = v)} />
+    </Field>
+    <Field label="Bucket" for="vc-s3-bucket">
+      <TextInput id="vc-s3-bucket" label="S3 bucket" value={cfg.s3.bucket} oninput={(v) => (cfg.s3.bucket = v)} />
+    </Field>
+    <Field label="Folder (optional)" for="vc-s3-prefix">
+      <TextInput id="vc-s3-prefix" label="S3 folder prefix" value={cfg.s3.prefix} oninput={(v) => (cfg.s3.prefix = v)} />
+    </Field>
+    <Field label="Access key" for="vc-s3-access">
+      <TextInput id="vc-s3-access" label="S3 access key" mono value={cfg.s3.accessKey} oninput={(v) => (cfg.s3.accessKey = v)} />
+    </Field>
+    <Field label="Secret key" for="vc-s3-secret">
+      <TextInput id="vc-s3-secret" secret label="S3 secret key" mono value={cfg.s3.secretKey} oninput={(v) => (cfg.s3.secretKey = v)} />
+    </Field>
   {/if}
 
-  <label for="vc-backup-interval">How often</label>
-  <Select id="vc-backup-interval" value={cfg.interval} onchange={(v) => (cfg.interval = v as Interval)}>
-    <option value="off">Off</option>
-    <option value="daily">Daily</option>
-    <option value="weekly">Weekly</option>
-  </Select>
-  {#if remote}
-    <label for="vc-backup-keep">Copies to keep</label>
-    <Select id="vc-backup-keep" value={String(cfg.keep)} onchange={(v) => (cfg.keep = Number(v))}>
-      {#each [3, 7, 14, 30] as n}<option value={String(n)}>{n}</option>{/each}
+  <Field label="How often" for="vc-backup-interval">
+    <Select id="vc-backup-interval" value={cfg.interval} onchange={(v) => (cfg.interval = v as Interval)}>
+      <option value="off">Off</option>
+      <option value="daily">Daily</option>
+      <option value="weekly">Weekly</option>
     </Select>
+  </Field>
+  {#if remote}
+    <Field label="Copies to keep" for="vc-backup-keep">
+      <Select id="vc-backup-keep" value={String(cfg.keep)} onchange={(v) => (cfg.keep = Number(v))}>
+        {#each [3, 7, 14, 30] as n}<option value={String(n)}>{n}</option>{/each}
+      </Select>
+    </Field>
   {/if}
-  <TextInput secret label="Automatic backup passphrase" placeholder="Passphrase (recommended)" value={cfg.passphrase} oninput={(v) => (cfg.passphrase = v)} />
-  <p class="hint">
-    {#if remote}
-      Only the server you choose is contacted; the browser asks permission for that address alone.
-      Older copies beyond the number to keep are deleted from that folder (only files named
-      vc-backup-….vcb). Without a passphrase the server can read every saved URL.
-    {:else}
-      Saved to Downloads/Vertically Challenged Backups. Browsers can't delete old files for you.
-    {/if}
-    Unchanged data is skipped. Credentials and the passphrase are kept on this device only, in
-    plain form, and are never included in a backup or synced.
-  </p>
 
   {#if insecure}
     <p class="error" role="alert">
@@ -179,8 +194,23 @@ const remote = $derived(cfg.target !== 'downloads');
       the server is on a network you fully trust, and set a passphrase.
     </p>
   {/if}
+  <details class="how">
+    <summary>How automatic backups work</summary>
+    <p class="hint">
+      {#if remote}
+        Only the server you choose is contacted; the browser asks permission for that address
+        alone. Copies beyond the number to keep are deleted from that folder (only files named
+        vc-backup-….vcb). Without a passphrase the server can read every saved URL.
+      {:else}
+        Saved to Downloads/Vertically Challenged Backups. Browsers can’t delete old files for you.
+      {/if}
+      Unchanged data is skipped. Credentials and the passphrase stay on this device in plain form,
+      and are never synced or included in a backup.
+    </p>
+  </details>
+
   <div class="row">
-    <Button variant="primary" onclick={() => save(cfg)}>Save</Button>
+    <Button variant="primary" onclick={() => save(cfg)}>Save schedule</Button>
     <Button disabled={running} onclick={runNow}>{running ? 'Backing up…' : 'Back up now'}</Button>
   </div>
   <p class="hint" role="status">{saved ? 'Saved. ' : ''}Last backup: {last}{status.name ? ` (${status.name})` : ''}</p>
@@ -193,4 +223,6 @@ const remote = $derived(cfg.target !== 'downloads');
   .hint, .error { margin: 0; font-size: 12px; color: var(--mOnSurfaceVariant); }
   .error { color: var(--mError); }
   .error:empty { display: none; }
+  .how summary { cursor: pointer; font-size: 12px; color: var(--mOnSurfaceVariant); }
+  .how p { margin-top: 6px; }
 </style>

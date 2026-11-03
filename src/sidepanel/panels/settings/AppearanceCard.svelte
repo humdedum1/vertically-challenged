@@ -214,7 +214,7 @@ const accentRatio = $derived(a.accent ? contrastRatio(a.accent, palette.mSurface
       <SegmentedControl
         label="Animations"
         options={[
-          { value: 'system', label: 'Follow system' },
+          { value: 'system', label: 'System' },
           { value: 'reduce', label: 'Reduced' },
           { value: 'full', label: 'On' },
         ]}

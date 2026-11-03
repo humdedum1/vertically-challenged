@@ -35,6 +35,7 @@ let status = $state('');
 let error = $state('');
 let notes = $state<string[]>([]);
 let confirmId = $state<string | null>(null);
+let moreId = $state<string | null>(null);
 let fileInput: HTMLInputElement | undefined = $state();
 
 function clear(): void {
@@ -128,13 +129,30 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
         {@const p = t[mode]}
         <li data-theme-id={t.id} class:active={t.id === activeId}>
           <div class="head">
-            <ul class="strip" aria-hidden="true">
-              {#each [p.mPrimary, p.mSecondary, p.mTertiary, p.mSurface, p.mSurfaceVariant] as c, i (i)}
-                <li style:background={c}></li>
-              {/each}
-            </ul>
-            <span class="name">{t.name}</span>
-            <span class="badge" class:custom>{custom ? 'Custom' : 'Built-in'}</span>
+            <!-- The whole row picks the theme; the rarer actions sit behind "More". -->
+            <button
+              type="button"
+              class="pick"
+              data-action="use"
+              aria-pressed={t.id === activeId}
+              aria-label="Use {t.name}"
+              onclick={() => use(t)}
+            >
+              <span class="strip" aria-hidden="true">
+                {#each [p.mPrimary, p.mSecondary, p.mTertiary, p.mSurface, p.mSurfaceVariant] as c, i (i)}
+                  <span style:background={c}></span>
+                {/each}
+              </span>
+              <span class="name">{t.name}</span>
+              {#if t.id === activeId}<span class="inuse">In use</span>{:else if custom}<span class="badge custom">Custom</span>{/if}
+            </button>
+            <button
+              type="button"
+              class="more"
+              aria-expanded={moreId === t.id}
+              aria-label="More actions for {t.name}"
+              onclick={() => { moreId = moreId === t.id ? null : t.id; confirmId = null; }}
+            >More</button>
           </div>
 
           {#if confirmId === t.id}
@@ -143,13 +161,8 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
               <Button variant="danger" onclick={() => remove(t)}>Delete</Button>
               <Button variant="text" onclick={() => (confirmId = null)}>Keep</Button>
             </div>
-          {:else}
+          {:else if moreId === t.id}
             <div class="actions" role="group" aria-label="{t.name} actions">
-              {#if t.id === activeId}
-                <span class="inuse">In use</span>
-              {:else}
-                <Button data-action="use" aria-label="Use {t.name}" onclick={() => use(t)}>Use</Button>
-              {/if}
               <Button data-action="duplicate" aria-label="Duplicate {t.name}" onclick={() => duplicate(t)}>Duplicate</Button>
               {#if custom}
                 <Button data-action="edit" aria-label="Edit {t.name}" onclick={() => { clear(); onedit(t, { id: t.id, action: 'edit' }); }}>Edit</Button>
@@ -202,9 +215,7 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
     margin: 0;
     padding: 0;
     list-style: none;
-    border: 1px solid var(--border);
     border-radius: var(--radius-row);
-    background: var(--surface-0);
     overflow: hidden;
   }
 
@@ -227,18 +238,54 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
   .head {
     display: flex;
     align-items: center;
+    gap: 6px;
+  }
+
+  .pick {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
     gap: 10px;
+    padding: 6px 4px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .pick:hover {
+    background: var(--state-hover);
+  }
+
+  .more {
+    flex: none;
+    padding: 4px 8px;
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: var(--mOnSurfaceVariant);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .more:hover,
+  .more[aria-expanded='true'] {
+    background: var(--state-hover);
+    color: var(--mOnSurface);
   }
 
   .strip {
     flex: none;
     display: flex;
-    margin: 0;
-    padding: 0;
-    list-style: none;
   }
 
-  .strip li {
+  .strip span {
+    display: block;
     width: 16px;
     height: 16px;
     margin-left: -4px;
@@ -247,7 +294,7 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
     box-shadow: 0 0 0 1px var(--border);
   }
 
-  .strip li:first-child {
+  .strip span:first-child {
     margin-left: 0;
   }
 
@@ -287,10 +334,10 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
   }
 
   .inuse {
-    padding: 0 10px;
+    flex: none;
     color: var(--mPrimary);
+    font-size: 12px;
     font-weight: 600;
-    line-height: 28px;
   }
 
   .import {

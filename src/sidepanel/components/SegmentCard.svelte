@@ -55,10 +55,8 @@ let { title, icon, trailing, children, fill = false }: Props = $props();
     flex: 1;
     min-width: 0;
     margin: 0;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
   }
 
   .trailing {

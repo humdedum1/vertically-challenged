@@ -45,7 +45,8 @@ const loose = [
 const double = $derived(settings.tabs.layout === 'double');
 const noop = (): void => {};
 
-let open = $state(true);
+// Collapsed by default: the preview is ~250px, a third of a short panel.
+let open = $state(false);
 </script>
 
 <div class="sticky">

@@ -11,6 +11,13 @@ import {
   STATUS_KEY,
   type TargetKind,
 } from '../../../background/backup/scheduler';
+import {
+  authUrl,
+  codeFromRedirect,
+  DROPBOX_ORIGINS,
+  exchangeCode,
+  newPkce,
+} from '../../../backup/dropbox';
 import Button from '../../components/controls/Button.svelte';
 import Select from '../../components/controls/Select.svelte';
 import TextInput from '../../components/controls/TextInput.svelte';
@@ -38,6 +45,10 @@ $effect(() => {
 /** The permission to ask for with the current settings, or an error for incomplete ones. */
 function needed(c: BackupConfig): { permissions?: string[]; origins?: string[] } {
   if (c.target === 'downloads') return { permissions: ['downloads'] };
+  if (c.target === 'dropbox') {
+    if (!c.dropbox.refreshToken) throw new Error('Connect Dropbox first');
+    return { origins: DROPBOX_ORIGINS };
+  }
   const server = c.target === 'webdav' ? c.webdav.url : c.s3.endpoint;
   const origin = originPattern(server);
   if (!origin) throw new Error('Enter a valid http(s) server address first');
@@ -64,6 +75,35 @@ async function save(next: BackupConfig): Promise<void> {
   }
 }
 
+async function connectDropbox(): Promise<void> {
+  error = '';
+  saved = false;
+  try {
+    const appKey = cfg.dropbox.appKey.trim();
+    if (!appKey) throw new Error('Enter your Dropbox app key first');
+    if (
+      !(await browser.permissions.request({ permissions: ['identity'], origins: DROPBOX_ORIGINS }))
+    )
+      throw new Error('Permission was not granted');
+    const redirect = browser.identity.getRedirectURL();
+    const p = await newPkce();
+    const back = await browser.identity.launchWebAuthFlow({
+      url: authUrl(appKey, redirect, p.challenge, p.state),
+      interactive: true,
+    });
+    if (!back) throw new Error('Dropbox sign-in was cancelled');
+    const refreshToken = await exchangeCode(
+      appKey,
+      codeFromRedirect(back, p.state),
+      p.verifier,
+      redirect,
+    );
+    await save({ ...cfg, dropbox: { appKey, refreshToken } });
+  } catch (err) {
+    error = err instanceof Error ? err.message : 'Couldn’t connect to Dropbox';
+  }
+}
+
 async function runNow(): Promise<void> {
   running = true;
   error = '';
@@ -81,6 +121,7 @@ async function runNow(): Promise<void> {
 }
 
 const last = $derived(status.at ? new Date(status.at).toLocaleString() : 'never');
+const redirectUri = browser.identity?.getRedirectURL?.() ?? '';
 const remote = $derived(cfg.target !== 'downloads');
 </script>
 
@@ -90,12 +131,24 @@ const remote = $derived(cfg.target !== 'downloads');
     <option value="downloads">Downloads folder</option>
     <option value="webdav">WebDAV (Nextcloud, ownCloud…)</option>
     <option value="s3">S3-compatible (AWS, R2, B2, MinIO…)</option>
+    <option value="dropbox">Dropbox</option>
   </Select>
 
   {#if cfg.target === 'webdav'}
     <TextInput label="WebDAV folder URL" placeholder="https://cloud.example.com/remote.php/dav/files/me/Backups" mono value={cfg.webdav.url} oninput={(v) => (cfg.webdav.url = v)} />
     <TextInput label="WebDAV user" placeholder="User" value={cfg.webdav.user} oninput={(v) => (cfg.webdav.user = v)} />
     <TextInput secret label="WebDAV password" placeholder="Password (use an app password)" value={cfg.webdav.password} oninput={(v) => (cfg.webdav.password = v)} />
+  {:else if cfg.target === 'dropbox'}
+    <p class="hint">
+      Create an "App folder" app at dropbox.com/developers/apps (scoped access, permissions
+      files.content.write, files.content.read), add <code>{redirectUri}</code> as a redirect URI, then paste its app key.
+      Backups go to Apps/&lt;your app&gt; only.
+    </p>
+    <TextInput label="Dropbox app key" placeholder="App key" mono value={cfg.dropbox.appKey} oninput={(v) => (cfg.dropbox.appKey = v)} />
+    <div class="row">
+      <Button onclick={connectDropbox}>{cfg.dropbox.refreshToken ? 'Reconnect Dropbox' : 'Connect Dropbox'}</Button>
+      <span class="hint">{cfg.dropbox.refreshToken ? 'Connected' : 'Not connected'}</span>
+    </div>
   {:else if cfg.target === 's3'}
     <TextInput label="S3 endpoint" placeholder="https://s3.eu-west-1.amazonaws.com" mono value={cfg.s3.endpoint} oninput={(v) => (cfg.s3.endpoint = v)} />
     <TextInput label="S3 region" placeholder="Region (us-east-1; auto for R2)" value={cfg.s3.region} oninput={(v) => (cfg.s3.region = v)} />
@@ -120,7 +173,7 @@ const remote = $derived(cfg.target !== 'downloads');
   <TextInput secret label="Automatic backup passphrase" placeholder="Passphrase (recommended)" value={cfg.passphrase} oninput={(v) => (cfg.passphrase = v)} />
   <p class="hint">
     {#if remote}
-      Only the server you enter is contacted; the browser asks permission for that address alone.
+      Only the server you choose is contacted; the browser asks permission for that address alone.
       Older copies beyond the number to keep are deleted from that folder (only files named
       vc-backup-….vcb). Without a passphrase the server can read every saved URL.
     {:else}

@@ -1,4 +1,5 @@
 import { type Browser, browser } from 'wxt/browser';
+import { dropboxTarget } from '../backup/dropbox';
 import { s3Target, webdavTarget } from '../backup/targets';
 import { migrateSettings } from '../settings/migrate';
 import type { TabRule } from '../settings/schema';

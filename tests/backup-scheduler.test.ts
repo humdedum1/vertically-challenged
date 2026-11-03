@@ -153,3 +153,14 @@ describe('remote config', () => {
     expect(used).toHaveLength(1);
   });
 });
+
+describe('dropbox config', () => {
+  it('keeps trimmed app key and token, and selects the dropbox target', () => {
+    const c = parseConfig({
+      target: 'dropbox',
+      dropbox: { appKey: ' k ', refreshToken: 'rt', extra: 1 },
+    });
+    expect(c.target).toBe('dropbox');
+    expect(c.dropbox).toEqual({ appKey: 'k', refreshToken: 'rt' });
+  });
+});

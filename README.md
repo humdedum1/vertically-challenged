@@ -113,7 +113,8 @@ Each permission is needed for a specific feature. No host permissions are reques
 | `scripting` | Injects the in-page popup into that tab, only after you invoke it there. |
 | `notifications` (optional) | Only when **Open on launch** is on: Chrome cannot open the panel without a user gesture, so launch shows a notification whose click opens it. |
 | `downloads` (optional) | Only when **Automatic backups** are turned on: saves the backup file to your Downloads folder. |
-| Server address (optional host permission) | Only when you set up a **WebDAV** or **S3-compatible** backup target: access to the one server address you enter, so backups can be uploaded and old copies deleted. Nothing is requested at install. |
+| Server address (optional host permission) | Only when you set up a **WebDAV**, **S3-compatible** or **Dropbox** backup target: access to the one server address you enter, so backups can be uploaded and old copies deleted. Nothing is requested at install. |
+| `identity` (optional) | Only for **Dropbox** backups: opens Dropbox's sign-in window. Dropbox sign-in uses your own Dropbox app key; the extension ships no shared credentials. |
 
 ## Build from source
 

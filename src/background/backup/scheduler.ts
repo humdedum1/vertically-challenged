@@ -1,4 +1,5 @@
 import { encode } from '../../backup/codec';
+import type { DropboxConfig } from '../../backup/dropbox';
 import { backupName, selectToDelete } from '../../backup/retention';
 import { buildFullBackup, type FullParts } from '../../backup/snapshot';
 import type { BackupTarget, S3Config, WebDavConfig } from '../../backup/targets';
@@ -10,7 +11,7 @@ export const STATUS_KEY = 'vc:backup:status';
 export const BACKUP_ALARM = 'vc-auto-backup';
 
 export type Interval = 'off' | 'daily' | 'weekly';
-export type TargetKind = 'downloads' | 'webdav' | 's3';
+export type TargetKind = 'downloads' | 'webdav' | 's3' | 'dropbox';
 /**
  * Per machine, in storage.local: never synced and never part of a backup. Server credentials
  * live here in plain form (the extension needs them unattended); use an app password or a
@@ -21,6 +22,7 @@ export interface BackupConfig {
   target: TargetKind;
   webdav: WebDavConfig;
   s3: S3Config;
+  dropbox: DropboxConfig;
   /** Empty = unencrypted. Stored locally so unattended runs can encrypt; see the design spec. */
   passphrase: string;
   keep: number;
@@ -50,6 +52,7 @@ export const DEFAULT_CONFIG: BackupConfig = {
   target: 'downloads',
   webdav: { url: '', user: '', password: '' },
   s3: { endpoint: '', region: 'us-east-1', bucket: '', prefix: '', accessKey: '', secretKey: '' },
+  dropbox: { appKey: '', refreshToken: '' },
   passphrase: '',
   keep: 7,
 };
@@ -84,7 +87,8 @@ export function parseConfig(raw: unknown): BackupConfig {
   return {
     interval,
     keep,
-    target: r.target === 'webdav' || r.target === 's3' ? r.target : 'downloads',
+    target:
+      r.target === 'webdav' || r.target === 's3' || r.target === 'dropbox' ? r.target : 'downloads',
     webdav: {
       url: url(w.url),
       user: text(w.user),
@@ -97,6 +101,10 @@ export function parseConfig(raw: unknown): BackupConfig {
       prefix: text(c.prefix, 200),
       accessKey: text(c.accessKey),
       secretKey: typeof c.secretKey === 'string' ? c.secretKey : '',
+    },
+    dropbox: {
+      appKey: text(obj(r.dropbox).appKey, 100),
+      refreshToken: text(obj(r.dropbox).refreshToken, 500),
     },
     passphrase: typeof r.passphrase === 'string' ? r.passphrase : '',
   };

@@ -265,3 +265,53 @@ describe('backupHealth', () => {
     expect((storage.data[STATUS_KEY] as { checkedAt: number }).checkedAt).toBe(s.checkedAt);
   });
 });
+
+describe('server addresses', () => {
+  it('allows http:// only on private networks', () => {
+    for (const u of [
+      'http://localhost:8080',
+      'http://192.168.1.5/dav',
+      'http://10.0.0.2',
+      'http://172.20.1.1',
+      'http://nas.local/x',
+      'http://nas/x',
+      'http://[::1]/x',
+    ])
+      expect(parseConfig({ target: 'webdav', webdav: { url: u } }).webdav.url, u).toBe(u);
+    for (const u of [
+      'http://example.com/dav',
+      'http://172.32.0.1',
+      'http://8.8.8.8',
+      'http://192.169.1.1',
+      'ftp://x',
+      'https-not://x',
+    ])
+      expect(parseConfig({ target: 'webdav', webdav: { url: u } }).webdav.url, u).toBe('');
+    expect(parseConfig({ webdav: { url: 'https://cloud.example.com/dav' } }).webdav.url).toBe(
+      'https://cloud.example.com/dav',
+    );
+  });
+});
+
+describe('upload verification', () => {
+  it('accepts an upload that reads back identically', async () => {
+    const files = new Map<string, Uint8Array>();
+    const ok: BackupTarget = {
+      put: async (n, b) => void files.set(n, b),
+      get: async (n) => files.get(n) as Uint8Array,
+    };
+    const { deps } = setup({}, ok);
+    expect((await runBackup(deps)).error).toBeUndefined();
+  });
+
+  it('fails the run when the server returns different bytes', async () => {
+    const bad: BackupTarget = {
+      put: async () => {},
+      get: async () => new Uint8Array([1, 2, 3]),
+    };
+    const { deps } = setup({}, bad);
+    const s = await runBackup(deps);
+    expect(s.error).toMatch(/did not match/);
+    expect(s.hash).toBeUndefined();
+  });
+});

@@ -139,6 +139,8 @@ async function openTab(url: string): Promise<void> {
 }
 
 /** Saves a session as a Markdown outline or a bookmarks file any browser imports. */
+let moreId = $state<string | null>(null);
+
 function exportAs(s: Session, kind: 'md' | 'html'): void {
   const name = fileSafe(s.name) || 'session';
   if (kind === 'md') downloadText(`${name}.md`, sessionToMarkdown(s), 'text/markdown');
@@ -407,10 +409,18 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
               <div class="actions" role="group" aria-label="Actions for {s.name}">
                 <Button variant="tonal" onclick={() => restore(s, 'newWindow')}>Restore</Button>
                 <Button variant="text" onclick={() => restore(s, 'currentWindow')}>Into this window</Button>
-                <Button variant="text" onclick={() => startRename(s)}>Rename</Button>
-                <Button variant="text" aria-label="Export {s.name} as Markdown" onclick={() => exportAs(s, 'md')}>Markdown</Button>
-                <Button variant="text" aria-label="Export {s.name} as a bookmarks file" onclick={() => exportAs(s, 'html')}>Bookmarks</Button>
-                <Button variant="text" onclick={() => (confirmDelete = s.id)}>Delete</Button>
+                <Button
+                  variant="text"
+                  aria-expanded={moreId === s.id}
+                  aria-label="More actions for {s.name}"
+                  onclick={() => (moreId = moreId === s.id ? null : s.id)}
+                >More</Button>
+                {#if moreId === s.id}
+                  <Button variant="text" onclick={() => { moreId = null; startRename(s); }}>Rename</Button>
+                  <Button variant="text" aria-label="Export {s.name} as Markdown" onclick={() => exportAs(s, 'md')}>Export Markdown</Button>
+                  <Button variant="text" aria-label="Export {s.name} as a bookmarks file" onclick={() => exportAs(s, 'html')}>Export bookmarks</Button>
+                  <Button variant="text" onclick={() => (confirmDelete = s.id)}>Delete</Button>
+                {/if}
               </div>
             {/if}
 

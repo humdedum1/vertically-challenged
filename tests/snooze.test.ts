@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { parsePanelMessage } from '../src/shared/protocol';
-import { dueSnoozed, isWakeTime, parseSnoozed, snoozePresets } from '../src/shared/snooze';
+import {
+  dueSnoozed,
+  isWakeTime,
+  parseSnoozed,
+  planSnooze,
+  snoozePresets,
+} from '../src/shared/snooze';
 
 const entry = (over: Record<string, unknown> = {}) => ({
   id: 'abc123',
@@ -64,5 +70,44 @@ describe('snooze messages', () => {
       id: 'abc-1',
     });
     expect(parsePanelMessage({ type: 'deleteSnoozed', id: '../x' })).toBeNull();
+  });
+});
+
+describe('planSnooze', () => {
+  const tab = (id: number, url: string, incognito = false) => ({
+    id,
+    url,
+    title: `t${id}`,
+    incognito,
+  });
+  let n = 0;
+  const newId = () => `id${n++}`;
+
+  it('closes only the tabs whose entries were stored', () => {
+    const p = planSnooze(
+      [
+        tab(1, 'https://a.example/'),
+        tab(2, 'data:text/html,x'),
+        tab(3, 'https://c.example/', true),
+        tab(4, 'https://a.example/'),
+      ],
+      0,
+      5000,
+      1,
+      newId,
+    );
+    expect(p.tabIds).toEqual([1, 4]);
+    expect(p.entries.map((e) => e.url)).toEqual(['https://a.example/', 'https://a.example/']);
+  });
+
+  it('keeps duplicate tabs open when there is no room left', () => {
+    const p = planSnooze(
+      [tab(1, 'https://a.example/'), tab(2, 'https://a.example/')],
+      199,
+      5000,
+      1,
+      newId,
+    );
+    expect(p.tabIds).toEqual([1]);
   });
 });

@@ -27,6 +27,32 @@ try {
     assert.equal(await page.locator('label', { hasText: label }).count(), 1, label);
   }
   console.log('PASS backup server fields have visible labels');
+
+  // Sessions: the common actions are visible; Rename, Export and Delete sit behind More.
+  await page.evaluate(async () => {
+    await chrome.storage.local.set({
+      sessions: [
+        {
+          id: 'ss1',
+          name: 'Trip',
+          createdAt: Date.now(),
+          windows: [
+            {
+              groups: [],
+              tabs: [{ url: 'https://a.example/', title: 'A', pinned: false, group: null }],
+            },
+          ],
+        },
+      ],
+    });
+  });
+  await page.getByRole('tab', { name: 'Sessions', exact: true }).click();
+  await page.getByRole('button', { name: 'Restore', exact: true }).first().waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Rename', exact: true }).count(), 0);
+  await page.getByRole('button', { name: 'More actions for Trip', exact: true }).click();
+  await page.getByRole('button', { name: 'Export Trip as Markdown', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Rename', exact: true }).waitFor();
+  console.log('PASS session rows keep rare actions behind More');
 } finally {
   await close();
 }

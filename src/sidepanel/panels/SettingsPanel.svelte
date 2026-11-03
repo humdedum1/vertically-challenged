@@ -100,11 +100,16 @@ $effect(() => () => {
         </div>
       </details>
       <details>
-        <summary><span><strong>Panel &amp; tabs</strong><small>Display, layout, tab rows and suspension</small></span><Icon name="chevron" size={16} /></summary>
+        <summary><span><strong>Panel &amp; tabs</strong><small>Display, layout and tab rows</small></span><Icon name="chevron" size={16} /></summary>
         <div class="category-content">
           <DisplayCard {settings} />
           <LayoutCard {settings} />
           <TabRowsCard {settings} />
+        </div>
+      </details>
+      <details>
+        <summary><span><strong>Rules &amp; suspending</strong><small>Site rules, auto-suspend and archiving</small></span><Icon name="chevron" size={16} /></summary>
+        <div class="category-content">
           <RulesCard {settings} />
           <SuspendCard {settings} {tabState} />
         </div>

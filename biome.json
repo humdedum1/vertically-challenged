@@ -9,7 +9,9 @@
       "!node_modules",
       "!public/icon",
       "!bench/.out",
-      "!.github/release"
+      "!.github/release",
+      "!**/*.md",
+      "!**/*.yml"
     ]
   },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },

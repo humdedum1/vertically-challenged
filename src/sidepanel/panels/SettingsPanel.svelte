@@ -1,6 +1,7 @@
 <script lang="ts">
 import { tick } from 'svelte';
 import type { Theme } from '../../themes/palette';
+import TextInput from '../components/controls/TextInput.svelte';
 import Icon from '../components/Icon.svelte';
 import type { SettingsState } from '../settings-state.svelte';
 import type { TabState } from '../tab-state.svelte';
@@ -18,6 +19,7 @@ import SyncCard from './settings/SyncCard.svelte';
 import TabRowsCard from './settings/TabRowsCard.svelte';
 import ThemeEditor from './settings/ThemeEditor.svelte';
 import ThemesCard from './settings/ThemesCard.svelte';
+import { applySettingsFilter } from './settings-filter';
 
 interface Props {
   settings: SettingsState;
@@ -72,6 +74,27 @@ async function save(theme: Theme): Promise<string | null> {
 $effect(() => () => {
   draft.theme = null;
 });
+
+let query = $state('');
+let cardsEl: HTMLElement | undefined = $state();
+let matches = $state(0);
+/** The accordions the user had open, restored when the search is cleared. */
+let openBefore: boolean[] | null = null;
+
+$effect(() => {
+  const q = query;
+  const root = cardsEl;
+  if (!root) return;
+  const details = [...root.querySelectorAll('details')];
+  if (q.trim() && !openBefore) openBefore = details.map((d) => d.open);
+  matches = applySettingsFilter(root, q);
+  if (!q.trim() && openBefore) {
+    details.forEach((d, i) => {
+      d.open = openBefore?.[i] ?? d.open;
+    });
+    openBefore = null;
+  }
+});
 </script>
 
 <div class="settings">
@@ -89,7 +112,20 @@ $effect(() => () => {
       />
     {/key}
   {:else}
-    <div class="cards">
+    <div class="find">
+      <TextInput
+        label="Search settings"
+        placeholder="Search settings"
+        value={query}
+        oninput={(v) => (query = v)}
+      />
+      {#if query.trim()}
+        <p class="hint" role="status">
+          {matches === 0 ? `No settings match “${query.trim()}”.` : `${matches} ${matches === 1 ? 'setting' : 'settings'} found.`}
+        </p>
+      {/if}
+    </div>
+    <div class="cards" bind:this={cardsEl}>
       <details open>
         <summary><span><strong>Appearance</strong><small>Colors, density and themes</small></span><Icon name="chevron" size={16} /></summary>
         <div class="category-content">
@@ -133,6 +169,23 @@ $effect(() => () => {
 <style>
   .settings {
     padding-bottom: var(--pad-panel);
+  }
+
+  /* Author display rules (flex, grid) would otherwise beat the hidden attribute. */
+  :global([data-sf]) {
+    display: none !important;
+  }
+
+  .find {
+    display: grid;
+    gap: 6px;
+    margin-bottom: var(--gap);
+  }
+
+  .hint {
+    margin: 0;
+    color: var(--mOnSurfaceVariant);
+    font-size: 12px;
   }
 
   .cards {

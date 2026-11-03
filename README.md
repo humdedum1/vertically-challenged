@@ -48,7 +48,7 @@ After installing, click the toolbar icon or press **Alt+Shift+V** to open the pa
 | Pinned tabs and folders | Arrange pins into nested folders, change folder icons, and drag items between sections or windows. |
 | Child tabs | New tabs opened from another page can appear beneath their opener. Drag to nest or unnest tabs. |
 | Native tab groups | Create, rename, recolor, collapse, and move Chrome groups. |
-| Search | Find tabs by title and URL with fuzzy matching and keyboard navigation. |
+| Search | Find tabs by title and URL with fuzzy matching and keyboard navigation. Also finds pages in your bookmarks, history, saved sessions and snoozed tabs. Settings has its own search box. |
 | Multiple selection | Select ranges or individual tabs and act on them together. |
 | Clear | Close ordinary tabs while keeping your Staples and pinned layout. |
 | Window setups | Save window names, Staples, pins, and folder structures for reuse. |

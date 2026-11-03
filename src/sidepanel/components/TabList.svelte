@@ -1628,7 +1628,7 @@ $effect(() => {
           <code>group:name</code>. Put <code>-</code> in front to exclude.
         </p>
         {#if searchMore}
-          <SearchMore text={parsed.text} windowId={tabState.windowId} {openUrls} />
+          <SearchMore text={parsed.text} windowId={tabState.windowId} {openUrls} onwake={(id) => send({ type: 'wakeSnoozed', id })} />
         {/if}
       {:else}
         <VirtualList
@@ -1794,7 +1794,7 @@ $effect(() => {
           {/snippet}
           {#snippet footer()}
             {#if searching && searchMore}
-              <SearchMore text={parsed.text} windowId={tabState.windowId} {openUrls} />
+              <SearchMore text={parsed.text} windowId={tabState.windowId} {openUrls} onwake={(id) => send({ type: 'wakeSnoozed', id })} />
             {/if}
             {#if !searching && tabState.windowId !== null}
               <button type="button" class="new-page" onclick={() => {

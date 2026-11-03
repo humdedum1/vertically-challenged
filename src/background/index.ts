@@ -12,7 +12,18 @@ import {
 } from '../shared/protocol';
 import { parseSessions, SESSIONS_KEY } from '../shared/sessions';
 import type { Surface } from '../shared/surface';
+import { DEVICE_KEY } from '../shared/sync-store';
 import type { GroupInfo, TabInfo, WindowInfo } from '../shared/types';
+import { parseTheme } from '../themes/palette';
+import { cleanName } from '../themes/transfer';
+import { downloadsTarget } from './backup/downloads';
+import {
+  BACKUP_ALARM,
+  CONFIG_KEY as BACKUP_CONFIG_KEY,
+  intervalMinutes,
+  parseConfig,
+  runBackup,
+} from './backup/scheduler';
 import { createBatcher } from './batcher';
 import { placeChildTab } from './child-tabs';
 import { type CommandDeps, runCommand } from './commands';
@@ -428,6 +439,62 @@ export function startBackground(): void {
     settings: async () => (await settingsNow()).sync,
     platform: async () => (await browser.runtime.getPlatformInfo()).os,
   });
+  // --- Scheduled full backup (see backup/scheduler.ts) -------------------------------------
+  const backupDeps = {
+    storage: browser.storage.local,
+    target: downloadsTarget,
+    version: browser.runtime.getManifest().version,
+    device: async () =>
+      String(
+        ((await browser.storage.local.get(DEVICE_KEY))[DEVICE_KEY] as { name?: string })?.name ??
+          '',
+      ),
+    collect: async () => {
+      await pins.loaded;
+      const [sync, local] = await Promise.all([
+        browser.storage.sync.get(null),
+        browser.storage.local.get([SESSIONS_KEY, 'customCss']),
+      ]);
+      const themes = Object.entries(sync).flatMap(([key, value]) => {
+        const id = key.startsWith('theme:') ? key.slice(6) : '';
+        if (!/^custom-[a-z0-9]{6,32}$/.test(id)) return [];
+        const r = parseTheme(value, {
+          id,
+          name: cleanName((value as { name?: unknown } | null)?.name, 'Custom theme'),
+        });
+        return r.ok ? [r.value] : [];
+      });
+      return {
+        settings: migrateSettings(sync.settings),
+        themes,
+        layouts: await pins.backupLayouts(),
+        sessions: local[SESSIONS_KEY],
+        customCss: local.customCss,
+      };
+    },
+  };
+  async function configureBackupAlarm(): Promise<void> {
+    const cfg = parseConfig(
+      (await browser.storage.local.get(BACKUP_CONFIG_KEY))[BACKUP_CONFIG_KEY],
+    );
+    const minutes = intervalMinutes(cfg.interval);
+    const existing = await browser.alarms.get(BACKUP_ALARM);
+    if (minutes === 0) {
+      if (existing) await browser.alarms.clear(BACKUP_ALARM);
+    } else if (existing?.periodInMinutes !== minutes) {
+      await browser.alarms.create(BACKUP_ALARM, { periodInMinutes: minutes });
+    }
+  }
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes[BACKUP_CONFIG_KEY])
+      void configureBackupAlarm().catch((err: unknown) =>
+        console.warn('[vc] backup alarm failed', err),
+      );
+  });
+  void configureBackupAlarm().catch((err: unknown) =>
+    console.warn('[vc] backup alarm failed', err),
+  );
+
   const syncAlarm = 'vc-auto-sync';
   async function configureSyncAlarm(): Promise<void> {
     const prefs = (await settingsNow()).sync;
@@ -440,6 +507,7 @@ export function startBackground(): void {
     }
   }
   browser.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === BACKUP_ALARM) void runBackup(backupDeps);
     if (alarm.name === syncAlarm)
       void pins.loaded
         .then(() => publisher.auto())
@@ -515,6 +583,10 @@ export function startBackground(): void {
     if (raw?.type === 'importTabs') {
       const result = importTabs(raw);
       void result.then(respond);
+      return true;
+    }
+    if (raw?.type === 'runBackup') {
+      void runBackup(backupDeps, true).then(respond);
       return true;
     }
     if (raw?.type === 'restoreSessions') {

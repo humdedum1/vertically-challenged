@@ -15,6 +15,7 @@ import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
 import type { SettingsState } from '../../settings-state.svelte';
 import { isCustomId, type ThemeRegistry } from '../../theme-registry.svelte';
+import AutoBackup from './AutoBackup.svelte';
 import { downloadBytes, downloadText, today } from './download';
 import { createFullBackup, openFullBackup, restoreFullExtras } from './full-backup';
 
@@ -228,6 +229,8 @@ function reset(): void {
       plain form. A lost passphrase can't be recovered. Restoring adds to what you have: existing
       sessions and setups are kept.
     </p>
+
+    <AutoBackup />
 
     {#if fullPending}
       <div class="confirm" role="group" aria-label="Restore full backup">

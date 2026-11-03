@@ -112,6 +112,7 @@ Each permission is needed for a specific feature. No host permissions are reques
 | `activeTab` | Grants temporary access to the current tab after you invoke the extension on it. |
 | `scripting` | Injects the in-page popup into that tab, only after you invoke it there. |
 | `notifications` (optional) | Only when **Open on launch** is on: Chrome cannot open the panel without a user gesture, so launch shows a notification whose click opens it. |
+| `downloads` (optional) | Only when **Automatic backups** are turned on: saves the backup file to your Downloads folder. |
 
 ## Build from source
 

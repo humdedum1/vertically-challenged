@@ -77,10 +77,7 @@ export class TabState {
   private heartbeat: ReturnType<typeof setTimeout> | undefined;
   private replyTimer: ReturnType<typeof setTimeout> | undefined;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
-  private lastRetryable: Extract<
-    PanelMessage,
-    { type: 'activate' | 'renameWindow' }
-  > | null = null;
+  private lastRetryable: Extract<PanelMessage, { type: 'activate' | 'renameWindow' }> | null = null;
   private retryable: Extract<PanelMessage, { type: 'activate' | 'renameWindow' }> | null = null;
   private disposed = false;
 

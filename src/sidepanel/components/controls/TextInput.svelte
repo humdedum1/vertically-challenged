@@ -9,6 +9,8 @@ interface Props {
   invalid?: boolean;
   describedby?: string;
   mono?: boolean;
+  /** Masks the value (passphrases). */
+  secret?: boolean;
   /** Called on Enter (e.g. to submit an add-field). */
   onenter?: () => void;
 }
@@ -23,13 +25,14 @@ let {
   invalid = false,
   describedby,
   mono = false,
+  secret = false,
   onenter,
 }: Props = $props();
 </script>
 
 <input
   {id}
-  type="text"
+  type={secret ? "password" : "text"}
   class:mono
   aria-label={label}
   aria-invalid={invalid}
@@ -38,7 +41,7 @@ let {
   {maxlength}
   {value}
   spellcheck="false"
-  autocomplete="off"
+  autocomplete={secret ? "new-password" : "off"}
   oninput={(e) => oninput(e.currentTarget.value)}
   onkeydown={(e) => {
     if (e.key === 'Enter' && onenter) {

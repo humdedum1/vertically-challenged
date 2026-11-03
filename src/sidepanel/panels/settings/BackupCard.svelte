@@ -1,5 +1,6 @@
 <script lang="ts">
 import { browser } from 'wxt/browser';
+import type { RestoredFull } from '../../../backup/snapshot';
 import { DEFAULT_SETTINGS } from '../../../settings/schema';
 import type { WindowLayout } from '../../../shared/layout';
 import {
@@ -9,11 +10,14 @@ import {
   type RestoredBackup,
 } from '../../../themes/transfer';
 import Button from '../../components/controls/Button.svelte';
+import TextInput from '../../components/controls/TextInput.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
 import type { SettingsState } from '../../settings-state.svelte';
 import { isCustomId, type ThemeRegistry } from '../../theme-registry.svelte';
-import { downloadText, today } from './download';
+import AutoBackup from './AutoBackup.svelte';
+import { downloadBytes, downloadText, today } from './download';
+import { createFullBackup, openFullBackup, restoreFullExtras } from './full-backup';
 
 let { settings, themes }: { settings: SettingsState; themes: ThemeRegistry } = $props();
 
@@ -29,32 +33,73 @@ const summary = $derived(
     ? `Restores settings, ${pending.themes.length} ${pending.themes.length === 1 ? 'theme' : 'themes'} and ${pending.layouts.length} pinned ${pending.layouts.length === 1 ? 'layout' : 'layouts'} as saved Window setups.`
     : '',
 );
+let passphrase = $state('');
+let fullPending = $state<RestoredFull | null>(null);
+let fullFile = $state<File | null>(null);
+let fullInput: HTMLInputElement | undefined = $state();
+
+async function fullExport(): Promise<void> {
+  if (exporting) return;
+  exporting = true;
+  clear();
+  try {
+    const r = await createFullBackup(settings.value, themes.custom, passphrase);
+    downloadBytes(`vertically-challenged-full-${today()}.vcb`, r.bytes);
+    status = `Full backup saved${passphrase ? ' (encrypted)' : ' (not encrypted)'}: settings, ${themes.custom.length} themes, ${r.layouts} layouts, ${r.sessions} sessions.`;
+  } catch (err) {
+    error = err instanceof Error ? err.message : 'Couldn’t create the backup';
+  } finally {
+    exporting = false;
+  }
+}
+
+async function openFull(file: File): Promise<void> {
+  clear();
+  fullPending = null;
+  const r = await openFullBackup(file, passphrase);
+  if (!r.ok) {
+    error = r.needsPassphrase
+      ? 'This backup is encrypted: enter its passphrase above, then choose the file again.'
+      : r.error;
+    return;
+  }
+  fullFile = file;
+  fullPending = r.value;
+  warnings = r.warnings;
+}
+
+async function onFullFile(e: Event & { currentTarget: HTMLInputElement }): Promise<void> {
+  const input = e.currentTarget;
+  const file = input.files?.[0];
+  input.value = '';
+  if (file) await openFull(file);
+}
+
+async function applyFull(): Promise<void> {
+  const r = fullPending;
+  if (!r || applying) return;
+  applying = true;
+  clear();
+  try {
+    const added = await restoreFullExtras(r);
+    for (const t of r.themes) await themes.save(t);
+    settings.update(() => r.settings);
+    status = `Restored settings, ${r.themes.length} themes, ${r.layouts.length} layouts (as Window setups) and ${added} new sessions${added < r.sessions.length ? ` (${r.sessions.length - added} already existed or didn’t fit the limit)` : ''}. Existing sessions and setups were kept.`;
+    fullPending = null;
+    fullFile = null;
+  } catch (err) {
+    error = err instanceof Error ? err.message : 'Couldn’t restore the backup';
+  } finally {
+    applying = false;
+  }
+}
+
 let fileInput: HTMLInputElement | undefined = $state();
 
 function clear(): void {
   status = '';
   error = '';
   warnings = [];
-}
-
-async function exportBackup(): Promise<void> {
-  if (exporting) return;
-  exporting = true;
-  clear();
-  try {
-    const result: { ok: boolean; layouts: WindowLayout[]; error?: string } =
-      await browser.runtime.sendMessage({ type: 'backupLayouts' });
-    if (!result?.ok) throw new Error(result?.error ?? 'Couldn’t read pinned layouts');
-    const text = createBackup(settings.value, themes.custom, new Date(), result.layouts);
-    if (new TextEncoder().encode(text).length > MAX_IMPORT_BYTES)
-      throw new Error('Backup exceeds the file size limit; no file was exported');
-    downloadText(`vertically-challenged-backup-${today()}.json`, text);
-    status = `Exported settings, ${themes.custom.length} custom themes and ${result.layouts.length} pinned layouts.`;
-  } catch (err) {
-    error = err instanceof Error ? err.message : 'Couldn’t export the backup';
-  } finally {
-    exporting = false;
-  }
 }
 
 async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<void> {
@@ -144,8 +189,41 @@ function reset(): void {
   {#snippet icon()}<Icon name="settings" size={12} />{/snippet}
   <div class="body">
     <div class="row">
-      <Button disabled={exporting || applying} onclick={exportBackup}>{exporting ? 'Exporting…' : 'Export backup'}</Button>
-      <Button disabled={exporting || applying} onclick={() => fileInput?.click()}>Import backup…</Button>
+      <TextInput secret label="Backup passphrase (optional)" placeholder="Passphrase (optional)" value={passphrase} oninput={(v) => (passphrase = v)} />
+    </div>
+    <div class="row">
+      <Button variant="primary" disabled={exporting || applying} onclick={fullExport}>{exporting ? 'Saving…' : 'Full backup'}</Button>
+      <Button disabled={exporting || applying} onclick={() => fullInput?.click()}>Restore full backup…</Button>
+      <input
+        bind:this={fullInput}
+        type="file"
+        accept=".vcb,application/octet-stream"
+        hidden
+        aria-label="Full backup file"
+        onchange={onFullFile}
+      />
+    </div>
+    <p class="hint">
+      Full backup saves settings, themes, Staples, pins, folders, Window setups, sessions and
+      custom CSS. Add a passphrase to encrypt it; without one the file lists every saved URL in
+      plain form. A lost passphrase can't be recovered. Restoring adds to what you have: existing
+      sessions and setups are kept.
+    </p>
+
+    <AutoBackup />
+
+    {#if fullPending}
+      <div class="confirm" role="group" aria-label="Restore full backup">
+        <p>Restore {fullFile?.name}: settings (replaced), {fullPending.themes.length} themes, {fullPending.layouts.length} layouts, {fullPending.sessions.length} sessions{fullPending.customCss ? ' and custom CSS (replaced)' : ''}?</p>
+        <div class="row">
+          <Button variant="primary" disabled={applying} onclick={applyFull}>Restore</Button>
+          <Button variant="text" disabled={applying} onclick={() => { fullPending = null; fullFile = null; }}>Cancel</Button>
+        </div>
+      </div>
+    {/if}
+
+    <div class="row">
+      <Button disabled={exporting || applying} onclick={() => fileInput?.click()}>Import older settings & themes backup…</Button>
       <input
         bind:this={fileInput}
         type="file"

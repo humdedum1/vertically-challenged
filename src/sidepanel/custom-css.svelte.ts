@@ -2,7 +2,11 @@ import { browser } from 'wxt/browser';
 
 const KEY = 'customCss';
 const CACHE_KEY = 'vc:custom-css';
-export const MAX_CUSTOM_CSS = 20_000;
+
+export { MAX_CUSTOM_CSS } from '../backup/snapshot';
+
+import { MAX_CUSTOM_CSS } from '../backup/snapshot';
+
 const WRITE_DELAY_MS = 400;
 
 function apply(css: string): void {

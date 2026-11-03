@@ -20,7 +20,7 @@
 import { tick, untrack } from 'svelte';
 import { type HoverTarget, PointerDrag } from '../../lib/drag/pointer-drag';
 import { tileInsertionIndex } from '../../lib/drag/tile-hit';
-import { actionFor } from '../../lib/keymap';
+import { actionFor, formatCombo } from '../../lib/keymap';
 import { matchesFilters, parseQuery } from '../../lib/search/filters';
 import { FuzzyIndex } from '../../lib/search/fuzzy-index';
 import type { SearchHit, SearchIndex } from '../../lib/search/search-index';
@@ -1431,6 +1431,18 @@ function onkeydown(e: KeyboardEvent): void {
   e.preventDefault();
 }
 
+/** Tab menu entries that the shortcut actions run, for the palette's key hints. */
+const TAB_COMMAND_KEYS: Record<string, ShortcutAction> = {
+  'New tab below': 'newTab',
+  Close: 'closeTab',
+  Duplicate: 'duplicateTab',
+  Pin: 'togglePin',
+  Unpin: 'togglePin',
+  Mute: 'toggleMute',
+  Unmute: 'toggleMute',
+  Suspend: 'suspendTab',
+};
+
 /** Palette commands: the active tab's menu, then this window's, as on their rows. */
 const commands = $derived.by((): Command[] => {
   if (!palette) return [];
@@ -1439,7 +1451,10 @@ const commands = $derived.by((): Command[] => {
   if (!w) return [];
   const active = w.tabs.find((t) => t.active);
   return [
-    ...(active ? menuCommands(tabMenuFor(active), 'Tab: ') : []),
+    ...(active ? menuCommands(tabMenuFor(active), 'Tab') : []).map((c) => {
+      const combo = shortcuts[TAB_COMMAND_KEYS[c.label] as ShortcutAction]?.[0];
+      return combo ? { ...c, keys: formatCombo(combo) } : c;
+    }),
     ...menuCommands(
       windowMenu({
         info: w.info,
@@ -1449,7 +1464,7 @@ const commands = $derived.by((): Command[] => {
         layout: tabState.layouts.get(w.info.id),
         themes,
       }),
-      'Window: ',
+      'Window',
     ),
   ];
 });

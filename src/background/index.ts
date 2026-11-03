@@ -1,4 +1,6 @@
 import { type Browser, browser } from 'wxt/browser';
+import { dropboxTarget } from '../backup/dropbox';
+import { s3Target, webdavTarget } from '../backup/targets';
 import { migrateSettings } from '../settings/migrate';
 import type { TabRule } from '../settings/schema';
 import { hostOf } from '../shared/host-pattern';
@@ -12,7 +14,19 @@ import {
 } from '../shared/protocol';
 import { parseSessions, SESSIONS_KEY } from '../shared/sessions';
 import type { Surface } from '../shared/surface';
+import { DEVICE_KEY } from '../shared/sync-store';
 import type { GroupInfo, TabInfo, WindowInfo } from '../shared/types';
+import { parseCustomThemes } from '../themes/custom-themes';
+import { downloadsTarget } from './backup/downloads';
+import {
+  BACKUP_ALARM,
+  CONFIG_KEY as BACKUP_CONFIG_KEY,
+  type BackupConfig,
+  type BackupTarget,
+  intervalMinutes,
+  parseConfig,
+  runBackup,
+} from './backup/scheduler';
 import { createBatcher } from './batcher';
 import { placeChildTab } from './child-tabs';
 import { type CommandDeps, runCommand } from './commands';
@@ -21,7 +35,7 @@ import { createDisplay, POPUP_WINDOW, type TargetTab } from './display';
 import { createMruCycle } from './mru';
 import { runPinCommand } from './pins/commands';
 import { PinManager } from './pins/pin-manager';
-import { addSession, listSessions, restoreSessionValue } from './sessions';
+import { addSession, addSessions, listSessions, restoreSessionValue } from './sessions';
 import { createSuspender } from './suspend/suspender';
 import { runSyncCommand, type SyncCommandDeps } from './sync/commands';
 import { createSyncPublisher } from './sync/publisher';
@@ -428,6 +442,59 @@ export function startBackground(): void {
     settings: async () => (await settingsNow()).sync,
     platform: async () => (await browser.runtime.getPlatformInfo()).os,
   });
+  // --- Scheduled full backup (see backup/scheduler.ts) -------------------------------------
+  const backupDeps = {
+    storage: browser.storage.local,
+    target: (cfg: BackupConfig): BackupTarget =>
+      cfg.target === 'webdav'
+        ? webdavTarget(cfg.webdav)
+        : cfg.target === 's3'
+          ? s3Target(cfg.s3)
+          : downloadsTarget(),
+    version: browser.runtime.getManifest().version,
+    device: async () =>
+      String(
+        ((await browser.storage.local.get(DEVICE_KEY))[DEVICE_KEY] as { name?: string })?.name ??
+          '',
+      ),
+    collect: async () => {
+      await pins.loaded;
+      const [sync, local] = await Promise.all([
+        browser.storage.sync.get(null),
+        browser.storage.local.get([SESSIONS_KEY, 'customCss']),
+      ]);
+      const themes = parseCustomThemes(sync);
+      return {
+        settings: migrateSettings(sync.settings),
+        themes,
+        layouts: await pins.backupLayouts(),
+        sessions: local[SESSIONS_KEY],
+        customCss: local.customCss,
+      };
+    },
+  };
+  async function configureBackupAlarm(): Promise<void> {
+    const cfg = parseConfig(
+      (await browser.storage.local.get(BACKUP_CONFIG_KEY))[BACKUP_CONFIG_KEY],
+    );
+    const minutes = intervalMinutes(cfg.interval);
+    const existing = await browser.alarms.get(BACKUP_ALARM);
+    if (minutes === 0) {
+      if (existing) await browser.alarms.clear(BACKUP_ALARM);
+    } else if (existing?.periodInMinutes !== minutes) {
+      await browser.alarms.create(BACKUP_ALARM, { periodInMinutes: minutes });
+    }
+  }
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes[BACKUP_CONFIG_KEY])
+      void configureBackupAlarm().catch((err: unknown) =>
+        console.warn('[vc] backup alarm failed', err),
+      );
+  });
+  void configureBackupAlarm().catch((err: unknown) =>
+    console.warn('[vc] backup alarm failed', err),
+  );
+
   const syncAlarm = 'vc-auto-sync';
   async function configureSyncAlarm(): Promise<void> {
     const prefs = (await settingsNow()).sync;
@@ -440,6 +507,7 @@ export function startBackground(): void {
     }
   }
   browser.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === BACKUP_ALARM) void runBackup(backupDeps);
     if (alarm.name === syncAlarm)
       void pins.loaded
         .then(() => publisher.auto())
@@ -515,6 +583,19 @@ export function startBackground(): void {
     if (raw?.type === 'importTabs') {
       const result = importTabs(raw);
       void result.then(respond);
+      return true;
+    }
+    if (raw?.type === 'runBackup') {
+      void runBackup(backupDeps, true).then(respond);
+      return true;
+    }
+    if (raw?.type === 'restoreSessions') {
+      // Same validation as sessions read from storage.
+      const sessions = parseSessions(raw.sessions);
+      void addSessions(sessions)
+        .then((count) => ({ ok: true, count }))
+        .catch(() => ({ ok: false, error: 'Couldn’t restore sessions' }))
+        .then(respond);
       return true;
     }
     if (raw?.type !== 'backupLayouts' && raw?.type !== 'restoreBackupLayouts') return;

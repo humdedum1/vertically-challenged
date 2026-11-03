@@ -31,3 +31,10 @@ it('matches every word in any order', () => {
   expect(matchCommands(cmds, '').length).toBe(3);
   expect(matchCommands(cmds, 'nothing')).toEqual([]);
 });
+
+it('keeps the group out of the label but matches on it', () => {
+  const cmds = menuCommands(menu, 'Window');
+  expect(cmds.map((c) => [c.group, c.label])[1]).toEqual(['Window', 'Theme: Abyss']);
+  expect(matchCommands(cmds, 'window abyss').map((c) => c.label)).toEqual(['Theme: Abyss']);
+  expect(matchCommands(cmds, 'tab abyss')).toEqual([]);
+});

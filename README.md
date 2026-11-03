@@ -95,7 +95,7 @@ Updates and reloads preserve saved layouts when their live tabs can be identifie
 
 ## Permissions
 
-Each permission is needed for a specific feature. No host permissions are requested; the popup injects only after you use its toolbar button, a shortcut, or the toolbar menu on that tab.
+Each permission is needed for a specific feature. No host permissions are requested at install (a backup server is requested only if you set one up); the popup injects only after you use its toolbar button, a shortcut, or the toolbar menu on that tab.
 
 | Permission | Why it is needed |
 | --- | --- |
@@ -112,6 +112,9 @@ Each permission is needed for a specific feature. No host permissions are reques
 | `activeTab` | Grants temporary access to the current tab after you invoke the extension on it. |
 | `scripting` | Injects the in-page popup into that tab, only after you invoke it there. |
 | `notifications` (optional) | Only when **Open on launch** is on: Chrome cannot open the panel without a user gesture, so launch shows a notification whose click opens it. |
+| `downloads` (optional) | Only when **Automatic backups** are turned on: saves the backup file to your Downloads folder. |
+| Server address (optional host permission) | Only when you set up a **WebDAV**, **S3-compatible** or **Dropbox** backup target: access to the one server address you enter, so backups can be uploaded and old copies deleted. Nothing is requested at install. |
+| `identity` (optional) | Only for **Dropbox** backups: opens Dropbox's sign-in window. Dropbox sign-in uses your own Dropbox app key; the extension ships no shared credentials. |
 
 ## Build from source
 

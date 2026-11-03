@@ -12,6 +12,21 @@ export function downloadText(fileName: string, text: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** Saves binary data as a file (full backups). */
+export function downloadBytes(fileName: string, bytes: Uint8Array): void {
+  const url = URL.createObjectURL(
+    new Blob([bytes as BlobPart], { type: 'application/octet-stream' }),
+  );
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.hidden = true;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export const fileSafe = (name: string): string =>
   name.replace(/[^\p{L}\p{N}._-]+/gu, '-').replace(/^-+|-+$/g, '') || 'theme';
 

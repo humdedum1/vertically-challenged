@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { DisplayMode } from '../../../settings/schema';
+import Button from '../../components/controls/Button.svelte';
 import Field from '../../components/controls/Field.svelte';
 import SegmentedControl from '../../components/controls/SegmentedControl.svelte';
 import Toggle from '../../components/controls/Toggle.svelte';
@@ -15,6 +16,15 @@ const MODES: { value: DisplayMode; label: string }[] = [
 ];
 
 const mode = $derived(settings.value.display.mode);
+
+// Chrome lets extensions read the side (getLayout, Chrome 140+) but not set it.
+let side: 'left' | 'right' | null = $state(null);
+$effect(() => {
+  browser.sidePanel?.getLayout?.().then(
+    (l) => (side = l.side),
+    () => {},
+  );
+});
 
 // Notifications are optional: asked for (in this click's gesture) only when switching on.
 async function setOpenOnLaunch(on: boolean): Promise<void> {
@@ -43,6 +53,13 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
         incognito) it opens in a small window.
       {/if}
     </p>
+    {#if mode === 'sidebar'}
+      <Field label="Side">
+        <Button onclick={() => void browser.tabs.create({ url: 'chrome://settings/appearance' })}>
+          {side ? `On the ${side} · ` : ''}Change in Chrome settings
+        </Button>
+      </Field>
+    {/if}
     <Toggle
       label="Open on browser launch"
       hint="Chrome doesn’t let extensions open the panel on their own, so a notification appears at launch; click it to open the panel."

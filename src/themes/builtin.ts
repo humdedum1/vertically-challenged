@@ -1,6 +1,7 @@
 import abyss from './abyss.json';
 import { NOCTALIA_THEMES } from './noctalia';
 import { parseTheme, type Theme } from './palette';
+import { TERMINAL_THEMES } from './terminal';
 
 function builtin(raw: unknown, id: string, name: string): Theme {
   const r = parseTheme(raw, { id, name });
@@ -14,6 +15,7 @@ export const DEFAULT_THEME_ID = 'abyss';
 export const BUILTIN_THEMES: readonly Theme[] = [
   builtin(abyss, DEFAULT_THEME_ID, 'Abyss'),
   ...NOCTALIA_THEMES.map((t) => builtin(t.raw, t.id, t.name)),
+  ...TERMINAL_THEMES.map((t) => builtin(t.raw, t.id, t.name)),
 ];
 
 export function findTheme(id: string): Theme {

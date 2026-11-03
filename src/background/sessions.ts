@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import { mergeSessions } from '../backup/snapshot';
 import type { WindowLayout } from '../shared/layout';
 import {
   captureWindow,
@@ -82,6 +83,10 @@ export const deleteSession = (id: string): Promise<void> =>
 export const listSessions = (): Promise<Session[]> => readAll();
 
 /** Keeps a copy of a session (another device's) here, under a new id, as the newest. */
+/** Backup restore: adds sessions whose id isn't stored yet; never replaces or removes any. */
+export const addSessions = (incoming: Session[]): Promise<void> =>
+  mutate((list) => mergeSessions(list, incoming));
+
 export const addSession = (session: Session): Promise<void> =>
   mutate((list) =>
     [{ ...session, id: newId(), createdAt: Date.now() }, ...list].slice(0, MAX_SESSIONS),

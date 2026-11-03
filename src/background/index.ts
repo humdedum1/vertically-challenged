@@ -21,7 +21,7 @@ import { createDisplay, POPUP_WINDOW, type TargetTab } from './display';
 import { createMruCycle } from './mru';
 import { runPinCommand } from './pins/commands';
 import { PinManager } from './pins/pin-manager';
-import { addSession, listSessions, restoreSessionValue } from './sessions';
+import { addSession, addSessions, listSessions, restoreSessionValue } from './sessions';
 import { createSuspender } from './suspend/suspender';
 import { runSyncCommand, type SyncCommandDeps } from './sync/commands';
 import { createSyncPublisher } from './sync/publisher';
@@ -515,6 +515,15 @@ export function startBackground(): void {
     if (raw?.type === 'importTabs') {
       const result = importTabs(raw);
       void result.then(respond);
+      return true;
+    }
+    if (raw?.type === 'restoreSessions') {
+      // Same validation as sessions read from storage.
+      const sessions = parseSessions(raw.sessions);
+      void addSessions(sessions)
+        .then(() => ({ ok: true, count: sessions.length }))
+        .catch(() => ({ ok: false, error: 'Couldn’t restore sessions' }))
+        .then(respond);
       return true;
     }
     if (raw?.type !== 'backupLayouts' && raw?.type !== 'restoreBackupLayouts') return;

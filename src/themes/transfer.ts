@@ -63,13 +63,13 @@ export function importTheme(text: string, fileName: string, id: string): ParseRe
   return parseTheme(json.value, { id, name });
 }
 
-export function createBackup(
+export function buildBackup(
   settings: Settings,
   themes: readonly Theme[],
   now = new Date(),
   layouts: readonly WindowLayout[] = [],
-): string {
-  const backup: Backup = {
+): Backup {
+  return {
     format: BACKUP_FORMAT,
     kind: 'backup',
     version: BACKUP_VERSION,
@@ -78,7 +78,15 @@ export function createBackup(
     themes: themes.map(({ id, name, dark, light }) => ({ id, name, dark, light })),
     layouts: parseBackupLayouts(layouts),
   };
-  return `${JSON.stringify(backup, null, 2)}\n`;
+}
+
+export function createBackup(
+  settings: Settings,
+  themes: readonly Theme[],
+  now = new Date(),
+  layouts: readonly WindowLayout[] = [],
+): string {
+  return `${JSON.stringify(buildBackup(settings, themes, now, layouts), null, 2)}\n`;
 }
 
 export interface RestoredBackup {
@@ -98,7 +106,14 @@ export function parseBackup(
 ): ParseResult<RestoredBackup> {
   const json = parseJsonText(text);
   if (!json.ok) return json;
-  const raw = json.value;
+  return parseBackupObject(json.value, isCustomId);
+}
+
+/** parseBackup for an already-parsed value (the full backup nests one). */
+export function parseBackupObject(
+  raw: unknown,
+  isCustomId: (id: string) => boolean,
+): ParseResult<RestoredBackup> {
   if (
     typeof raw !== 'object' ||
     raw === null ||

@@ -13,8 +13,8 @@ Staples, pinned folders, tab groups, saved sessions and themes. Local-first, no 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Chrome 116+](https://img.shields.io/badge/Chrome-116%2B-4285F4?logo=googlechrome&logoColor=white)
 ![Free](https://img.shields.io/badge/price-free-brightgreen)
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/TODO)
-[![PayPal](https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white)](https://paypal.me/TODO)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/humdedum1)
+[![PayPal](https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white)](https://paypal.me/oddboxx)
 
 [Install](#install) · [Features](#features) · [Shortcuts](#keyboard-shortcuts) · [Releases](https://github.com/humdedum1/vertically-challenged/releases) · [Report a bug](https://github.com/humdedum1/vertically-challenged/issues/new/choose) · [Contribute](CONTRIBUTING.md)
 
@@ -27,7 +27,7 @@ Staples, pinned folders, tab groups, saved sessions and themes. Local-first, no 
 > **Vibecoded, lightly tested.** This extension was built with heavy use of AI coding tools. It has unit and end-to-end tests, but they come from a small sample: a few machines, a few profiles, a few workflows. Bugs happen, edge cases are untested, and releases may need follow-up fixes. Keep backups of anything you cannot afford to lose, and please report what you find.
 
 > [!NOTE]
-> **Free and open source.** Licensed under the [MIT License](LICENSE). It is free to use and will stay free for the foreseeable future. Donations are optional ([Ko-fi](https://ko-fi.com/TODO), [PayPal](https://paypal.me/TODO)) and unlock nothing.
+> **Free and open source.** Licensed under the [MIT License](LICENSE). It is free to use and will stay free for the foreseeable future. Donations are optional ([Ko-fi](https://ko-fi.com/humdedum1), [PayPal](https://paypal.me/oddboxx)) and unlock nothing.
 
 ## Install
 
@@ -187,8 +187,8 @@ Vertically Challenged is free, MIT licensed, and has no paywalled features. If i
 
 | | |
 | --- | --- |
-| ☕ **Ko-fi** | [ko-fi.com/TODO](https://ko-fi.com/TODO) (placeholder link) |
-| 💙 **PayPal** | [paypal.me/TODO](https://paypal.me/TODO) (placeholder link) |
+| ☕ **Ko-fi** | [ko-fi.com/humdedum1](https://ko-fi.com/humdedum1) |
+| 💙 **PayPal** | [paypal.me/oddboxx](https://paypal.me/oddboxx) |
 
 Bug reports, testing on your own setup, documentation fixes and code review help just as much.
 

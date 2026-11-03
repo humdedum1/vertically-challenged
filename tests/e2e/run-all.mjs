@@ -13,6 +13,8 @@ const SCRIPTS = [
   'themes-row.mjs',
   'snooze-welcome.mjs',
   'csp.mjs',
+  'put-away-search.mjs',
+  'settings-search.mjs',
   'command-palette.mjs',
   'child-tabs.mjs',
   'new-tab-url.mjs',

@@ -1,6 +1,8 @@
 <script lang="ts">
 import { browser } from 'wxt/browser';
-import { isRestorableUrl } from '../../shared/sessions';
+import { type SessionHit, searchPutAway } from '../../shared/put-away-search';
+import { isRestorableUrl, parseSessions, SESSIONS_KEY } from '../../shared/sessions';
+import { parseSnoozed, SNOOZE_KEY, type Snoozed } from '../../shared/snooze';
 import Favicon from './Favicon.svelte';
 
 /**
@@ -11,7 +13,14 @@ let {
   text,
   windowId,
   openUrls,
-}: { text: string; windowId: number | null; openUrls: ReadonlySet<string> } = $props();
+  onwake,
+}: {
+  text: string;
+  windowId: number | null;
+  openUrls: ReadonlySet<string>;
+  /** Reopens a snoozed tab now. */
+  onwake: (id: string) => void;
+} = $props();
 
 interface Hit {
   url: string;
@@ -19,6 +28,26 @@ interface Hit {
 }
 let bookmarks = $state.raw<Hit[]>([]);
 let history = $state.raw<Hit[]>([]);
+let sessionHits = $state.raw<SessionHit[]>([]);
+let snoozedHits = $state.raw<Snoozed[]>([]);
+
+// Saved sessions can be large, so they are parsed once and again only when storage changes.
+let putAway: Promise<{
+  sessions: ReturnType<typeof parseSessions>;
+  snoozed: ReturnType<typeof parseSnoozed>;
+}> | null = null;
+const loadPutAway = () =>
+  (putAway ??= browser.storage.local.get([SESSIONS_KEY, SNOOZE_KEY]).then((s) => ({
+    sessions: parseSessions(s[SESSIONS_KEY]),
+    snoozed: parseSnoozed(s[SNOOZE_KEY]),
+  })));
+$effect(() => {
+  const on = (c: Record<string, unknown>, area: string) => {
+    if (area === 'local' && (SESSIONS_KEY in c || SNOOZE_KEY in c)) putAway = null;
+  };
+  browser.storage.onChanged.addListener(on);
+  return () => browser.storage.onChanged.removeListener(on);
+});
 const LIMIT = 5;
 
 // Debounced: each keystroke would otherwise query both APIs.
@@ -27,6 +56,8 @@ $effect(() => {
   const open = openUrls;
   if (q.length < 2) {
     bookmarks = history = [];
+    sessionHits = [];
+    snoozedHits = [];
     return;
   }
   let stale = false;
@@ -37,7 +68,9 @@ $effect(() => {
       browser.bookmarks.search(q).catch(() => []),
       browser.history.search({ text: q, startTime: 0, maxResults: 25 }).catch(() => []),
     ]);
+    const away = await loadPutAway().catch(() => null);
     if (stale) return;
+    if (away) ({ sessionHits, snoozedHits } = searchPutAway(q, away.sessions, away.snoozed, open));
     bookmarks = b
       .filter(keep)
       .slice(0, LIMIT)
@@ -68,6 +101,8 @@ const summary = $derived(
   [
     bookmarks.length && `${bookmarks.length} bookmark${bookmarks.length === 1 ? '' : 's'}`,
     history.length && `${history.length} from history`,
+    sessionHits.length && `${sessionHits.length} from saved sessions`,
+    snoozedHits.length && `${snoozedHits.length} snoozed`,
   ]
     .filter(Boolean)
     .join(', '),
@@ -99,6 +134,33 @@ function open(url: string): void {
   <p class="sr" role="status">{summary}</p>
   {@render section('Bookmarks', bookmarks)}
   {@render section('History', history)}
+  {#if snoozedHits.length}
+    <p class="label">Snoozed</p>
+    <ul>
+      {#each snoozedHits as s (s.id)}
+        <li>
+          <button type="button" title="{s.url} (snoozed; opens it now)" onclick={() => onwake(s.id)}>
+            <Favicon url={s.url} size={14} />
+            <span class="t">{s.title || s.url}</span>
+          </button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+  {#if sessionHits.length}
+    <p class="label">Saved sessions</p>
+    <ul>
+      {#each sessionHits as h (h.url)}
+        <li>
+          <button type="button" title="{h.url} (in “{h.session}”)" onclick={() => open(h.url)}>
+            <Favicon url={h.url} size={14} />
+            <span class="t">{h.title}</span>
+            <span class="from">{h.session}</span>
+          </button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
 </div>
 
 <style>
@@ -148,6 +210,16 @@ function open(url: string): void {
   button:hover,
   button:focus-visible {
     background: var(--state-hover);
+  }
+
+  .from {
+    flex: none;
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--mOnSurfaceVariant);
+    font-size: 11px;
   }
 
   .t {

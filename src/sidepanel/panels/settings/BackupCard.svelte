@@ -276,7 +276,7 @@ function reset(): void {
 <SegmentCard title="Backup">
   {#snippet icon()}<Icon name="settings" size={12} />{/snippet}
   <div class="body">
-    <section class="block" aria-labelledby="vc-bk-now">
+    <section class="block" data-sf-group aria-labelledby="vc-bk-now">
       <h3 id="vc-bk-now">Back up now</h3>
       <Field label="Passphrase (encrypts the backup file)" for="vc-bk-pass">
         <TextInput id="vc-bk-pass" secret label="Backup passphrase" value={passphrase} oninput={(v) => (passphrase = v)} />
@@ -323,12 +323,12 @@ function reset(): void {
       {/if}
     </section>
 
-    <section class="block" aria-labelledby="vc-bk-auto">
+    <section class="block" data-sf-group aria-labelledby="vc-bk-auto">
       <h3 id="vc-bk-auto">Automatic backups</h3>
       <AutoBackup {passphrase} />
     </section>
 
-    <section class="block" aria-labelledby="vc-bk-import">
+    <section class="block" data-sf-group aria-labelledby="vc-bk-import">
       <h3 id="vc-bk-import">Import and reset</h3>
       <div class="row">
         <Button disabled={exporting || applying} onclick={() => fileInput?.click()}>Import older settings &amp; themes backup…</Button>

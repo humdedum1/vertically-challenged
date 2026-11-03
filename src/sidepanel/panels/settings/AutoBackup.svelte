@@ -119,7 +119,7 @@ const insecure = $derived(
 const remote = $derived(cfg.target !== 'downloads');
 </script>
 
-<div class="auto">
+<div class="auto" data-sf-group>
   <Field label="Where to save" for="vc-backup-target">
     <Select id="vc-backup-target" value={cfg.target} onchange={(v) => (cfg.target = v as TargetKind)}>
       <option value="downloads">Downloads folder</option>

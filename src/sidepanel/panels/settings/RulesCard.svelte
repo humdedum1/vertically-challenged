@@ -154,8 +154,14 @@ const describe = (r: { action: RuleAction; group: string }) =>
     white-space: nowrap;
   }
 
+  /* The site truncates first; the group keeps up to half the row so it never vanishes. */
+  .host {
+    flex: 1 1 auto;
+  }
+
   .group {
-    flex: 1;
+    flex: none;
+    max-width: 50%;
     font-weight: 600;
   }
 

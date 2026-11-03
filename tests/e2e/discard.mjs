@@ -146,7 +146,7 @@ check(
   JSON.stringify(pinnedOrder),
 );
 
-// Group suspend keeps the active tab and tabs outside the group loaded.
+// Group suspend also suspends its active tab: focus moves to a tab outside the group first.
 const grouped = await Promise.all([make('group-active'), make('group-idle')]);
 const outside = await make('outside-group');
 const groupId = await api((ids) => chrome.tabs.group({ tabIds: ids }), grouped);
@@ -158,7 +158,17 @@ await waitFor(
   'group suspend discards its inactive tab',
   async () => (await tabOf(grouped[1]))?.discarded === true,
 );
-check(!(await tabOf(grouped[0]))?.discarded, 'group suspend keeps its active tab loaded');
+await waitFor(
+  'group suspend discards its active tab too',
+  async () => (await tabOf(grouped[0]))?.discarded === true,
+);
+check(
+  (await api(
+    async (w) => (await chrome.tabs.query({ windowId: w, active: true }))[0]?.groupId,
+    win,
+  )) !== groupId,
+  'focus moves out of the suspended group',
+);
 check(!(await tabOf(outside))?.discarded, 'group suspend leaves other tabs loaded');
 
 await close();

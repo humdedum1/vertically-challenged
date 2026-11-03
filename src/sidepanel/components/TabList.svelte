@@ -1131,8 +1131,13 @@ function onPointerDown(e: PointerEvent): void {
 function onMouseDown(e: MouseEvent): void {
   if ((e.target as Element).closest('input, .new-page')) return;
   e.preventDefault();
+  // A mouse focus must not reveal the old focused row: that scrolls the list between
+  // mousedown and click, so the click lands on a different row.
+  mouseFocus = true;
   tree()?.focus();
+  mouseFocus = false;
 }
+let mouseFocus = false;
 
 // --- Keyboard --------------------------------------------------------------------------
 
@@ -1458,7 +1463,7 @@ $effect(() => {
           tabindex={0}
           aria-activedescendant={focusedRow ? `vc-row-${focusedRow.key}` : undefined}
           {onkeydown}
-          onfocus={() => list?.reveal(focusedIndex)}
+          onfocus={() => { if (!mouseFocus) list?.reveal(focusedIndex); }}
           onpointerdown={onPointerDown}
           onmousedown={onMouseDown}
         >

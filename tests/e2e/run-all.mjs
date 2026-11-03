@@ -15,6 +15,7 @@ const SCRIPTS = [
   'csp.mjs',
   'put-away-search.mjs',
   'settings-search.mjs',
+  'help-and-contrast.mjs',
   'command-palette.mjs',
   'child-tabs.mjs',
   'new-tab-url.mjs',

@@ -122,6 +122,10 @@ async function runNow(): Promise<void> {
 
 const last = $derived(status.at ? new Date(status.at).toLocaleString() : 'never');
 const redirectUri = browser.identity?.getRedirectURL?.() ?? '';
+const insecure = $derived(
+  (cfg.target === 'webdav' && cfg.webdav.url.startsWith('http:')) ||
+    (cfg.target === 's3' && cfg.s3.endpoint.startsWith('http:')),
+);
 const remote = $derived(cfg.target !== 'downloads');
 </script>
 
@@ -183,6 +187,12 @@ const remote = $derived(cfg.target !== 'downloads');
     plain form, and are never included in a backup or synced.
   </p>
 
+  {#if insecure}
+    <p class="error" role="alert">
+      This address uses http://, so your login and backup travel unencrypted. Use https:// unless
+      the server is on a network you fully trust, and set a passphrase.
+    </p>
+  {/if}
   <div class="row">
     <Button variant="primary" onclick={() => save(cfg)}>Save</Button>
     <Button disabled={running} onclick={runNow}>{running ? 'Backing up…' : 'Back up now'}</Button>

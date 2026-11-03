@@ -37,6 +37,15 @@ export interface RestoredFull extends RestoredBackup {
   customCss: string;
 }
 
+/**
+ * A backup file is untrusted input. CSS can't run script, but url() and @import would make
+ * the panel fetch from any server, which a hostile file could use to leak what the panel shows.
+ */
+export function stripRemoteCss(css: string): { css: string; stripped: boolean } {
+  const out = css.replace(/@import\b[^;]*;?/gi, '').replace(/url\s*\([^)]*\)/gi, 'none');
+  return { css: out, stripped: out !== css };
+}
+
 export function buildFullBackup(
   parts: FullParts,
   appVersion: string,
@@ -71,15 +80,11 @@ export function parseFullBackup(
   const warnings = [...inner.warnings];
   if (Array.isArray(b.sessions) && sessions.length !== b.sessions.length)
     warnings.push('Some invalid sessions were skipped');
-  return {
-    ok: true,
-    value: {
-      ...inner.value,
-      sessions,
-      customCss: typeof b.customCss === 'string' ? b.customCss.slice(0, MAX_CUSTOM_CSS) : '',
-    },
-    warnings,
-  };
+  const css = stripRemoteCss(
+    typeof b.customCss === 'string' ? b.customCss.slice(0, MAX_CUSTOM_CSS) : '',
+  );
+  if (css.stripped) warnings.push('Removed url() and @import from the custom CSS');
+  return { ok: true, value: { ...inner.value, sessions, customCss: css.css }, warnings };
 }
 
 /** Additive restore: sessions already present (same id) are kept; existing order kept, new ones newest first, capped. */

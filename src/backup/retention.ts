@@ -1,4 +1,5 @@
-export const BACKUP_FILE = /^vc-backup-\d{8}-\d{6}.*\.vcb$/;
+// Names only ever hold what backupName() writes; a listing can't smuggle in a path.
+export const BACKUP_FILE = /^vc-backup-\d{8}-\d{6}(-[\p{L}\p{N}_-]+)?\.vcb$/u;
 
 export function backupName(now: Date, device: string): string {
   const p = (n: number) => String(n).padStart(2, '0');

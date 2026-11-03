@@ -5,6 +5,7 @@ import {
   FULL_FORMAT,
   mergeSessions,
   parseFullBackup,
+  stripRemoteCss,
 } from '../src/backup/snapshot';
 import { DEFAULT_SETTINGS } from '../src/settings/schema';
 import type { Session } from '../src/shared/sessions';
@@ -80,5 +81,24 @@ describe('mergeSessions', () => {
     const out = mergeSessions(existing, [{ ...session('a', 5), name: 'changed' }, session('c', 3)]);
     expect(out.map((s) => s.id)).toEqual(['a', 'b', 'c']);
     expect(out[0]?.name).toBe('a');
+  });
+});
+
+describe('restored custom CSS', () => {
+  it('drops url() and @import but keeps the rest', () => {
+    const r = stripRemoteCss(
+      '@import "https://evil/x.css"; a{color:red;background:url( https://evil/?q=1 )}',
+    );
+    expect(r.css).not.toMatch(/evil|@import|url\(/);
+    expect(r.css).toContain('color:red');
+    expect(r.stripped).toBe(true);
+    expect(stripRemoteCss('a{color:red}').stripped).toBe(false);
+  });
+
+  it('warns when a backup file carried remote CSS', () => {
+    const full = buildFullBackup(parts([]), '1');
+    const r = parseFullBackup({ ...full, customCss: 'a{background:url(https://evil/)}' }, isCustom);
+    expect(r.ok && r.value.customCss).not.toContain('evil');
+    expect(r.ok && r.warnings.join()).toMatch(/custom CSS/);
   });
 });

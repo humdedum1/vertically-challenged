@@ -164,3 +164,19 @@ describe('dropbox config', () => {
     expect(c.dropbox).toEqual({ appKey: 'k', refreshToken: 'rt' });
   });
 });
+
+describe('hardening', () => {
+  it('never selects names that are not plain backup file names', () => {
+    const evil = [
+      'vc-backup-20260101-000000/../../x.vcb',
+      'vc-backup-20260101-000000-a/b.vcb',
+      'vc-backup-20260101-000001..vcb',
+    ];
+    expect(
+      selectToDelete(
+        [...evil, 'vc-backup-20260101-000002.vcb', 'vc-backup-20260101-000003.vcb'],
+        1,
+      ),
+    ).toEqual(['vc-backup-20260101-000002.vcb']);
+  });
+});

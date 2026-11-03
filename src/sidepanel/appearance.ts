@@ -1,5 +1,7 @@
 import { rowHeight, type Settings } from '../settings/schema';
 import { withAccent } from '../themes/accent';
+import { legibleTheme } from '../themes/contrast';
+import { isCustomId } from '../themes/custom-themes';
 import type { Theme } from '../themes/palette';
 import { themeToCss } from '../themes/token-mapper';
 
@@ -30,7 +32,11 @@ export function applyAppearance(
   { persist = true, accent }: { persist?: boolean; accent?: { light: string; dark: string } } = {},
 ): void {
   const a = settings.appearance;
-  if (theme) setThemeCss(themeToCss(withAccent(theme, accent ?? a.accent)));
+  if (theme) {
+    const t = withAccent(theme, accent ?? a.accent);
+    // Built-in palettes get readable text; user themes are shown exactly as made.
+    setThemeCss(themeToCss(isCustomId(theme.id) ? t : legibleTheme(t)));
+  }
 
   const root = document.documentElement;
   if (a.mode === 'system') delete root.dataset.mode;

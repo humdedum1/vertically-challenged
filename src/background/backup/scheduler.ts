@@ -63,11 +63,36 @@ export const DEFAULT_CONFIG: BackupConfig = {
 
 const text = (v: unknown, max = 500): string =>
   typeof v === 'string' ? v.trim().slice(0, max) : '';
-/** Only http(s) URLs are ever fetched. */
+/**
+ * http:// is only acceptable on a network you control: loopback, private ranges, .local names
+ * and single-label intranet hosts. Anything on the public internet must use https://.
+ */
+export function isPrivateHost(hostname: string): boolean {
+  const h = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h === '::1')
+    return true;
+  if (/^fe80:|^f[cd][0-9a-f]{2}:/.test(h)) return true;
+  const m = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(h);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    return (
+      a === 10 ||
+      a === 127 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254)
+    );
+  }
+  return !h.includes('.') && !h.includes(':');
+}
+
+/** Only https:// URLs, or http:// on a private network, are ever fetched. */
 const url = (v: unknown): string => {
   const t = text(v, 2000);
   try {
-    return ['http:', 'https:'].includes(new URL(t).protocol) ? t : '';
+    const u = new URL(t);
+    if (u.protocol === 'https:') return t;
+    return u.protocol === 'http:' && isPrivateHost(u.hostname) ? t : '';
   } catch {
     return '';
   }
@@ -137,7 +162,8 @@ export function requiredAccess(
     return { origins: dropboxOrigins };
   }
   const origin = originOf(c.target === 'webdav' ? c.webdav.url : c.s3.endpoint);
-  if (!origin) throw new Error('Enter a valid http(s) server address first');
+  if (!origin)
+    throw new Error('Enter a valid https:// address (http:// works only on your own network)');
   if (c.target === 'webdav' && !(c.webdav.user && c.webdav.password))
     throw new Error('Enter the WebDAV user and password');
   if (c.target === 's3' && !(c.s3.bucket && c.s3.accessKey && c.s3.secretKey))
@@ -166,6 +192,11 @@ async function sha256(text: string): Promise<string> {
   return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+async function sha256Bytes(b: Uint8Array): Promise<string> {
+  const d = await crypto.subtle.digest('SHA-256', b as BufferSource);
+  return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+
 /** Runs one backup. `force` ignores the unchanged-content skip (Back up now). Never throws. */
 export async function runBackup(deps: SchedulerDeps, force = false): Promise<BackupStatus> {
   const now = (deps.now ?? (() => new Date()))();
@@ -184,6 +215,10 @@ export async function runBackup(deps: SchedulerDeps, force = false): Promise<Bac
       const target = deps.target(cfg);
       const name = backupName(now, await deps.device());
       await target.put(name, bytes);
+      // Read it back: a server that accepted the upload but stored something else is caught now,
+      // not on the day the backup is needed.
+      if (target.get && (await sha256Bytes(await target.get(name))) !== (await sha256Bytes(bytes)))
+        throw new Error('The uploaded backup did not match what was sent; check the server');
       if (target.list && target.delete) {
         for (const old of selectToDelete(await target.list(), cfg.keep)) await target.delete(old);
       }

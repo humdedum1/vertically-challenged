@@ -56,6 +56,31 @@ export function snoozePresets(now: Date): { label: string; at: number }[] {
   ];
 }
 
+/**
+ * Which tabs to put away. A tab is closed only if its entry was kept (valid, and room is left),
+ * so a tab that could not be stored is never lost. `stored` is how many entries exist already.
+ */
+export function planSnooze(
+  tabs: readonly { id: number; url: string; title: string; incognito: boolean }[],
+  stored: number,
+  wakeAt: number,
+  now: number,
+  newId: () => string,
+): { entries: Snoozed[]; tabIds: number[] } {
+  const entries: Snoozed[] = [];
+  const tabIds: number[] = [];
+  for (const t of tabs) {
+    if (t.incognito || !t.url || stored + entries.length >= MAX_SNOOZED) continue;
+    const [entry] = parseSnoozed([
+      { id: newId(), url: t.url, title: t.title, wakeAt, snoozedAt: now },
+    ]);
+    if (!entry) continue;
+    entries.push(entry);
+    tabIds.push(t.id);
+  }
+  return { entries, tabIds };
+}
+
 export const dueSnoozed = (list: readonly Snoozed[], now: number): Snoozed[] =>
   list.filter((s) => s.wakeAt <= now);
 

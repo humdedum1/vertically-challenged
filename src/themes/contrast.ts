@@ -45,3 +45,46 @@ export function contrastIssues(theme: Theme, min = 4.5): ContrastIssue[] {
   }
   return issues;
 }
+
+const toRgb = (hex: string): [number, number, number] => [
+  Number.parseInt(hex.slice(1, 3), 16),
+  Number.parseInt(hex.slice(3, 5), 16),
+  Number.parseInt(hex.slice(5, 7), 16),
+];
+const toHex = (c: readonly number[]): string =>
+  `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+
+/**
+ * Nudges `fg` toward black or white (whichever the background is further from) in small steps
+ * until it reaches `min` against `bg`, keeping its hue as long as it can.
+ */
+export function legibleOn(fg: string, bg: string, min = 4.5): string {
+  if (contrastRatio(fg, bg) >= min) return fg;
+  const target = luminance(bg) > 0.18 ? [0, 0, 0] : [255, 255, 255];
+  const [r, g, b] = toRgb(fg);
+  for (let i = 1; i <= 20; i++) {
+    const t = i / 20;
+    const next = toHex([
+      r + ((target[0] ?? 0) - r) * t,
+      g + ((target[1] ?? 0) - g) * t,
+      b + ((target[2] ?? 0) - b) * t,
+    ]);
+    if (contrastRatio(next, bg) >= min) return next;
+  }
+  return toHex(target);
+}
+
+/**
+ * Built-in third-party palettes ship as their authors made them, and several fall below
+ * WCAG AA in places. This returns the theme with only the text roles adjusted, so text stays
+ * readable and the backgrounds and accents (the look) are untouched. User themes are not
+ * changed: the editor reports their contrast instead.
+ */
+export function legibleTheme(theme: Theme, min = 4.5): Theme {
+  const fix = (p: Palette): Palette => {
+    const out: Palette = { ...p };
+    for (const [fg, bg] of TEXT_PAIRS) out[fg] = legibleOn(out[fg], out[bg], min);
+    return out;
+  };
+  return { ...theme, dark: fix(theme.dark), light: fix(theme.light) };
+}

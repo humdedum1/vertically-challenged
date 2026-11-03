@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { dueSnoozed, MAX_SNOOZED, parseSnoozed, SNOOZE_KEY, type Snoozed } from '../shared/snooze';
+import { dueSnoozed, parseSnoozed, planSnooze, SNOOZE_KEY, type Snoozed } from '../shared/snooze';
 import type { TabInfo } from '../shared/types';
 
 export const SNOOZE_ALARM = 'vc-snooze';
@@ -32,28 +32,14 @@ export async function scheduleSnoozeAlarm(): Promise<void> {
 
 /** Puts tabs away and closes them. Incognito tabs are skipped: nothing of theirs is stored. */
 export async function snoozeTabs(tabs: readonly TabInfo[], wakeAt: number): Promise<number> {
-  const keep = tabs.filter((t) => !t.incognito && t.url);
-  const now = Date.now();
-  const entries = keep.map<Snoozed>((t) => ({
-    id: newId(),
-    url: t.url,
-    title: t.title,
-    wakeAt,
-    snoozedAt: now,
-  }));
-  // Only entries that survive validation are stored, and only their tabs are closed.
-  const stored = parseSnoozed(entries);
-  const added = await mutate((list) => {
-    const room = Math.max(0, MAX_SNOOZED - list.length);
-    const take = stored.slice(0, room);
-    return { list: [...list, ...take], result: take };
+  const plan = await mutate((list) => {
+    const p = planSnooze(tabs, list.length, wakeAt, Date.now(), newId);
+    return { list: [...list, ...p.entries], result: p };
   });
-  const ids = keep
-    .filter((t) => added.some((a) => a.url === t.url && a.title === t.title))
-    .map((t) => t.id);
-  if (ids.length) await browser.tabs.remove(ids);
+  // Close only after the entries are stored.
+  if (plan.tabIds.length) await browser.tabs.remove(plan.tabIds);
   await scheduleSnoozeAlarm();
-  return added.length;
+  return plan.entries.length;
 }
 
 async function open(entries: readonly Snoozed[]): Promise<void> {

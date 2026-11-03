@@ -199,6 +199,11 @@ const describe = (r: { action: RuleAction; group: string }) =>
     min-width: 0;
   }
 
+  /* The site field gets its own line so its placeholder isn't cut off at narrow widths. */
+  .add > :global(#vc-rule-host) {
+    flex-basis: 100%;
+  }
+
   .sr {
     position: absolute;
     width: 1px;

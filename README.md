@@ -18,7 +18,7 @@ Staples, pinned folders, tab groups, saved sessions and themes. Local-first, no 
 
 [Install](#install) · [Features](#features) · [Shortcuts](#keyboard-shortcuts) · [Releases](https://github.com/humdedum1/vertically-challenged/releases) · [Report a bug](https://github.com/humdedum1/vertically-challenged/issues/new/choose) · [Contribute](CONTRIBUTING.md)
 
-<!-- TODO: screenshots or a short demo GIF of the side panel and the popup (light and dark theme). -->
+<img src="docs/store/panel-tabs-light.png" alt="The tab list in the light theme" width="260"> <img src="docs/store/panel-tabs-dark.png" alt="The tab list in the dark theme" width="260"> <img src="docs/store/panel-palette-dark.png" alt="The command palette, opened with &gt;" width="260">
 <!-- TODO: add Chrome Web Store version/users badges once the store listing exists. -->
 
 </div>
@@ -55,6 +55,9 @@ After installing, click the toolbar icon or press **Alt+Shift+V** to open the pa
 | Saved sessions | Save windows or all windows and restore their tabs, groups, and live pinned layouts. |
 | Other devices | Browse published workspaces and sessions, open or add them locally, and keep copies. |
 | Suspend tabs | Discard tabs manually or after an idle interval, with pinned, audible, and site exclusions. Chrome reloads them when activated. |
+| Snooze | Put a tab away until later today, tomorrow, Monday or next month. It reopens on time, even if the browser was closed. |
+| Full backups | Encrypted backups of everything to Downloads, WebDAV (Nextcloud), S3-compatible storage or Dropbox, on a schedule. Restore from the server, undo a restore, and get a toolbar warning if backups stop. |
+| Export sessions | Save a session as a Markdown outline or a bookmarks file. |
 | Bookmarks and history | Search and open saved bookmarks and visited pages from dedicated panels. |
 | Recently closed | Reopen recently closed tabs and windows. |
 | Themes | Built-in palettes, custom themes, accent colors, light/dark/system mode, import and export. |
@@ -161,6 +164,8 @@ npm run test:e2e
 Tests use temporary browser profiles. Chromium or Chrome for Testing is required; branded Chrome ignores the test extension-loading flag. Set `CHROME_BIN` to use a compatible local binary. See [bench/README.md](bench/README.md) for profiling and benchmarks.
 
 ## Privacy
+
+The full policy is in [docs/PRIVACY.md](docs/PRIVACY.md).
 
 Local-first, with no analytics or project-operated sync server. Enabling sync sends the shared tab URLs, titles, workspace data, and settings through Chrome Sync. Local-first does not mean that synced data never leaves your computer.
 

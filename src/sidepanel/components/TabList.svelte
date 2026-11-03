@@ -1,4 +1,5 @@
 <script lang="ts">
+import { browser } from 'wxt/browser';
 /*
  * Keyboard map (focus stays on the tree; rows are addressed with aria-activedescendant).
  * Fixed navigation keys:
@@ -1466,6 +1467,25 @@ const commands = $derived.by((): Command[] => {
       }),
       'Window',
     ),
+    {
+      label: 'Back up now',
+      group: 'Backup',
+      danger: false,
+      run: () => {
+        void browser.runtime
+          .sendMessage({ type: 'runBackup' })
+          .then((s?: { error?: string; skipped?: boolean }) =>
+            tabState.onNotice?.(
+              s?.error
+                ? { level: 'error', text: `Backup failed: ${s.error}` }
+                : {
+                    level: 'info',
+                    text: s?.skipped ? 'Nothing changed since the last backup' : 'Backup saved',
+                  },
+            ),
+          );
+      },
+    },
   ];
 });
 const paletteHits = $derived(matchCommands(commands, query.trimStart().slice(1)));

@@ -11,6 +11,7 @@ const SCRIPTS = [
   'panel-recovery.mjs',
   'settings-load.mjs',
   'themes-row.mjs',
+  'snooze-welcome.mjs',
   'command-palette.mjs',
   'child-tabs.mjs',
   'new-tab-url.mjs',

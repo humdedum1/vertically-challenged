@@ -505,6 +505,10 @@ export function startBackground(): void {
   void configureBackupAlarm().catch((err: unknown) =>
     console.warn('[vc] backup alarm failed', err),
   );
+  // Fresh installs only (not updates) get the one-time welcome card in the panel.
+  browser.runtime.onInstalled.addListener((d) => {
+    if (d.reason === 'install') void browser.storage.local.set({ 'vc:welcome': 'pending' });
+  });
   void refreshBackupBadge().catch(() => {});
   // Tabs that came due while the browser was closed reopen now; then arm the next alarm.
   void wakeDue()

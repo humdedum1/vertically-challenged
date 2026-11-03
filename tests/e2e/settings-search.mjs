@@ -24,7 +24,8 @@ try {
   await box.fill('passphrase');
   await page.getByText(/settings? found/).waitFor();
   assert.deepEqual(await visibleSummaries(), ['Data']);
-  assert.equal(await page.getByLabel('Backup passphrase', { exact: true }).isVisible(), true);
+  // The section eases open, so the field is zero-sized for a moment after the search.
+  await page.getByLabel('Backup passphrase', { exact: true }).waitFor({ state: 'visible' });
   assert.equal(
     await page.getByLabel('Where to save', { exact: true }).isVisible(),
     false,

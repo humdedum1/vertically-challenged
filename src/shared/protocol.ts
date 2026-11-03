@@ -1,9 +1,11 @@
+import type { SortKey } from '../background/tab-tools';
 import {
   FOLDER_ICONS,
   type FolderIcon,
   MAX_ITEMS,
   MAX_NAME,
   type PinDest,
+  THEME_ID,
   type WindowLayout,
 } from './layout';
 import type { Surface } from './surface';
@@ -45,6 +47,11 @@ export type PanelMessage =
   | { type: 'close'; tabIds: number[] }
   | { type: 'closeOthers'; tabId: number }
   | { type: 'closeBelow'; tabId: number }
+  | { type: 'closeAbove'; tabId: number }
+  /** Closes repeated pages in the window, keeping one copy of each. */
+  | { type: 'closeDuplicates'; windowId: number }
+  /** Sorts the window's tabs (or one group's) without moving tabs across group edges. */
+  | { type: 'sortTabs'; windowId: number; groupId: number | null; by: SortKey }
   | { type: 'duplicate'; tabId: number }
   | { type: 'setPinned'; tabIds: number[]; pinned: boolean }
   | { type: 'setMuted'; tabIds: number[]; muted: boolean }
@@ -101,6 +108,15 @@ export type PanelMessage =
   /** Closes the window's unpinned tabs, grouped ones included, except the active tab. */
   | { type: 'clearTabs'; windowId: number }
   | { type: 'renameWindow'; windowId: number; name: string | null }
+  /** Per-window look; an omitted field is unchanged, null resets it. */
+  | {
+      type: 'setWindowLook';
+      windowId: number;
+      themeId?: string | null;
+      icon?: FolderIcon | null;
+      density?: 'compact' | 'comfortable' | null;
+      accent?: GroupColor | null;
+    }
   /** `windowId` is the panel's own window; the collapse is remembered in its layout. */
   | { type: 'setWindowCollapsed'; windowId: number; otherWindowId: number; collapsed: boolean }
   | { type: 'setupOpen'; setupId: string }
@@ -165,6 +181,7 @@ export type PinMessage = Extract<
       | 'folderSuspend'
       | 'clearTabs'
       | 'renameWindow'
+      | 'setWindowLook'
       | 'setWindowCollapsed'
       | 'setupOpen'
       | 'setupApply'
@@ -187,6 +204,7 @@ const PIN_TYPES = new Set<string>([
   'folderSuspend',
   'clearTabs',
   'renameWindow',
+  'setWindowLook',
   'setWindowCollapsed',
   'setupOpen',
   'setupApply',
@@ -343,6 +361,33 @@ function parsePinMessage(m: Record<string, unknown>): PinMessage | null {
             name: m.name === null ? null : m.name.trim(),
           }
         : null;
+    case 'setWindowLook': {
+      if (!isId(m.windowId)) return null;
+      const out: Extract<PanelMessage, { type: 'setWindowLook' }> = {
+        type: 'setWindowLook',
+        windowId: m.windowId,
+      };
+      if (m.themeId !== undefined) {
+        if (m.themeId !== null && (typeof m.themeId !== 'string' || !THEME_ID.test(m.themeId)))
+          return null;
+        out.themeId = m.themeId;
+      }
+      if (m.icon !== undefined) {
+        if (m.icon !== null && !(FOLDER_ICONS as readonly unknown[]).includes(m.icon)) return null;
+        out.icon = m.icon as FolderIcon | null;
+      }
+      if (m.density !== undefined) {
+        if (m.density !== null && m.density !== 'compact' && m.density !== 'comfortable')
+          return null;
+        out.density = m.density;
+      }
+      if (m.accent !== undefined) {
+        if (m.accent !== null && !(GROUP_COLORS as readonly unknown[]).includes(m.accent))
+          return null;
+        out.accent = m.accent as GroupColor | null;
+      }
+      return out;
+    }
     case 'setWindowCollapsed':
       return isId(m.windowId) && isId(m.otherWindowId) && isBool(m.collapsed)
         ? {
@@ -404,10 +449,19 @@ export function parsePanelMessage(raw: unknown): PanelMessage | null {
     case 'activate':
     case 'closeOthers':
     case 'closeBelow':
+    case 'closeAbove':
     case 'duplicate':
       return isId(m.tabId) ? { type: m.type, tabId: m.tabId } : null;
     case 'autoGroup':
       return isId(m.windowId) ? { type: 'autoGroup', windowId: m.windowId } : null;
+    case 'closeDuplicates':
+      return isId(m.windowId) ? { type: 'closeDuplicates', windowId: m.windowId } : null;
+    case 'sortTabs':
+      return isId(m.windowId) &&
+        isIdOrNull(m.groupId) &&
+        (m.by === 'site' || m.by === 'title' || m.by === 'recent')
+        ? { type: 'sortTabs', windowId: m.windowId, groupId: m.groupId, by: m.by }
+        : null;
     case 'reload':
     case 'close':
     case 'ungroup':

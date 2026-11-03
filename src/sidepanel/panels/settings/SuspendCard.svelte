@@ -1,8 +1,9 @@
 <script lang="ts">
-import { LIMITS, type SuspendSettings } from '../../../settings/schema';
+import { ARCHIVE_DAYS, LIMITS, type SuspendSettings } from '../../../settings/schema';
 import { normalizeHostPattern } from '../../../shared/host-pattern';
 import Button from '../../components/controls/Button.svelte';
 import Field from '../../components/controls/Field.svelte';
+import Select from '../../components/controls/Select.svelte';
 import TextInput from '../../components/controls/TextInput.svelte';
 import Toggle from '../../components/controls/Toggle.svelte';
 import Icon from '../../components/Icon.svelte';
@@ -119,6 +120,18 @@ function suspendOthers(): void {
       hint={su.auto ? undefined : 'Turn on automatic suspending first'}
       onchange={(skipAudible) => patch({ skipAudible })}
     />
+
+    <Field label="Archive tabs not opened for" for="vc-archive-days">
+      <Select id="vc-archive-days" value={String(su.archiveDays)} onchange={(v) => patch({ archiveDays: Number(v) })}>
+        {#each ARCHIVE_DAYS as d}
+          <option value={String(d)}>{d === 0 ? 'Off' : `${d} days`}</option>
+        {/each}
+      </Select>
+      <p class="muted">
+        Saves them to the “Archived tabs” session in Sessions, then closes them. Pinned tabs,
+        tabs playing audio and the sites below are kept.
+      </p>
+    </Field>
 
     <Field label="Never suspend these sites" for="vc-whitelist-add">
       {#if su.whitelist.length > 0}

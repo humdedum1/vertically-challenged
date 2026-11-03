@@ -1,12 +1,29 @@
 import { DEFAULT_THEME_ID } from '../themes/builtin';
 
 /** Bump when the stored shape changes, and add a step to MIGRATIONS in migrate.ts. */
-export const SETTINGS_VERSION = 9;
+export const SETTINGS_VERSION = 10;
 
 export type ColorMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'comfortable';
 export type RowLayout = 'single' | 'double';
 export type ActionVisibility = 'hover' | 'always';
+/** system follows the OS "reduce motion" preference. */
+export type Motion = 'system' | 'reduce' | 'full';
+export const MOUSE_ACTIONS = [
+  'none',
+  'close',
+  'suspend',
+  'duplicate',
+  'pin',
+  'reload',
+  'mute',
+] as const;
+export type MouseAction = (typeof MOUSE_ACTIONS)[number];
+export const AGE_DAYS = [0, 1, 3, 7, 14, 30] as const;
+/** Archive (save to the Archived tabs session, then close) tabs not opened for this long. */
+export const ARCHIVE_DAYS = [0, 3, 7, 14, 30, 60] as const;
+export const RULE_ACTIONS = ['group', 'pin', 'mute'] as const;
+export type RuleAction = (typeof RULE_ACTIONS)[number];
 
 /**
  * Every panel the strip can show, including ones not built yet, so a setting saved by a
@@ -32,6 +49,15 @@ export interface Appearance {
   fontSize: number;
   /** Overrides the theme's mPrimary in both modes; null uses the theme's own. */
   accent: string | null;
+  motion: Motion;
+}
+
+/** What clicking a tab row does, besides a plain click (which always activates). */
+export interface MouseSettings {
+  middle: MouseAction;
+  double: MouseAction;
+  /** The mouse wheel over the panel's top bar switches to the previous/next tab. */
+  wheelSwitch: boolean;
 }
 
 /**
@@ -40,6 +66,7 @@ export interface Appearance {
  */
 export const SHORTCUT_ACTIONS = [
   'focusSearch',
+  'commandPalette',
   'closeTab',
   'renameGroup',
   'moveUp',
@@ -66,6 +93,8 @@ export interface SuspendSettings {
   skipAudible: boolean;
   /** Host patterns never auto-suspended: "example.com" (and subdomains) or "*.example.com". */
   whitelist: string[];
+  /** Archive tabs not opened for this many days; 0 = off. */
+  archiveDays: number;
 }
 
 export interface SessionSettings {
@@ -99,6 +128,19 @@ export interface DisplaySettings {
   openOnLaunch: boolean;
 }
 
+/**
+ * Tabs that navigate to `host` (a normalized host pattern), and when `path` is set to a URL
+ * path starting with it, get `action`: put in the tab group titled `group`, pinned or muted.
+ */
+export interface TabRule {
+  host: string;
+  /** "" matches any path; otherwise starts with "/". */
+  path: string;
+  action: RuleAction;
+  /** Group title for the group action; "" otherwise. */
+  group: string;
+}
+
 export interface TabRowSettings {
   /** Empty keeps the browser’s default new-tab page. */
   newTabUrl: string;
@@ -109,6 +151,10 @@ export interface TabRowSettings {
   showMute: boolean;
   showNewTabButton: boolean;
   showCount: boolean;
+  /** Dim tabs not opened for this many days; 0 = off. */
+  ageDays: number;
+  /** Load favicons only once scrolling settles, so fast scrolls don't decode images. */
+  lazyFavicons: boolean;
 }
 
 export interface Ordered<T extends string> {
@@ -132,6 +178,8 @@ export interface Settings {
   sessions: SessionSettings;
   sync: SyncSettings;
   display: DisplaySettings;
+  rules: TabRule[];
+  mouse: MouseSettings;
   shortcuts: Keymap;
 }
 
@@ -157,6 +205,7 @@ export const DEFAULT_SETTINGS: Settings = {
     fontFamily: DEFAULT_FONT,
     fontSize: 13,
     accent: null,
+    motion: 'system',
   },
   tabs: {
     newTabUrl: '',
@@ -167,17 +216,30 @@ export const DEFAULT_SETTINGS: Settings = {
     showMute: true,
     showNewTabButton: true,
     showCount: true,
+    ageDays: 0,
+    lazyFavicons: true,
   },
   layout: {
     panels: PANEL_IDS.map((id) => ({ id, visible: true })),
     sections: SECTION_IDS.map((id) => ({ id, visible: true })),
   },
-  suspend: { auto: false, minutes: 30, skipPinned: true, skipAudible: true, whitelist: [] },
+  suspend: {
+    auto: false,
+    minutes: 30,
+    skipPinned: true,
+    skipAudible: true,
+    whitelist: [],
+    archiveDays: 0,
+  },
   sessions: { restoreDiscarded: true },
   sync: { workspaces: true, sessions: true, intervalMinutes: 1 },
   display: { mode: 'sidebar', openOnLaunch: false },
+  rules: [],
+  mouse: { middle: 'close', double: 'none', wheelSwitch: true },
   shortcuts: {
     focusSearch: ['/', 'Ctrl+F'],
+    // ">" like the search's own palette prefix; Ctrl+K would take Chrome's web search.
+    commandPalette: ['>'],
     closeTab: ['Delete'],
     renameGroup: ['F2'],
     moveUp: ['Alt+ArrowUp'],
@@ -197,6 +259,9 @@ export const LIMITS = {
   fontSize: { min: 11, max: 16 },
   suspendMinutes: { min: 1, max: 1440 },
   whitelist: 200,
+  rules: 50,
+  ruleGroup: 40,
+  rulePath: 200,
 } as const;
 
 /** Row heights per layout and density; the virtual list and CSS both read these. */

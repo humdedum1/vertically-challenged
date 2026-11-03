@@ -1,6 +1,6 @@
 <script lang="ts">
 import { browser } from 'wxt/browser';
-import { comboFromEvent, findConflicts, formatCombo } from '../../../lib/keymap';
+import { chromeUse, comboFromEvent, findConflicts, formatCombo } from '../../../lib/keymap';
 import {
   DEFAULT_SETTINGS,
   MAX_BINDINGS,
@@ -16,6 +16,7 @@ let { settings }: { settings: SettingsState } = $props();
 
 const LABELS: Record<ShortcutAction, string> = {
   focusSearch: 'Focus search',
+  commandPalette: 'Command palette',
   closeTab: 'Close tab or group',
   renameGroup: 'Rename group',
   moveUp: 'Move up',
@@ -42,6 +43,9 @@ function clashes(action: ShortcutAction): string[] {
   for (const combo of keymap[action]) {
     const others = (conflicts.get(combo) ?? []).filter((a) => a !== action);
     for (const o of others) out.push(`${formatCombo(combo)} is also bound to ${LABELS[o]}`);
+    const chrome = chromeUse(combo);
+    if (chrome)
+      out.push(`Chrome uses ${formatCombo(combo)} to ${chrome}; it may never reach the panel`);
   }
   return out;
 }

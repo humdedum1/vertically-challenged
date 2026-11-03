@@ -18,6 +18,8 @@ export function toTabInfo(tab: Browser.tabs.Tab): TabInfo | null {
     groupId: tab.groupId ?? -1,
     ...(tab.openerTabId === undefined ? {} : { openerTabId: tab.openerTabId }),
     incognito: tab.incognito,
+    // Rounded so a value that only moved by seconds doesn't count as a change.
+    ...(tab.lastAccessed ? { lastAccessed: Math.floor(tab.lastAccessed / 60_000) * 60_000 } : {}),
   };
 }
 

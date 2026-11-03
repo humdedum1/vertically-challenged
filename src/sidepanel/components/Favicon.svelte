@@ -1,12 +1,18 @@
 <script lang="ts">
 import { faviconUrl } from '../../shared/favicon';
+import { scrollIdle } from '../scroll-idle.svelte';
 
 let { url, size = 16 }: { url: string; size?: number } = $props();
 
 const src = $derived(faviconUrl(url, size));
 // Remember which URL failed so a different page retries instead of staying on the glyph.
 let failedFor: string | null = $state(null);
-const showImg = $derived(src !== null && failedFor !== src);
+// Mounted during a fast scroll: wait until it settles (then stay loaded).
+let settled = $state(!scrollIdle.scrolling);
+$effect(() => {
+  if (!settled && !scrollIdle.scrolling) settled = true;
+});
+const showImg = $derived(settled && src !== null && failedFor !== src);
 </script>
 
 <span class="icon" style:width="{size}px" style:height="{size}px" aria-hidden="true">

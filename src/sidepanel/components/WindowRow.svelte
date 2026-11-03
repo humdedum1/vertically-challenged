@@ -1,10 +1,12 @@
 <script lang="ts">
+import type { FolderIcon } from '../../shared/layout';
 import Icon from './Icon.svelte';
 
 interface Props {
   windowId: number;
   /** Layout name, else the window's active tab title, else "Window N". */
   name: string;
+  icon?: FolderIcon | null;
   count: number;
   collapsed: boolean;
   incognito: boolean;
@@ -24,6 +26,7 @@ interface Props {
 let {
   windowId,
   name,
+  icon = null,
   count,
   collapsed,
   incognito,
@@ -83,7 +86,7 @@ function onkeydown(e: KeyboardEvent & { currentTarget: HTMLInputElement }): void
   {oncontextmenu}
 >
   <span class="chevron" class:open={!collapsed}><Icon name="chevron" size={12} /></span>
-  <span class="glyph" aria-hidden="true"><Icon name="windows" size={13} /></span>
+  <span class="glyph" aria-hidden="true"><Icon name={icon ?? 'windows'} size={13} /></span>
   {#if renaming}
     <input
       class="rename"

@@ -14,7 +14,11 @@ const tint = (p: Palette, accent: string): Palette => ({
  * Applies a user accent over a theme's primary in both modes. mOnPrimary is recomputed
  * (black or white, whichever contrasts more) so text on accent fills stays readable.
  */
-export function withAccent(theme: Theme, accent: string | null): Theme {
+export function withAccent(
+  theme: Theme,
+  accent: string | null | { light: string; dark: string },
+): Theme {
   if (!accent) return theme;
-  return { ...theme, dark: tint(theme.dark, accent), light: tint(theme.light, accent) };
+  const { light, dark } = typeof accent === 'string' ? { light: accent, dark: accent } : accent;
+  return { ...theme, dark: tint(theme.dark, dark), light: tint(theme.light, light) };
 }

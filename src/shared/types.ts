@@ -19,6 +19,8 @@ export interface TabInfo {
   /** Browser-reported opener; absent once the opener no longer exists. */
   openerTabId?: number;
   incognito: boolean;
+  /** When the tab was last active, rounded to the minute (tab age indicator). */
+  lastAccessed?: number;
 }
 
 /** Chrome's fixed tab-group colour names. */

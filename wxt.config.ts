@@ -57,6 +57,10 @@ export default defineConfig({
       'focus-search': { description: 'Open the panel and search tabs' },
       'suspend-tab': { description: 'Suspend the current tab' },
       'suspend-other-tabs': { description: 'Suspend all other tabs in the window' },
+      'mru-back': {
+        description: 'Switch to the previously used tab (press again to go further back)',
+      },
+      'mru-forward': { description: 'Switch forward through recently used tabs' },
     },
   },
 });

@@ -2,6 +2,7 @@ import { mount } from 'svelte';
 import { migrateSettings } from '../../settings/migrate';
 import App from '../../sidepanel/App.svelte';
 import { applyAppearance, applyCachedAppearance } from '../../sidepanel/appearance';
+import { customCss } from '../../sidepanel/custom-css.svelte';
 import { SettingsState } from '../../sidepanel/settings-state.svelte';
 import { ThemeRegistry } from '../../sidepanel/theme-registry.svelte';
 import '../../sidepanel/styles/base.css';
@@ -17,6 +18,7 @@ if (!document.getElementById('vc-theme')) {
   applyAppearance(settings.value, themes.resolveReady(settings.value.appearance.themeId));
 }
 void settings.start();
+customCss.start();
 void themes.start();
 
 mount(App, { target, props: { settings, themes } });

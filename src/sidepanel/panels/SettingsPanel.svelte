@@ -11,6 +11,7 @@ import BackupCard from './settings/BackupCard.svelte';
 import DisplayCard from './settings/DisplayCard.svelte';
 import LayoutCard from './settings/LayoutCard.svelte';
 import PreviewCard from './settings/PreviewCard.svelte';
+import RulesCard from './settings/RulesCard.svelte';
 import ShortcutsCard from './settings/ShortcutsCard.svelte';
 import SuspendCard from './settings/SuspendCard.svelte';
 import SyncCard from './settings/SyncCard.svelte';
@@ -104,6 +105,7 @@ $effect(() => () => {
           <DisplayCard {settings} />
           <LayoutCard {settings} />
           <TabRowsCard {settings} />
+          <RulesCard {settings} />
           <SuspendCard {settings} {tabState} />
         </div>
       </details>

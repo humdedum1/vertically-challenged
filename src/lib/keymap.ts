@@ -150,3 +150,57 @@ export function formatCombo(combo: string): string {
     .map((p) => glyph[p] ?? p)
     .join(' + ');
 }
+
+/** Chrome's own shortcuts (Windows/Linux Ctrl, macOS Cmd), by what they do. */
+const CHROME_KEYS: Record<string, string> = {
+  T: 'new tab',
+  'Shift+T': 'reopen closed tab',
+  N: 'new window',
+  'Shift+N': 'new incognito window',
+  W: 'close tab',
+  'Shift+W': 'close window',
+  Tab: 'next tab',
+  'Shift+Tab': 'previous tab',
+  PageUp: 'previous tab',
+  PageDown: 'next tab',
+  L: 'address bar',
+  K: 'search the web',
+  E: 'search the web',
+  D: 'bookmark page',
+  'Shift+D': 'bookmark all tabs',
+  H: 'history',
+  J: 'downloads',
+  P: 'print',
+  S: 'save page',
+  O: 'open file',
+  R: 'reload',
+  U: 'view source',
+  G: 'find next',
+  'Shift+B': 'bookmarks bar',
+  'Shift+O': 'bookmark manager',
+  'Shift+Delete': 'clear browsing data',
+  'Shift+I': 'developer tools',
+  'Shift+J': 'developer tools',
+  'Shift+C': 'developer tools',
+  ...Object.fromEntries(Array.from({ length: 9 }, (_, i) => [String(i + 1), 'switch to tab'])),
+};
+const CHROME_PLAIN: Record<string, string> = {
+  F5: 'reload',
+  F6: 'address bar',
+  F11: 'full screen',
+  F12: 'developer tools',
+  'Alt+ArrowLeft': 'back',
+  'Alt+ArrowRight': 'forward',
+  'Alt+Home': 'home page',
+  'Alt+F': 'Chrome menu',
+};
+
+/**
+ * What Chrome does with a combo, if anything, so the shortcut editor can warn before a
+ * binding that the browser takes first (Ctrl+T, Ctrl+W, …) or that users expect to keep.
+ */
+export function chromeUse(combo: string): string | null {
+  const mod = /^(Ctrl|Meta)\+(.+)$/.exec(combo);
+  if (mod) return CHROME_KEYS[mod[2] as string] ?? null;
+  return CHROME_PLAIN[combo] ?? null;
+}

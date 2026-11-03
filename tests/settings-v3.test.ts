@@ -39,7 +39,13 @@ describe('v2 -> v3 migration', () => {
     const r = migrateSettings(v2);
     expect(r.version).toBe(SETTINGS_VERSION);
     expect(r.appearance).toEqual(v2.appearance);
-    expect(r.tabs).toEqual({ ...v2.tabs, childTabs: true, newTabUrl: '' });
+    expect(r.tabs).toEqual({
+      ...v2.tabs,
+      childTabs: true,
+      newTabUrl: '',
+      ageDays: 0,
+      lazyFavicons: true,
+    });
     expect(r.layout.panels[0]).toEqual({ id: 'history', visible: false });
     expect(r.layout.sections[0]).toEqual({ id: 'recentlyClosed', visible: false });
     expect(r.suspend).toEqual(D.suspend);

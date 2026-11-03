@@ -31,7 +31,7 @@ describe('migration to v2/v3', () => {
   it('v1 object keeps appearance and default-fills the new groups', () => {
     const r = migrateSettings(v1);
     expect(r.version).toBe(SETTINGS_VERSION);
-    expect(r.appearance).toEqual({ ...v1.appearance, accent: null });
+    expect(r.appearance).toEqual({ ...v1.appearance, accent: null, motion: 'system' });
     expect(r.tabs).toEqual(DEFAULT_SETTINGS.tabs);
     expect(r.layout).toEqual(DEFAULT_SETTINGS.layout);
   });
@@ -45,7 +45,13 @@ describe('migration to v2/v3', () => {
     const s: Settings = {
       version: SETTINGS_VERSION,
       sync: { workspaces: false, sessions: true, intervalMinutes: 1 },
-      appearance: { ...v1.appearance, mode: 'dark', density: 'compact', accent: '#aabbcc' },
+      appearance: {
+        ...v1.appearance,
+        mode: 'dark',
+        density: 'compact',
+        motion: 'reduce',
+        accent: '#aabbcc',
+      },
       tabs: {
         newTabUrl: '',
         childTabs: false,
@@ -55,6 +61,8 @@ describe('migration to v2/v3', () => {
         showMute: false,
         showNewTabButton: false,
         showCount: false,
+        ageDays: 7,
+        lazyFavicons: false,
       },
       layout: {
         panels: [
@@ -76,9 +84,15 @@ describe('migration to v2/v3', () => {
         skipPinned: false,
         skipAudible: false,
         whitelist: ['example.com'],
+        archiveDays: 0,
       },
       sessions: { restoreDiscarded: false },
       display: { mode: 'popup', openOnLaunch: true },
+      rules: [
+        { host: 'github.com', path: '', action: 'group', group: 'Code' },
+        { host: 'docs.rs', path: '/tokio', action: 'pin', group: '' },
+      ],
+      mouse: { middle: 'suspend', double: 'close', wheelSwitch: false },
       shortcuts: { ...DEFAULT_SETTINGS.shortcuts, newTab: ['Ctrl+Alt+T'], closeTab: [] },
     };
     expect(migrateSettings(s)).toEqual(s);

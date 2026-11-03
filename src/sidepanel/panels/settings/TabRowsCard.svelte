@@ -1,9 +1,17 @@
 <script lang="ts">
 import { normalizeNewTabUrl } from '../../../settings/migrate';
-import type { ActionVisibility, TabRowSettings } from '../../../settings/schema';
+import {
+  type ActionVisibility,
+  AGE_DAYS,
+  MOUSE_ACTIONS,
+  type MouseAction,
+  type MouseSettings,
+  type TabRowSettings,
+} from '../../../settings/schema';
 import Button from '../../components/controls/Button.svelte';
 import Field from '../../components/controls/Field.svelte';
 import SegmentedControl from '../../components/controls/SegmentedControl.svelte';
+import Select from '../../components/controls/Select.svelte';
 import TextInput from '../../components/controls/TextInput.svelte';
 import Toggle from '../../components/controls/Toggle.svelte';
 import Icon from '../../components/Icon.svelte';
@@ -18,6 +26,21 @@ const ACTIONS: { value: ActionVisibility; label: string }[] = [
 ];
 
 const t = $derived(settings.value.tabs);
+const m = $derived(settings.value.mouse);
+
+function patchMouse(p: Partial<MouseSettings>): void {
+  settings.update((s) => ({ ...s, mouse: { ...s.mouse, ...p } }));
+}
+
+const MOUSE_LABELS: Record<MouseAction, string> = {
+  none: 'Nothing',
+  close: 'Close',
+  suspend: 'Suspend',
+  duplicate: 'Duplicate',
+  pin: 'Pin / unpin',
+  reload: 'Reload',
+  mute: 'Mute / unmute',
+};
 
 let newTabUrl = $state('');
 $effect(() => {
@@ -80,6 +103,34 @@ function patch(p: Partial<TabRowSettings>): void {
       onchange={(showNewTabButton) => patch({ showNewTabButton })}
     />
     <Toggle label="Tab count" checked={t.showCount} onchange={(showCount) => patch({ showCount })} />
+    <Field label="Dim tabs not opened for" for="vc-age-days">
+      <Select id="vc-age-days" value={String(t.ageDays)} onchange={(v) => patch({ ageDays: Number(v) })}>
+        {#each AGE_DAYS as d}
+          <option value={String(d)}>{d === 0 ? 'Off' : `${d} day${d === 1 ? '' : 's'}`}</option>
+        {/each}
+      </Select>
+    </Field>
+    <Toggle
+      label="Load icons after scrolling"
+      hint="Saves work on fast scrolls through long lists."
+      checked={t.lazyFavicons}
+      onchange={(lazyFavicons) => patch({ lazyFavicons })}
+    />
+    <Field label="Middle-click a tab" for="vc-mouse-middle">
+      <Select id="vc-mouse-middle" value={m.middle} onchange={(v) => patchMouse({ middle: v as MouseAction })}>
+        {#each MOUSE_ACTIONS as a}<option value={a}>{MOUSE_LABELS[a]}</option>{/each}
+      </Select>
+    </Field>
+    <Field label="Double-click a tab" for="vc-mouse-double">
+      <Select id="vc-mouse-double" value={m.double} onchange={(v) => patchMouse({ double: v as MouseAction })}>
+        {#each MOUSE_ACTIONS as a}<option value={a}>{MOUSE_LABELS[a]}</option>{/each}
+      </Select>
+    </Field>
+    <Toggle
+      label="Scroll over the top bar to switch tabs"
+      checked={m.wheelSwitch}
+      onchange={(wheelSwitch) => patchMouse({ wheelSwitch })}
+    />
   </div>
 </SegmentCard>
 

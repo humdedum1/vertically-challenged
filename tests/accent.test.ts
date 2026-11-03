@@ -46,3 +46,11 @@ describe('withAccent', () => {
     expect(t.light).not.toBe(base.light);
   });
 });
+
+describe('withAccent per mode', () => {
+  it('tints each palette with its own colour', () => {
+    const t = withAccent(base, { light: '#1a73e8', dark: '#8ab4f8' });
+    expect(t.light.mPrimary).toBe('#1a73e8');
+    expect(t.dark.mPrimary).toBe('#8ab4f8');
+  });
+});

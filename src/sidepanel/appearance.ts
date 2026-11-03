@@ -27,15 +27,16 @@ function setThemeCss(css: string): void {
 export function applyAppearance(
   settings: Settings,
   theme: Theme | null,
-  { persist = true }: { persist?: boolean } = {},
+  { persist = true, accent }: { persist?: boolean; accent?: { light: string; dark: string } } = {},
 ): void {
   const a = settings.appearance;
-  if (theme) setThemeCss(themeToCss(withAccent(theme, a.accent)));
+  if (theme) setThemeCss(themeToCss(withAccent(theme, accent ?? a.accent)));
 
   const root = document.documentElement;
   if (a.mode === 'system') delete root.dataset.mode;
   else root.dataset.mode = a.mode;
   root.dataset.density = a.density;
+  root.dataset.motion = a.motion;
   root.dataset.rowLayout = settings.tabs.layout;
   root.dataset.actions = settings.tabs.actions;
 

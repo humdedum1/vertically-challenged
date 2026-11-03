@@ -2,6 +2,7 @@
 import type { Snippet } from 'svelte';
 import type { HTMLAttributes } from 'svelte/elements';
 import { computeRange, scrollToReveal } from '../../lib/virtual-range';
+import { noteScroll } from '../scroll-idle.svelte';
 
 interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'onscroll'> {
   items: readonly T[];
@@ -55,6 +56,7 @@ export function reveal(index: number): void {
 
 function onscroll(e: Event & { currentTarget: HTMLDivElement }): void {
   scrollTop = e.currentTarget.scrollTop;
+  noteScroll();
 }
 </script>
 
@@ -101,5 +103,11 @@ function onscroll(e: Event & { currentTarget: HTMLDivElement }): void {
     position: absolute;
     inset: 0 0 auto 0;
     will-change: transform;
+  }
+
+  /* Rows have a fixed height and draw nothing outside themselves (focus rings are inset), so
+     a row's style, layout and paint changes can't spill into its neighbours. */
+  .window > :global(*) {
+    contain: layout paint style;
   }
 </style>

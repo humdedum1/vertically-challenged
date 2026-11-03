@@ -10,6 +10,7 @@ import {
   SESSIONS_KEY,
   type Session,
   splitIncognito,
+  withArchived,
 } from '../shared/sessions';
 import type { GroupInfo, TabInfo } from '../shared/types';
 import type { RestoredLayout, RestoredNode } from './pins/pin-manager';
@@ -53,6 +54,22 @@ export async function saveSession(
   // Newest first; the oldest fall off past the cap rather than failing the save.
   await mutate((list) => [session, ...list].slice(0, MAX_SESSIONS));
   return { count, skipped };
+}
+
+/**
+ * Saves tabs into the Archived tabs session. Resolves only once the write is stored, so the
+ * caller can close the tabs knowing they can be restored. Incognito tabs are never saved.
+ */
+export async function archiveTabs(
+  windows: { tabs: readonly TabInfo[]; groups: readonly GroupInfo[] }[],
+): Promise<number> {
+  const own = browser.runtime.getURL('/');
+  const saved = splitIncognito(windows)
+    .keep.map((w) => captureWindow(w.tabs, w.groups, own))
+    .filter((w) => w.tabs.length > 0);
+  const count = saved.reduce((n, w) => n + w.tabs.length, 0);
+  if (count) await mutate((list) => withArchived(list, saved, Date.now()));
+  return count;
 }
 
 export const renameSession = (id: string, name: string): Promise<void> =>

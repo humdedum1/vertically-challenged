@@ -84,6 +84,29 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
   warnings = r.warnings;
 }
 
+let tabsInput: HTMLInputElement | undefined = $state();
+
+/** Another tab manager's export (Sidebery, SideTab Pro, VertiTab, OneTab…) → a saved session. */
+async function onTabsFile(e: Event & { currentTarget: HTMLInputElement }): Promise<void> {
+  const input = e.currentTarget;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  clear();
+  try {
+    const result: { ok: boolean; count?: number; error?: string } =
+      await browser.runtime.sendMessage({
+        type: 'importTabs',
+        text: await file.text(),
+        name: `Imported: ${file.name.replace(/\.[^.]+$/, '')}`,
+      });
+    if (!result?.ok) throw new Error(result?.error ?? 'Couldn’t import tabs');
+    status = `Imported ${result.count} tabs as a saved session (see Sessions).`;
+  } catch (err) {
+    error = err instanceof Error ? err.message : 'Couldn’t import tabs';
+  }
+}
+
 async function apply(): Promise<void> {
   const restored = pending;
   if (!restored || applying) return;
@@ -132,6 +155,23 @@ function reset(): void {
         onchange={onFile}
       />
     </div>
+    <div class="row">
+      <Button disabled={exporting || applying} onclick={() => tabsInput?.click()}>
+        Import tabs from another extension…
+      </Button>
+      <input
+        bind:this={tabsInput}
+        type="file"
+        accept=".json,.md,.txt,.html,.htm,application/json,text/plain,text/markdown,text/html"
+        hidden
+        aria-label="Tab export file"
+        onchange={onTabsFile}
+      />
+    </div>
+    <p class="hint">
+      Sidebery, SideTab Pro, VertiTab and OneTab exports, bookmark files and plain URL lists
+      become a saved session you can restore from Sessions.
+    </p>
 
     {#if pending}
       <div class="confirm" role="group" aria-label="Restore backup">
@@ -170,6 +210,12 @@ function reset(): void {
 </SegmentCard>
 
 <style>
+  .hint {
+    margin: 0;
+    color: var(--mOnSurfaceVariant);
+    font-size: 12px;
+  }
+
   .body {
     display: flex;
     flex-direction: column;

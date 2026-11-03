@@ -175,7 +175,8 @@ function onkeydown(e: KeyboardEvent): void {
       {:else}
         <button
           type="button"
-          role="menuitem"
+          role={item.type === 'item' && item.checked !== undefined ? 'menuitemradio' : 'menuitem'}
+          aria-checked={item.type === 'item' && item.checked !== undefined ? item.checked : undefined}
           class="entry"
           class:danger={item.type === 'item' && item.danger}
           data-nav
@@ -192,6 +193,9 @@ function onkeydown(e: KeyboardEvent): void {
             <span class="glyph"><Icon name={item.icon} size={14} /></span>
           {/if}
           <span class="text">{item.label}</span>
+          {#if item.type === 'item' && item.checked}
+            <span class="check" aria-hidden="true">✓</span>
+          {/if}
           {#if item.type !== 'item'}
             <span class="chev"><Icon name="chevron" size={12} /></span>
           {/if}
@@ -202,6 +206,11 @@ function onkeydown(e: KeyboardEvent): void {
 </div>
 
 <style>
+  .check {
+    margin-left: auto;
+    color: var(--mPrimary);
+  }
+
   .menu {
     position: fixed;
     z-index: 100;

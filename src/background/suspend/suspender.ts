@@ -1,8 +1,9 @@
 import { browser } from 'wxt/browser';
 import { migrateSettings } from '../../settings/migrate';
 import type { Settings } from '../../settings/schema';
-import type { TabInfo } from '../../shared/types';
-import { autoSuspendDecision } from './eligibility';
+import type { GroupInfo, TabInfo } from '../../shared/types';
+import { archiveTabs } from '../sessions';
+import { autoSuspendDecision, shouldArchive } from './eligibility';
 import { LastActive } from './last-active';
 
 const ALARM = 'vc-auto-suspend';
@@ -14,7 +15,9 @@ const KEY = 'lastActive';
  * "Suspend" is Chrome's native discard: memory is freed, the tab stays in the strip and
  * reloads when activated, so no placeholder page (and no host permission) is needed.
  */
-export function createSuspender(liveTabs: () => Promise<TabInfo[]>) {
+export function createSuspender(
+  liveWindows: () => Promise<{ tabs: TabInfo[]; groups: GroupInfo[] }[]>,
+) {
   const last = new LastActive(
     async () => (await browser.storage.session.get(KEY))[KEY] as Record<string, number> | undefined,
     (v) => browser.storage.session.set({ [KEY]: v }),
@@ -31,14 +34,16 @@ export function createSuspender(liveTabs: () => Promise<TabInfo[]>) {
   async function syncAlarm(): Promise<void> {
     const s = await getSettings();
     const existing = await browser.alarms.get(ALARM);
-    if (s.suspend.auto && !existing) await browser.alarms.create(ALARM, { periodInMinutes: 1 });
-    if (!s.suspend.auto && existing) await browser.alarms.clear(ALARM);
+    const on = s.suspend.auto || s.suspend.archiveDays > 0;
+    if (on && !existing) await browser.alarms.create(ALARM, { periodInMinutes: 1 });
+    if (!on && existing) await browser.alarms.clear(ALARM);
   }
 
   async function tick(): Promise<void> {
     await loaded;
     const s = await getSettings();
-    const tabs = await liveTabs();
+    const windows = await liveWindows();
+    const tabs = windows.flatMap((w) => w.tabs);
     const now = Date.now();
     last.retain(new Set(tabs.map((t) => t.id)));
     for (const tab of tabs) {
@@ -54,6 +59,31 @@ export function createSuspender(liveTabs: () => Promise<TabInfo[]>) {
       }
     }
     await last.flush();
+    if (s.suspend.archiveDays > 0) await archive(windows, now, s);
+  }
+
+  /** Saves old tabs to the Archived tabs session, then closes them; never closes unsaved. */
+  async function archive(
+    windows: { tabs: TabInfo[]; groups: GroupInfo[] }[],
+    now: number,
+    s: Settings,
+  ): Promise<void> {
+    const old = windows
+      .map((w) => ({
+        groups: w.groups,
+        tabs: w.tabs.filter((t) =>
+          shouldArchive(t, now, s.suspend.archiveDays, s.suspend.whitelist),
+        ),
+      }))
+      .filter((w) => w.tabs.length > 0);
+    if (!old.length) return;
+    await archiveTabs(old);
+    const ids = old.flatMap((w) => w.tabs.map((t) => t.id));
+    // A tab activated since the snapshot is in use again; keep it (it stays archived too).
+    const live = await browser.tabs.query({ active: true });
+    const keep = new Set(live.map((t) => t.id));
+    const close = ids.filter((id) => !keep.has(id));
+    if (close.length) await browser.tabs.remove(close).catch(() => {});
   }
 
   return {

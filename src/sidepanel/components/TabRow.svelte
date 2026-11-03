@@ -35,10 +35,15 @@ interface Props {
   showUrl: boolean;
   showClose?: boolean;
   showMute?: boolean;
+  /** Not opened for a while (Settings → tab age); drawn dimmed. */
+  stale?: boolean;
   onclick: (e: MouseEvent) => void;
   oncontextmenu: (e: MouseEvent) => void;
   onclose: () => void;
   onmute: () => void;
+  /** Middle-click (Settings → mouse); closes when not given. */
+  onmiddle?: () => void;
+  ondouble?: () => void;
 }
 
 let {
@@ -62,10 +67,13 @@ let {
   showUrl,
   showClose = true,
   showMute = true,
+  stale = false,
   onclick,
   oncontextmenu,
   onclose,
   onmute,
+  onmiddle,
+  ondouble,
 }: Props = $props();
 
 const icon = $derived(faviconUrl(tab.url, 16));
@@ -80,7 +88,7 @@ const urlParts = $derived(highlight ? segments(shownUrl, highlight.url) : null);
 function onauxclick(e: MouseEvent): void {
   if (e.button !== 1) return;
   e.preventDefault();
-  onclose();
+  (onmiddle ?? onclose)();
 }
 
 function closeClick(e: MouseEvent): void {
@@ -103,6 +111,7 @@ function muteClick(e: MouseEvent): void {
   class:focused
   class:selected={selectedLook}
   class:discarded={tab.discarded}
+  class:stale={stale && !tab.active}
   class:indent={grouped}
   class:nested
   class:pinned-end={pinnedEnd}
@@ -121,6 +130,7 @@ function muteClick(e: MouseEvent): void {
   {onclick}
   {oncontextmenu}
   {onauxclick}
+  ondblclick={ondouble}
 >
   {#if grouped}<span class="guide" aria-hidden="true"></span>{/if}
   {#if hasChildren}
@@ -159,6 +169,7 @@ function muteClick(e: MouseEvent): void {
     {/if}
   </span>
 
+  {#if stale && !tab.active}<span class="sr">, not opened recently</span>{/if}
   {#if windowTag}<span class="wtag">{windowTag}</span>{/if}
 
   {#if tab.discarded}
@@ -205,6 +216,23 @@ function muteClick(e: MouseEvent): void {
 </div>
 
 <style>
+  /* Muted text colour, not opacity: opacity would drop contrast below AA. */
+  .row.stale:not(:hover, .focused) :is(.label, .url) {
+    color: var(--mOnSurfaceVariant);
+  }
+
+  .row.stale:not(:hover, .focused) .icon {
+    filter: grayscale(1);
+  }
+
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
   .row {
     --tab-inset: 20px;
     position: relative;

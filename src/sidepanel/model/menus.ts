@@ -1,3 +1,4 @@
+import type { SortKey } from '../../background/tab-tools';
 import { hostOf, matchesHostPattern } from '../../shared/host-pattern';
 import {
   FOLDER_ICONS,
@@ -5,9 +6,10 @@ import {
   type PinFolder,
   type PinItem,
   type PinNode,
+  type WindowLayout,
 } from '../../shared/layout';
 import type { PanelMessage } from '../../shared/protocol';
-import type { GroupInfo, TabInfo, WindowInfo } from '../../shared/types';
+import { GROUP_COLORS, type GroupInfo, type TabInfo, type WindowInfo } from '../../shared/types';
 import type { MenuItem } from '../components/menu-types';
 
 export interface TabMenuContext {
@@ -221,6 +223,12 @@ export function tabMenu(c: TabMenuContext): MenuItem[] {
     },
     {
       type: 'item',
+      label: 'Close tabs above',
+      disabled: c.allTabs.find((t) => !t.pinned)?.id === c.target.id,
+      onselect: () => c.send({ type: 'closeAbove', tabId: c.target.id }),
+    },
+    {
+      type: 'item',
       label: 'Close tabs below',
       disabled: last === undefined || last.id === c.target.id,
       onselect: () => c.send({ type: 'closeBelow', tabId: c.target.id }),
@@ -236,6 +244,29 @@ export interface GroupMenuContext {
   onRename: () => void;
 }
 
+const SORT_KEYS: { by: SortKey; label: string }[] = [
+  { by: 'site', label: 'By website' },
+  { by: 'title', label: 'By title' },
+  { by: 'recent', label: 'By last used' },
+];
+
+function sortMenu(
+  label: string,
+  windowId: number,
+  groupId: number | null,
+  send: (m: PanelMessage) => void,
+): MenuItem {
+  return {
+    type: 'submenu',
+    label,
+    items: SORT_KEYS.map(({ by, label: l }) => ({
+      type: 'item' as const,
+      label: l,
+      onselect: () => send({ type: 'sortTabs', windowId, groupId, by }),
+    })),
+  };
+}
+
 export function groupMenu(c: GroupMenuContext): MenuItem[] {
   const ids = c.tabs.filter((t) => t.groupId === c.group.id).map((t) => t.id);
   const suspendable = c.tabs
@@ -244,6 +275,7 @@ export function groupMenu(c: GroupMenuContext): MenuItem[] {
   const lastId = ids[ids.length - 1] ?? null;
   return [
     { type: 'item', label: 'Rename', onselect: c.onRename },
+    sortMenu('Sort group', c.group.windowId, c.group.id, c.send),
     {
       type: 'colors',
       label: 'Colour',
@@ -290,6 +322,8 @@ export interface WindowMenuContext {
   send: (msg: PanelMessage) => void;
   /** Opens the inline name field on the header. */
   onRename: () => void;
+  layout?: WindowLayout;
+  themes: readonly { id: string; name: string }[];
 }
 
 export function windowMenu(c: WindowMenuContext): MenuItem[] {
@@ -299,9 +333,63 @@ export function windowMenu(c: WindowMenuContext): MenuItem[] {
   return [
     { type: 'item', label: 'Rename', onselect: c.onRename },
     {
+      type: 'submenu',
+      label: 'Theme',
+      items: [{ id: null, name: 'Same as everywhere' }, ...c.themes].map((t) => ({
+        type: 'item' as const,
+        label: t.name,
+        checked: (c.layout?.themeId ?? null) === t.id,
+        onselect: () => c.send({ type: 'setWindowLook', windowId: c.info.id, themeId: t.id }),
+      })),
+    },
+    {
+      type: 'submenu',
+      label: 'Icon',
+      items: [null, ...FOLDER_ICONS].map((icon) => ({
+        type: 'item' as const,
+        label: icon === null ? 'Default' : capitalize(icon),
+        ...(icon ? { icon } : {}),
+        checked: (c.layout?.icon ?? null) === icon,
+        onselect: () => c.send({ type: 'setWindowLook', windowId: c.info.id, icon }),
+      })),
+    },
+    {
       type: 'item',
       label: 'Group tabs by website',
       onselect: () => c.send({ type: 'autoGroup', windowId: c.info.id }),
+    },
+    {
+      type: 'submenu',
+      label: 'Density',
+      items: (
+        [
+          [null, 'Same as everywhere'],
+          ['compact', 'Compact'],
+          ['comfortable', 'Comfortable'],
+        ] as const
+      ).map(([density, label]) => ({
+        type: 'item' as const,
+        label,
+        checked: (c.layout?.density ?? null) === density,
+        onselect: () => c.send({ type: 'setWindowLook', windowId: c.info.id, density }),
+      })),
+    },
+    {
+      type: 'submenu',
+      label: 'Accent colour',
+      items: [null, ...GROUP_COLORS].map((accent) => ({
+        type: 'item' as const,
+        label: accent === null ? 'Same as everywhere' : capitalize(accent),
+        ...(accent ? { dot: `var(--g-${accent})` } : {}),
+        checked: (c.layout?.accent ?? null) === accent,
+        onselect: () => c.send({ type: 'setWindowLook', windowId: c.info.id, accent }),
+      })),
+    },
+    sortMenu('Sort tabs', c.info.id, null, c.send),
+    {
+      type: 'item',
+      label: 'Close duplicate tabs',
+      onselect: () => c.send({ type: 'closeDuplicates', windowId: c.info.id }),
     },
     {
       type: 'item',

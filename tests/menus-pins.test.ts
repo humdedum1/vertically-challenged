@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { FOLDER_ICONS, type PinFolder, type PinItem } from '../src/shared/layout';
+import { emptyLayout, FOLDER_ICONS, type PinFolder, type PinItem } from '../src/shared/layout';
 import type { PanelMessage } from '../src/shared/protocol';
 import type { MenuItem } from '../src/sidepanel/components/menu-types';
 import {
@@ -337,6 +337,7 @@ describe('windowMenu', () => {
       tabs: [tab(1, { windowId: 2 })],
       send: r.send,
       onRename,
+      themes: [],
     });
     expect(labels(items)[0]).toBe('Rename');
     find(items, 'Rename').onselect();
@@ -344,5 +345,37 @@ describe('windowMenu', () => {
     expect(r.sent).toEqual([]);
     find(items, 'Group tabs by website').onselect();
     expect(r.sent).toEqual([{ type: 'autoGroup', windowId: 2 }]);
+  });
+
+  it('picks a per-window theme and icon, marking the current ones', () => {
+    const r = recorder();
+    const items = windowMenu({
+      info: { id: 2, incognito: false, focused: false },
+      tabs: [tab(1, { windowId: 2 })],
+      send: r.send,
+      onRename: () => {},
+      layout: { ...emptyLayout(false), themeId: 'nord', icon: 'code' },
+      themes: [
+        { id: 'abyss', name: 'Abyss' },
+        { id: 'nord', name: 'Nord' },
+      ],
+    });
+    const sub = (label: string) => {
+      const m = items.find((i) => i.type === 'submenu' && i.label === label);
+      if (m?.type !== 'submenu') throw new Error(label);
+      return m.items.flatMap((i) => (i.type === 'item' ? [i] : []));
+    };
+    expect(sub('Theme').map((i) => [i.label, i.checked])).toEqual([
+      ['Same as everywhere', false],
+      ['Abyss', false],
+      ['Nord', true],
+    ]);
+    sub('Theme')[0]?.onselect();
+    expect(sub('Icon').find((i) => i.checked)?.label).toBe('Code');
+    sub('Icon')[0]?.onselect();
+    expect(r.sent).toEqual([
+      { type: 'setWindowLook', windowId: 2, themeId: null },
+      { type: 'setWindowLook', windowId: 2, icon: null },
+    ]);
   });
 });

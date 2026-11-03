@@ -19,6 +19,7 @@ import TextInput from '../../components/controls/TextInput.svelte';
 import Toggle from '../../components/controls/Toggle.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
+import { customCss, MAX_CUSTOM_CSS } from '../../custom-css.svelte';
 import type { SettingsState } from '../../settings-state.svelte';
 import type { ThemeRegistry } from '../../theme-registry.svelte';
 import { SystemDark } from './system-dark.svelte';
@@ -208,10 +209,53 @@ const accentRatio = $derived(a.accent ? contrastRatio(a.accent, palette.mSurface
         </p>
       {/if}
     </Field>
+
+    <Field label="Animations">
+      <SegmentedControl
+        label="Animations"
+        options={[
+          { value: 'system', label: 'Follow system' },
+          { value: 'reduce', label: 'Reduced' },
+          { value: 'full', label: 'On' },
+        ]}
+        value={a.motion}
+        onchange={(motion) => patch({ motion })}
+      />
+    </Field>
+
+    <Field label="Custom CSS" for="vc-custom-css-input">
+      <textarea
+        id="vc-custom-css-input"
+        class="css"
+        aria-describedby="vc-custom-css-hint"
+        spellcheck="false"
+        maxlength={MAX_CUSTOM_CSS}
+        placeholder={'[role="treeitem"] { font-weight: 500; }'}
+        value={customCss.value}
+        oninput={(e) => customCss.set(e.currentTarget.value)}
+      ></textarea>
+      <p class="hint" id="vc-custom-css-hint">
+        Applied after the theme, in this browser only (not synced). Theme colours are CSS
+        variables such as <code>var(--mPrimary)</code>.
+      </p>
+    </Field>
   </div>
 </SegmentCard>
 
 <style>
+  .css {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 96px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    background: var(--surface-0);
+    color: var(--mOnSurface);
+    font: 12px/1.4 var(--font-mono, ui-monospace, monospace);
+    resize: vertical;
+  }
+
   .fields {
     display: flex;
     flex-direction: column;

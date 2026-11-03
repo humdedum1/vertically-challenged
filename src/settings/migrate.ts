@@ -4,6 +4,7 @@ import { isRestorableUrl } from '../shared/sessions';
 import {
   AGE_DAYS,
   type Appearance,
+  ARCHIVE_DAYS,
   DEFAULT_SETTINGS,
   DISPLAY_MODES,
   type DisplaySettings,
@@ -57,6 +58,8 @@ const MIGRATIONS: readonly ((s: Raw) => Raw)[] = [
   // v7 → v8: automatic sync interval, default-filled.
   (s) => s,
   // v8 → v9: optional new-tab URL; empty preserves the browser default.
+  (s) => s,
+  // v9 → v10: `suspend.archiveDays` (off) and the commandPalette shortcut; default-filled.
   (s) => s,
 ];
 
@@ -216,6 +219,7 @@ function sanitize(raw: Raw): Settings {
     skipPinned: bool(su.skipPinned, d.suspend.skipPinned),
     skipAudible: bool(su.skipAudible, d.suspend.skipAudible),
     whitelist,
+    archiveDays: oneOf(su.archiveDays, ARCHIVE_DAYS, d.suspend.archiveDays),
   };
 
   const se = isObj(raw.sessions) ? raw.sessions : {};

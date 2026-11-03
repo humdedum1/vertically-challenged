@@ -500,7 +500,7 @@ export function startBackground(): void {
 
   const suspender = createSuspender(async () => {
     await ready;
-    return windowList.flatMap((w) => store.snapshot(w.id).tabs);
+    return windowList.map((w) => store.snapshot(w.id));
   });
   suspender.register();
 

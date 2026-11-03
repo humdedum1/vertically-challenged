@@ -133,6 +133,48 @@ function captureLayout(
   return essentials.length || pinned.length ? { essentials, pinned } : null;
 }
 
+export const ARCHIVE_ID = 'archive';
+export const ARCHIVE_NAME = 'Archived tabs';
+const MAX_ARCHIVED = 2000;
+
+/**
+ * Adds auto-archived tabs to the one "Archived tabs" session, as a single window so a
+ * restore opens one window, not one per archive run. A URL archived again replaces its
+ * older entry, and past the cap the oldest entries go first.
+ */
+export function withArchived(
+  list: readonly Session[],
+  add: readonly SavedWindow[],
+  now: number,
+): Session[] {
+  const old = list.find((x) => x.id === ARCHIVE_ID);
+  const groups: SavedGroup[] = [];
+  const tabs: SavedTab[] = [];
+  for (const w of [...(old?.windows ?? []), ...add]) {
+    const offset = groups.length;
+    groups.push(...w.groups);
+    for (const t of w.tabs)
+      tabs.push({ ...t, pinned: false, group: t.group === null ? null : t.group + offset });
+  }
+  const urls = new Set<string>();
+  const kept: SavedTab[] = [];
+  for (let i = tabs.length - 1; i >= 0 && kept.length < MAX_ARCHIVED; i--) {
+    const t = tabs[i] as SavedTab;
+    if (urls.has(t.url)) continue;
+    urls.add(t.url);
+    kept.push(t);
+  }
+  kept.reverse();
+  const archive: Session = {
+    id: ARCHIVE_ID,
+    name: old?.name ?? ARCHIVE_NAME,
+    createdAt: now,
+    windows: kept.length ? [{ tabs: kept, groups }] : [],
+  };
+  const rest = list.filter((x) => x.id !== ARCHIVE_ID);
+  return kept.length ? [archive, ...rest] : rest;
+}
+
 export const sessionTabCount = (s: Session): number =>
   s.windows.reduce((n, w) => n + w.tabs.length, 0);
 

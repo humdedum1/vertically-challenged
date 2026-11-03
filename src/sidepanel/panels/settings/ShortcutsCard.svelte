@@ -16,6 +16,7 @@ let { settings }: { settings: SettingsState } = $props();
 
 const LABELS: Record<ShortcutAction, string> = {
   focusSearch: 'Focus search',
+  commandPalette: 'Command palette',
   closeTab: 'Close tab or group',
   renameGroup: 'Rename group',
   moveUp: 'Move up',

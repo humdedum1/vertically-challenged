@@ -39,3 +39,19 @@ export function autoSuspendDecision(
 
 /** Manual suspend ignores timers and the whitelist; Chrome can't discard an active tab. */
 export const canDiscardManually = (tab: TabInfo): boolean => !tab.active && !tab.discarded;
+
+/**
+ * Whether auto-archive may save and close a tab: one not opened for `days`. Anything the
+ * user would miss stays (active, pinned, playing, never-suspend list), and incognito tabs
+ * are never archived because sessions don't store them, so closing would lose them.
+ */
+export function shouldArchive(
+  tab: TabInfo,
+  now: number,
+  days: number,
+  whitelist: readonly string[],
+): boolean {
+  if (days <= 0 || tab.active || tab.pinned || tab.audible || tab.incognito) return false;
+  if (!/^https?:/i.test(tab.url) || matchesHostPattern(tab.url, whitelist)) return false;
+  return tab.lastAccessed !== undefined && now - tab.lastAccessed >= days * 86_400_000;
+}

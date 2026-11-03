@@ -12,6 +12,7 @@ const S: SuspendSettings = {
   skipPinned: true,
   skipAudible: true,
   whitelist: [],
+  archiveDays: 0,
 };
 const idleSince = NOW - 31 * MIN;
 

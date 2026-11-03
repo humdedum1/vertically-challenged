@@ -84,6 +84,7 @@ describe('migration to v2/v3', () => {
         skipPinned: false,
         skipAudible: false,
         whitelist: ['example.com'],
+        archiveDays: 0,
       },
       sessions: { restoreDiscarded: false },
       display: { mode: 'popup', openOnLaunch: true },

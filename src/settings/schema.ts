@@ -1,7 +1,7 @@
 import { DEFAULT_THEME_ID } from '../themes/builtin';
 
 /** Bump when the stored shape changes, and add a step to MIGRATIONS in migrate.ts. */
-export const SETTINGS_VERSION = 9;
+export const SETTINGS_VERSION = 10;
 
 export type ColorMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'comfortable';
@@ -20,6 +20,8 @@ export const MOUSE_ACTIONS = [
 ] as const;
 export type MouseAction = (typeof MOUSE_ACTIONS)[number];
 export const AGE_DAYS = [0, 1, 3, 7, 14, 30] as const;
+/** Archive (save to the Archived tabs session, then close) tabs not opened for this long. */
+export const ARCHIVE_DAYS = [0, 3, 7, 14, 30, 60] as const;
 export const RULE_ACTIONS = ['group', 'pin', 'mute'] as const;
 export type RuleAction = (typeof RULE_ACTIONS)[number];
 
@@ -64,6 +66,7 @@ export interface MouseSettings {
  */
 export const SHORTCUT_ACTIONS = [
   'focusSearch',
+  'commandPalette',
   'closeTab',
   'renameGroup',
   'moveUp',
@@ -90,6 +93,8 @@ export interface SuspendSettings {
   skipAudible: boolean;
   /** Host patterns never auto-suspended: "example.com" (and subdomains) or "*.example.com". */
   whitelist: string[];
+  /** Archive tabs not opened for this many days; 0 = off. */
+  archiveDays: number;
 }
 
 export interface SessionSettings {
@@ -218,7 +223,14 @@ export const DEFAULT_SETTINGS: Settings = {
     panels: PANEL_IDS.map((id) => ({ id, visible: true })),
     sections: SECTION_IDS.map((id) => ({ id, visible: true })),
   },
-  suspend: { auto: false, minutes: 30, skipPinned: true, skipAudible: true, whitelist: [] },
+  suspend: {
+    auto: false,
+    minutes: 30,
+    skipPinned: true,
+    skipAudible: true,
+    whitelist: [],
+    archiveDays: 0,
+  },
   sessions: { restoreDiscarded: true },
   sync: { workspaces: true, sessions: true, intervalMinutes: 1 },
   display: { mode: 'sidebar', openOnLaunch: false },
@@ -226,6 +238,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mouse: { middle: 'close', double: 'none', wheelSwitch: true },
   shortcuts: {
     focusSearch: ['/', 'Ctrl+F'],
+    commandPalette: ['Ctrl+K'],
     closeTab: ['Delete'],
     renameGroup: ['F2'],
     moveUp: ['Alt+ArrowUp'],

@@ -17,7 +17,7 @@
  *   outside the tree), newTab, duplicateTab, togglePin, toggleMute, suspendTab (unbound).
  */
 
-import { untrack } from 'svelte';
+import { tick, untrack } from 'svelte';
 import { type HoverTarget, PointerDrag } from '../../lib/drag/pointer-drag';
 import { tileInsertionIndex } from '../../lib/drag/tile-hit';
 import { actionFor } from '../../lib/keymap';
@@ -35,6 +35,7 @@ import { flattenItems, type PinItem, type PinNode, type WindowLayout } from '../
 import type { PanelMessage } from '../../shared/protocol';
 import type { GroupInfo, TabInfo } from '../../shared/types';
 import { buildChildRows } from '../model/child-tabs';
+import { type Command, matchCommands, menuCommands } from '../model/commands';
 import {
   type Drag,
   type DropZone,
@@ -66,6 +67,7 @@ import {
 import { movableTabIds, pruneSelection, tabIdsBetween } from '../model/selection';
 import type { TabState } from '../tab-state.svelte';
 import { tintCache } from '../tint-cache.svelte';
+import CommandList from './CommandList.svelte';
 import ContextMenu from './ContextMenu.svelte';
 import DividerRow from './DividerRow.svelte';
 import EssentialsGrid from './EssentialsGrid.svelte';
@@ -166,7 +168,9 @@ function observeWidth(node: HTMLElement) {
 }
 
 let query = $state('');
-const needle = $derived(query.trim());
+// ">" turns the search field into a command palette over this window's menu.
+const palette = $derived(query.trimStart().startsWith('>'));
+const needle = $derived(palette ? '' : query.trim());
 const searching = $derived(needle !== '');
 // Pre-effect so the index is fed before the derived search below reads it in the same flush.
 // Only while searching: outside search nothing reads the index, and patches arrive often.
@@ -1216,6 +1220,7 @@ let mouseFocus = false;
 function runAction(action: ShortcutAction, row: Row | undefined): boolean {
   switch (action) {
     case 'focusSearch':
+    case 'commandPalette':
       return false; // handled on window so it also works when the tree isn't focused
     case 'closeTab':
       if (row?.kind === 'tab') send({ type: 'close', tabIds: targetsOf(row.tab) });
@@ -1426,7 +1431,39 @@ function onkeydown(e: KeyboardEvent): void {
   e.preventDefault();
 }
 
+/** Palette commands: the current window's menu, as on its header. */
+const commands = $derived.by((): Command[] => {
+  if (!palette) return [];
+  const id = tabState.windowId;
+  const w = id === null ? undefined : windowViewById.get(id);
+  if (!w) return [];
+  return menuCommands(
+    windowMenu({
+      info: w.info,
+      tabs: w.tabs,
+      send,
+      onRename: () => void tick().then(() => startRename(`w${w.info.id}`)),
+      layout: tabState.layouts.get(w.info.id),
+      themes,
+    }),
+  );
+});
+const paletteHits = $derived(matchCommands(commands, query.trimStart().slice(1)));
+
+function runCommand(c: Command): void {
+  query = '';
+  c.run();
+}
+
 function onSearchKeydown(e: KeyboardEvent): void {
+  if (palette && (e.key === 'Enter' || e.key === 'ArrowDown')) {
+    e.preventDefault();
+    const first = paletteHits[0];
+    if (e.key === 'Enter') {
+      if (first) runCommand(first);
+    } else document.querySelector<HTMLElement>('.commands button')?.focus();
+    return;
+  }
   if (e.key === 'ArrowDown') {
     if (view.length === 0) {
       const more = document.querySelector<HTMLElement>('.search-more button');
@@ -1467,14 +1504,18 @@ export function focusSearch(): boolean {
 
 $effect(() => {
   const onKey = (e: KeyboardEvent) => {
-    if (actionFor(shortcuts, e) !== 'focusSearch') return;
+    const action = actionFor(shortcuts, e);
+    if (action !== 'focusSearch' && action !== 'commandPalette') return;
     const t = e.target as HTMLElement | null;
     const typing =
       t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t?.isContentEditable;
     // Typing in some other field must not be hijacked; the search field itself may re-select.
     if (typing && !(t === searchInput && (e.ctrlKey || e.metaKey || e.altKey))) return;
+    if (action === 'commandPalette' && search !== 'hidden') query = '>';
     if (!focusSearch()) return;
     e.preventDefault();
+    // Caret after the ">" so typing filters commands instead of replacing it.
+    if (action === 'commandPalette') searchInput?.setSelectionRange(1, 1);
   };
   window.addEventListener('keydown', onKey);
   return () => window.removeEventListener('keydown', onKey);
@@ -1489,7 +1530,7 @@ $effect(() => {
       bind:value={query}
       type="text"
       role="searchbox"
-      placeholder="Search tabs"
+      placeholder="Search tabs, or > for commands"
       title="Filters: is:audible, is:muted, is:suspended, is:pinned, is:grouped, site:example.com, group:name. Put - in front to exclude."
       aria-label="Search tabs"
       aria-describedby={searching && view.length === 0 ? 'vc-filter-hint' : undefined}
@@ -1537,7 +1578,9 @@ $effect(() => {
   <div class="body">
     {#if showGrid && tabState.windowId !== null}{@render essentialsGrid(tabState.windowId)}{/if}
     <div class="list" use:observeWidth>
-      {#if searching && view.length === 0}
+      {#if palette}
+        <CommandList commands={paletteHits} onrun={runCommand} />
+      {:else if searching && view.length === 0}
         <p class="empty" role="status">No tabs match “{needle}”</p>
         <p class="filters-hint" id="vc-filter-hint">
           Narrow with <code>is:audible</code> <code>is:muted</code> <code>is:suspended</code>
@@ -1846,6 +1889,8 @@ $effect(() => {
   .list {
     flex: 1;
     min-height: 0;
+    /* VirtualList scrolls itself; this is for the palette and the no-match results. */
+    overflow-y: auto;
   }
 
   .body :global([role='tree']) {

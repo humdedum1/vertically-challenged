@@ -1,32 +1,25 @@
 # Vertically Challenged
 
-Vertical tabs for Chrome, in the side panel or a popup over your current page. Organize windows with Staples, pinned folders, tab groups, saved sessions, and themes.
+Fast, customizable vertical tabs for Chrome, in the side panel or an in-page popup. Organize windows with Staples, pinned folders, tab groups, saved sessions, and themes. Local-first, no telemetry.
+
+![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+<!-- TODO: add Chrome Web Store version/users badges and a CI badge once the store listing exists and the repository is public. -->
+
+[Releases](https://github.com/humdedum1/vertically-challenged/releases) · [Report a bug](https://github.com/humdedum1/vertically-challenged/issues/new/choose) · [Contribute](CONTRIBUTING.md) · [Security](SECURITY.md)
+
+<!-- TODO: screenshots or a short demo GIF of the side panel and the popup (light and dark theme). -->
 
 **This is a vibecoded project.** AI coding tools have been used extensively to build it. It is a personal, experimental project: bugs happen, tests do not cover everything, and releases may need follow-up fixes. Reports, code review, and focused PRs are welcome. Keep backups of anything you cannot afford to lose.
 
-[Releases](https://github.com/humdedum1/vertically-challenged/releases) · [Report a bug](https://github.com/humdedum1/vertically-challenged/issues/new/choose) · [Contribute](CONTRIBUTING.md)
-
-## Quick start
+## Install
 
 Requires Chrome 116 or newer. Closing the side panel by shortcut needs Chrome 141 or newer.
 
-To build and load it locally, install Node.js 22 or newer and npm, then:
+- **Chrome Web Store:** [TODO: Chrome Web Store listing URL]
+- **Manual install from GitHub Releases:** download `vertically-challenged-<version>-crx.zip` from the [Releases](https://github.com/humdedum1/vertically-challenged/releases) page and extract the signed `.crx` from it. Chrome can restrict installing extensions from outside the Web Store, so you may need to use a store build or an unpacked build instead. The CRX ZIP is not the same as an unpacked source ZIP and cannot be selected directly with Load unpacked.
+- **Unpacked (build from source):** see [Build from source](#build-from-source).
 
-```sh
-git clone https://github.com/humdedum1/vertically-challenged.git
-cd vertically-challenged
-npm ci
-npm run build
-```
-
-1. Open `chrome://extensions` and enable **Developer mode**.
-2. Select **Load unpacked** and choose `.output/chrome-mv3`.
-3. Click the extension's toolbar icon or press **Alt+Shift+V**.
-4. Open Settings to choose your theme, display mode, layout, shortcuts, and sync timing.
-
-For packaged builds, see the release's installation notes. A release ZIP may contain a signed CRX; extract it first. Chrome can restrict installation of extensions outside its Web Store. A CRX ZIP is different from an unpacked source ZIP and cannot be selected directly with Load unpacked.
-
-The repository is currently private; GitHub links require access until it is made public.
+After installing, click the toolbar icon or press **Alt+Shift+V** to open the panel, then open Settings to choose your theme, display mode, layout, shortcuts, and sync timing.
 
 ## Features
 
@@ -51,11 +44,20 @@ The repository is currently private; GitHub links require access until it is mad
 | Shortcuts and context menus | Configurable in-panel shortcuts, Chrome commands, and browser context-menu actions. |
 | Panel recovery | Reload the panel with the button beside colour mode, or from its context menu. |
 
-### Keyboard and display
+## Keyboard shortcuts
 
-**Alt+Shift+V** toggles the panel. Change Chrome-level bindings at `chrome://extensions/shortcuts`; edit in-panel bindings in Settings. Search, selection, tab navigation, and context menus support the keyboard.
+**Alt+Shift+V** toggles the panel by default. Change Chrome-level bindings at `chrome://extensions/shortcuts`; edit in-panel bindings in Settings. Search, selection, tab navigation, and context menus support the keyboard.
 
-Choose the Chrome side panel or an in-page popup. On pages where Chrome disallows injection, the popup uses a separate window. In-page injection needs a user gesture and does not request access to every website.
+| Chrome command | Default | Action |
+| --- | --- | --- |
+| Open or close the vertical tab panel | Alt+Shift+V | Toggle the panel |
+| Open the panel and search tabs | none | Open the panel with search focused |
+| Suspend the current tab | none | Discard the current tab |
+| Suspend all other tabs in the window | none | Discard the other tabs in the window |
+| Switch to the previously used tab | none | Go back through recently used tabs (press again to go further) |
+| Switch forward through recently used tabs | none | Go forward through recently used tabs |
+
+Choose the Chrome side panel or an in-page popup in Settings. On pages where Chrome disallows injection, the popup uses a separate window. In-page injection needs a user gesture and does not request access to every website.
 
 ## Sync and its limits
 
@@ -69,29 +71,58 @@ Sign in to the same Google account in Chrome on each computer and enable Chrome 
 - **Keep here** saves a workspace's pinned layout as a setup. When it includes ordinary tabs, a full snapshot is also saved in Saved sessions.
 - Incognito tabs are excluded. Extension pages are excluded from ordinary-tab capture. Device snapshots do not share browser tab IDs.
 - **File backups** include settings, custom themes, Staples, pinned tabs, nested pinned folders, and saved Window setups. Import adds layouts to Sessions → Window setups without replacing open windows or existing setups. Incognito layouts are excluded. Older settings-only backups remain supported.
-
 - Chrome Sync has about **100 KB total storage**, shared by settings, themes, and compressed device snapshots. Large collections may not fit. Settings shows storage errors and omitted snapshots; this is not an unlimited or complete backup service.
 
 Updates and reloads preserve saved layouts when their live tabs can be identified. **Uninstalling removes the extension's local data.** Reinstalling is not a recovery method. Settings/theme export backs up settings and themes, not every tab, session, or folder.
 
-## Updates and pull requests
+## Permissions
 
-Check [Releases](https://github.com/humdedum1/vertically-challenged/releases) for changes and downloads. For an unpacked install, rebuild into the same directory and use **Reload** on `chrome://extensions`; avoid removing and reinstalling to update.
+Each permission is needed for a specific feature. No host permissions are requested; the popup injects only after you use its toolbar button, a shortcut, or the toolbar menu on that tab.
 
-Use a feature branch and submit a focused PR with the problem, resulting behavior, and checks actually run. AI-assisted contributions are welcome; contributors remain responsible for reviewing the code, protecting private data, and testing it. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
+| Permission | Why it is needed |
+| --- | --- |
+| `tabs` | Read tab titles and URLs for the list and search, and switch or close tabs. |
+| `sidePanel` | Render the UI in Chrome's side panel. |
+| `favicon` | Load page favicons without host permissions. |
+| `storage` | Persist settings (synced across your Chrome profile) and local layout and session data. |
+| `tabGroups` | Show, create, rename, recolor, collapse, and move native tab groups. |
+| `sessions` | Recently closed tabs and windows, and restoring them. |
+| `bookmarks` | The Bookmarks panel (read, open, search). |
+| `history` | The History panel (read, search, delete entries). |
+| `alarms` | Auto-suspend timers and scheduled sync. The background worker sleeps when idle, so timers cannot run with `setTimeout`. |
+| `contextMenus` | "Suspend tab", "Save window as session" and similar items in Chrome's page and toolbar menus. |
+| `activeTab` | Grants temporary access to the current tab after you invoke the extension on it. |
+| `scripting` | Injects the in-page popup into that tab, only after you invoke it there. |
+| `notifications` (optional) | Only when **Open on launch** is on: Chrome cannot open the panel without a user gesture, so launch shows a notification whose click opens it. |
 
-Versions follow Semantic Versioning and commit messages follow Conventional Commits. The existing GitHub Actions release workflow derives releases from changes on `main`; contributors should not bump versions, create release tags, or upload signing keys in ordinary PRs.
+## Build from source
 
-## Development
+Requires Node.js 22 or newer and npm.
 
-Built with TypeScript, Svelte 5, WXT, Vitest, and Biome. No new runtime service is required.
+```sh
+git clone https://github.com/humdedum1/vertically-challenged.git
+cd vertically-challenged
+npm ci
+npm run build
+```
+
+1. Open `chrome://extensions` and enable **Developer mode**.
+2. Select **Load unpacked** and choose `.output/chrome-mv3`.
+3. For updates, rebuild into the same directory and use **Reload** on `chrome://extensions`.
+
+| Command | Purpose |
+| --- | --- |
+| `npm run build` | Production extension in `.output/chrome-mv3` |
+| `npm run zip` | Package the unpacked extension as a ZIP, not a signed CRX |
+| `npm run pack:crx` | Build and package a signed CRX inside a release ZIP (needs the signing key; see [CONTRIBUTING.md](CONTRIBUTING.md)) |
+
+## Development and testing
+
+Built with TypeScript, Svelte 5, WXT, Vitest, Playwright, and Biome. No new runtime service is required.
 
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Development browser and hot reload |
-| `npm run build` | Production extension in `.output/chrome-mv3` |
-| `npm run zip` | Package the unpacked extension as a ZIP, not a signed CRX |
-| `npm run pack:crx` | Build and package a signed CRX inside a release ZIP |
 | `npm run lint` | Formatting and lint checks |
 | `npm run check` | Svelte and TypeScript checks |
 | `npm test` | Unit and integration tests |
@@ -108,13 +139,21 @@ npm run test:e2e
 
 Tests use temporary browser profiles. Chromium or Chrome for Testing is required; branded Chrome ignores the test extension-loading flag. Set `CHROME_BIN` to use a compatible local binary. See [bench/README.md](bench/README.md) for profiling and benchmarks.
 
-## Privacy and permissions
+## Privacy
 
 Local-first, with no analytics or project-operated sync server. Enabling sync sends the shared tab URLs, titles, workspace data, and settings through Chrome Sync. Local-first does not mean that synced data never leaves your computer.
 
-Permissions support tab/window management, side panels, favicons, storage, groups, sessions, bookmarks, history, alarms, context menus, and user-triggered popup injection. Bookmarks and history remain Chrome-managed data; reading them in the panel does not put the whole browser history or bookmark library into workspace snapshots.
+Bookmarks and history remain Chrome-managed data; reading them in the panel does not put the whole browser history or bookmark library into workspace snapshots. Do not paste private browsing data into issues.
 
-Do not paste private browsing data into issues. See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+## Contributing
+
+Use a feature branch and submit a focused PR with the problem, resulting behavior, and checks actually run. AI-assisted contributions are welcome; contributors remain responsible for reviewing the code, protecting private data, and testing it. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow, and the [issue chooser](https://github.com/humdedum1/vertically-challenged/issues/new/choose) for bugs and feature requests.
+
+Versions follow Semantic Versioning and commit messages follow Conventional Commits. Releases are created automatically from `main`; contributors should not bump versions or create tags in ordinary PRs.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for vulnerability reporting. Do not publish exploit details in issues or pull requests.
 
 ## Support the project
 

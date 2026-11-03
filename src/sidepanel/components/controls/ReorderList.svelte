@@ -116,7 +116,7 @@ async function move(i: number, delta: -1 | 1, id: Id): Promise<void> {
 
   .hint {
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   .icon {
@@ -166,6 +166,13 @@ async function move(i: number, delta: -1 | 1, id: Id): Promise<void> {
     background: var(--surface-0);
     cursor: pointer;
     transition: background-color var(--dur) var(--ease);
+  }
+
+  /* Invisible hit area: the 22px track alone is under the 24px WCAG 2.5.8 minimum. */
+  .sw::after {
+    content: '';
+    position: absolute;
+    inset: -4px 0;
   }
 
   .knob {

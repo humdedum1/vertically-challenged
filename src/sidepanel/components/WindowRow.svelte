@@ -149,7 +149,7 @@ let {
     border: 1px solid var(--border-strong);
     border-radius: 999px;
     color: var(--mOnSurfaceVariant);
-    font-size: 10.5px;
+    font-size: var(--font-size-meta);
     line-height: 16px;
   }
 
@@ -160,7 +160,7 @@ let {
     border-radius: 999px;
     background: var(--surface-2);
     color: var(--mOnSurface);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     line-height: 18px;
     text-align: center;
     font-variant-numeric: tabular-nums;

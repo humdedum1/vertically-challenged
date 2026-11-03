@@ -179,7 +179,7 @@ function open(url: string): void {
   .label {
     margin: 8px 8px 4px;
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -219,7 +219,7 @@ function open(url: string): void {
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   .t {

@@ -134,7 +134,7 @@ const indent = $derived(4 + (depth - 1) * 16 + (nested ? 16 : 0));
     border-radius: 999px;
     background: color-mix(in srgb, var(--mTertiary) 18%, transparent);
     color: var(--mOnSurface);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     line-height: 18px;
     text-align: center;
     font-variant-numeric: tabular-nums;

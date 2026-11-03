@@ -517,7 +517,7 @@ const activeId = $derived.by(() => {
     align-items: flex-end;
     padding: 0 8px 4px;
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -570,7 +570,7 @@ const activeId = $derived.by(() => {
   .url {
     display: none;
     color: var(--mOnSurfaceVariant);
-    font-size: 10.5px;
+    font-size: var(--font-size-meta);
     line-height: 1.15;
   }
 
@@ -585,7 +585,7 @@ const activeId = $derived.by(() => {
   .time {
     flex: none;
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     font-variant-numeric: tabular-nums;
   }
 
@@ -611,7 +611,7 @@ const activeId = $derived.by(() => {
     padding: 4px;
     text-align: center;
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   .skeleton {

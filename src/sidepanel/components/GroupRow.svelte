@@ -141,7 +141,7 @@ const name = $derived(group.title || 'Unnamed group');
     border-radius: 999px;
     background: color-mix(in srgb, var(--gc) 22%, transparent);
     color: var(--mOnSurface);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     line-height: 18px;
     text-align: center;
     font-variant-numeric: tabular-nums;

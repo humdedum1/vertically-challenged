@@ -348,7 +348,7 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
     border: 1px solid var(--border);
     border-radius: 999px;
     color: var(--mOnSurfaceVariant);
-    font-size: 10.5px;
+    font-size: var(--font-size-meta);
   }
 
   .badge.custom {
@@ -378,7 +378,7 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
 
   .count {
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   .status,

@@ -294,7 +294,7 @@ const accentRatio = $derived(a.accent ? contrastRatio(a.accent, palette.mSurface
   .error {
     margin: 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   .error {

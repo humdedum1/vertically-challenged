@@ -129,7 +129,7 @@ let open = $state(false);
     border-radius: 999px;
     background: transparent;
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     cursor: pointer;
   }
 

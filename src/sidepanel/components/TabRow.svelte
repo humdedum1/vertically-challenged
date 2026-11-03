@@ -388,7 +388,7 @@ function muteClick(e: MouseEvent): void {
 
   .url {
     color: var(--mOnSurfaceVariant);
-    font-size: 10.5px;
+    font-size: var(--font-size-meta);
     line-height: 1.15;
   }
 
@@ -415,7 +415,7 @@ function muteClick(e: MouseEvent): void {
     border-radius: 999px;
     background: var(--surface-2);
     color: var(--mOnSurfaceVariant);
-    font-size: 10.5px;
+    font-size: var(--font-size-meta);
     line-height: 16px;
   }
 

@@ -265,6 +265,6 @@ function setPref(key: 'workspaces' | 'sessions', value: boolean): void {
 
   .dev-sub {
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 </style>

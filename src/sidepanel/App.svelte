@@ -345,7 +345,7 @@ const count = $derived(tabState.tabs.length);
     background: var(--surface-2);
     border: 1px solid var(--border);
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     text-align: center;
     font-variant-numeric: tabular-nums;
   }

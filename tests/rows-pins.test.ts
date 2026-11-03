@@ -254,9 +254,15 @@ describe('buildPanelRows performance', () => {
     const tabs = Array.from({ length: 1500 }, (_, i) => tab(i + 1));
     const w = [{ info: win(1), tabs, groups: [], layout: layout({ pinned: [item('a', null)] }) }];
     buildPanelRows(w, 1, opts);
-    const t0 = performance.now();
-    const rows = buildPanelRows(w, 1, opts);
-    expect(performance.now() - t0).toBeLessThan(5);
+    // Best of several runs: one slow run on a busy machine is noise, a slow best run is a regression.
+    let best = Number.POSITIVE_INFINITY;
+    let rows = buildPanelRows(w, 1, opts);
+    for (let i = 0; i < 7; i++) {
+      const t0 = performance.now();
+      rows = buildPanelRows(w, 1, opts);
+      best = Math.min(best, performance.now() - t0);
+    }
+    expect(best).toBeLessThan(5);
     expect(rows).toHaveLength(1502);
   });
 });

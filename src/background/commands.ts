@@ -5,6 +5,7 @@ import type { GroupColor, GroupInfo, TabInfo } from '../shared/types';
 import { planGroupMove, planMoves } from './move-plan';
 import type { SessionLayouts } from './sessions';
 import { deleteSession, renameSession, restoreSession, saveSession } from './sessions';
+import { duplicateTabIds, sortMoves } from './tab-tools';
 
 export interface CommandDeps {
   /** Store contents for windows, in strip order. */
@@ -73,6 +74,26 @@ export async function runCommand(
       const self = await browser.tabs.get(msg.tabId);
       const ids = await windowTabs(msg.tabId, (t) => !t.pinned && t.index > self.index);
       if (ids.length) await closeTabs(ids);
+      return;
+    }
+    case 'closeAbove': {
+      const self = await browser.tabs.get(msg.tabId);
+      const ids = await windowTabs(msg.tabId, (t) => !t.pinned && t.index < self.index);
+      if (ids.length) await closeTabs(ids);
+      return;
+    }
+    case 'closeDuplicates': {
+      const ids = duplicateTabIds(await browser.tabs.query({ windowId: msg.windowId }));
+      if (ids.length) await closeTabs(ids);
+      return ids.length
+        ? `Closed ${ids.length} duplicate ${ids.length === 1 ? 'tab' : 'tabs'}`
+        : 'No duplicate tabs';
+    }
+    case 'sortTabs': {
+      const tabs = await browser.tabs.query({ windowId: msg.windowId });
+      const moves = sortMoves(tabs, msg.by, msg.groupId ?? undefined);
+      // In order: each move's index assumes the previous ones were applied.
+      for (const m of moves) await browser.tabs.move(m.id, { index: m.index });
       return;
     }
     case 'duplicate':

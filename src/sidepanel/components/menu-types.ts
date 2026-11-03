@@ -12,6 +12,8 @@ export type MenuItem =
       dot?: string;
       /** Leading glyph (folder icon choices). */
       icon?: IconName;
+      /** The current choice in a pick-one submenu (rendered as menuitemradio). */
+      checked?: boolean;
     }
   | { type: 'separator' }
   | { type: 'submenu'; label: string; items: MenuItem[] }

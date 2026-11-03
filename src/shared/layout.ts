@@ -4,6 +4,7 @@
  * messages. Parsing never throws, because a corrupt entry must not take the other
  * windows' layouts down with it.
  */
+import { GROUP_COLORS, type GroupColor } from './types';
 
 export const FOLDER_ICONS = [
   'folder',
@@ -46,6 +47,14 @@ export interface WindowLayout {
   id: string;
   /** null = use the active tab's title. */
   name: string | null;
+  /** Theme for this window's panel (Zen-style spaces); absent/null uses the global theme. */
+  themeId?: string | null;
+  /** Shown on the window header instead of the generic window glyph. */
+  icon?: FolderIcon | null;
+  /** Per-window row density; absent uses the global setting. */
+  density?: 'compact' | 'comfortable';
+  /** Per-window accent, as one of Chrome's group colours. */
+  accent?: GroupColor;
   /** Last known tab URLs, used to recover named windows after browser ids change. */
   tabUrls?: string[];
   essentials: PinItem[];
@@ -76,6 +85,8 @@ export const MAX_SETUPS = 50;
 /** Root-level folders are depth 1; a folder at depth 3 may hold items but not folders. */
 export const MAX_FOLDER_DEPTH = 3;
 export const MAX_NAME = 100;
+/** Built-in ids and `custom-<id>`; validated because it travels on the wire and syncs. */
+export const THEME_ID = /^[a-z0-9-]{1,64}$/;
 
 const MAX_URL = 8192;
 const MAX_TITLE = 200;
@@ -128,7 +139,15 @@ export function flattenItems(l: WindowLayout): PinItem[] {
 
 /** A custom name or a folder makes a layout worth keeping even without pinned items. */
 export function isEmptyLayout(l: WindowLayout): boolean {
-  return l.name === null && l.essentials.length === 0 && l.pinned.length === 0;
+  return (
+    l.name === null &&
+    !l.themeId &&
+    !l.icon &&
+    !l.density &&
+    !l.accent &&
+    l.essentials.length === 0 &&
+    l.pinned.length === 0
+  );
 }
 
 type NodeHit = {
@@ -259,6 +278,16 @@ function parseLayout(raw: Record<string, unknown>): WindowLayout | null {
   return {
     id,
     name,
+    ...(typeof raw.themeId === 'string' && THEME_ID.test(raw.themeId)
+      ? { themeId: raw.themeId }
+      : {}),
+    ...((FOLDER_ICONS as readonly unknown[]).includes(raw.icon)
+      ? { icon: raw.icon as FolderIcon }
+      : {}),
+    ...(raw.density === 'compact' || raw.density === 'comfortable' ? { density: raw.density } : {}),
+    ...((GROUP_COLORS as readonly unknown[]).includes(raw.accent)
+      ? { accent: raw.accent as GroupColor }
+      : {}),
     ...(Array.isArray(raw.tabUrls)
       ? {
           tabUrls: raw.tabUrls

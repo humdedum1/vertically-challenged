@@ -141,10 +141,11 @@ textarea {
   outline-offset: 2px;
 }
 
+/* Motion setting: "system" follows the OS preference, "reduce" always, "full" never. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  :root:not([data-motion="full"]) *,
+  :root:not([data-motion="full"]) *::before,
+  :root:not([data-motion="full"]) *::after {
     /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
     transition: none !important;
     /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
@@ -152,4 +153,15 @@ textarea {
     /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
     scroll-behavior: auto !important;
   }
+}
+
+:root[data-motion="reduce"] *,
+:root[data-motion="reduce"] *::before,
+:root[data-motion="reduce"] *::after {
+  /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
+  transition: none !important;
+  /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
+  animation: none !important;
+  /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
+  scroll-behavior: auto !important;
 }

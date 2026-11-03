@@ -1,5 +1,6 @@
 import type { Range, SearchHit } from '../../lib/search/search-index';
 import {
+  type FolderIcon,
   flattenItems,
   type PinFolder,
   type PinItem,
@@ -52,6 +53,7 @@ export type WindowRow = TreePos & {
   collapsed: boolean;
   /** Layout name, else the window's active tab title, else "Window N". */
   name: string;
+  icon: FolderIcon | null;
   /** null until the window's layout has been received. */
   layoutId: string | null;
 };
@@ -346,6 +348,7 @@ export function buildPanelRows(
         count: w.tabs.length,
         collapsed,
         name: windowName(w.tabs, layout, wi + 1),
+        icon: layout?.icon ?? null,
         layoutId: layout?.id ?? null,
         level: 1,
         pos: ++header,

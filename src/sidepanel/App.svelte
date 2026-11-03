@@ -1,7 +1,8 @@
 <script lang="ts">
 import { tick } from 'svelte';
-import { type PanelId, rowHeight } from '../settings/schema';
+import { type PanelId, rowHeight, type Settings } from '../settings/schema';
 import { POPUP_CLOSE, parseSurface } from '../shared/surface';
+import type { GroupColor } from '../shared/types';
 import { applyAppearance } from './appearance';
 import Icon from './components/Icon.svelte';
 import PanelStrip, { type PanelDef } from './components/PanelStrip.svelte';
@@ -10,6 +11,8 @@ import TabList from './components/TabList.svelte';
 import Toasts, { type Toast } from './components/Toasts.svelte';
 import TopBar from './components/TopBar.svelte';
 import { IMPLEMENTED_PANELS, PANEL_ICONS, PANEL_LABELS } from './panel-defs';
+import SettingsPanel from './panels/SettingsPanel.svelte';
+import { scrollIdle } from './scroll-idle.svelte';
 import RecentlyClosed from './sections/RecentlyClosed.svelte';
 import type { SettingsState } from './settings-state.svelte';
 import { TabState } from './tab-state.svelte';
@@ -55,18 +58,24 @@ let selected: PanelId = $state('tabs');
 const panel = $derived(panels.some((p) => p.id === selected) ? selected : 'tabs');
 const currentLabel = $derived(PANEL_LABELS[panel]);
 
-// A theme open in the settings editor overrides the saved one so edits preview live.
-const draft = new ThemeDraft();
 $effect(() => {
-  const s = settings.value;
-  if (draft.theme) {
-    // Preview in the palette being edited, whatever the saved colour mode is.
-    const preview = { ...s, appearance: { ...s.appearance, mode: draft.mode } };
-    applyAppearance(preview, draft.theme, { persist: false });
-  } else {
-    applyAppearance(s, themes.resolveReady(s.appearance.themeId));
-  }
+  scrollIdle.lazy = settings.value.tabs.lazyFavicons;
 });
+
+// Mouse wheel over the top bar steps through this window's tabs (Sidebery-style). Deltas
+// are accumulated so a touchpad's many small events don't skip several tabs at once.
+let wheelAcc = 0;
+function onTopWheel(e: WheelEvent): void {
+  if (!settings.value.mouse.wheelSwitch) return;
+  wheelAcc += e.deltaY || e.deltaX;
+  if (Math.abs(wheelAcc) < 50) return;
+  const step = wheelAcc > 0 ? 1 : -1;
+  wheelAcc = 0;
+  const tabs = tabState.tabs;
+  const at = tabs.findIndex((t) => t.active);
+  const next = tabs[(at + step + tabs.length) % tabs.length];
+  if (next && at !== -1) tabState.send({ type: 'activate', tabId: next.id });
+}
 
 const sections = $derived(settings.value.layout.sections);
 const searchPos = $derived.by((): 'top' | 'bottom' | 'hidden' => {
@@ -78,6 +87,55 @@ const searchPos = $derived.by((): 'top' | 'bottom' | 'hidden' => {
 });
 
 let tabState = $state.raw(new TabState(where));
+
+// Chrome's light-mode group colours, for a window's accent (window menu → Accent colour).
+const ACCENT_HEX: Record<GroupColor, string> = {
+  grey: '#5f6368',
+  blue: '#1a73e8',
+  red: '#d93025',
+  yellow: '#f9ab00',
+  green: '#1e8e3e',
+  pink: '#d01884',
+  purple: '#9334e6',
+  cyan: '#007b83',
+  orange: '#fa903e',
+};
+
+// This window's own look (window menu): theme, density and accent override the settings.
+const ownLook = $derived(
+  tabState.windowId === null ? undefined : tabState.layouts.get(tabState.windowId),
+);
+const effective = $derived.by((): Settings => {
+  const s = settings.value;
+  const l = ownLook;
+  if (!l?.themeId && !l?.density && !l?.accent) return s;
+  return {
+    ...s,
+    appearance: {
+      ...s.appearance,
+      themeId: l.themeId ?? s.appearance.themeId,
+      density: l.density ?? s.appearance.density,
+      accent: l.accent ? ACCENT_HEX[l.accent] : s.appearance.accent,
+    },
+  };
+});
+
+// A theme open in the settings editor overrides the saved one so edits preview live.
+const draft = new ThemeDraft();
+$effect(() => {
+  const s = effective;
+  if (draft.theme) {
+    // Preview in the palette being edited, whatever the saved colour mode is.
+    const preview = { ...s, appearance: { ...s.appearance, mode: draft.mode } };
+    applyAppearance(preview, draft.theme, { persist: false });
+  } else {
+    // The first-frame cache only holds the global look, not one window's.
+    applyAppearance(s, themes.resolveReady(s.appearance.themeId), {
+      persist: s === settings.value,
+    });
+  }
+});
+
 let tabList: ReturnType<typeof TabList> | undefined = $state();
 
 // --- Notices ---------------------------------------------------------------------------
@@ -129,6 +187,8 @@ const count = $derived(tabState.tabs.length);
 <svelte:window onkeydown={onWindowKeydown} onblur={onWindowBlur} />
 
 <main>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="wheel" onwheel={onTopWheel}>
   <TopBar
     title={currentLabel}
     showBack={panel !== 'tabs'}
@@ -137,6 +197,7 @@ const count = $derived(tabState.tabs.length);
     onclose={where.surface === 'sidebar' ? undefined : requestClose}
     onmode={(mode) => settings.update((s) => ({ ...s, appearance: { ...s.appearance, mode } }))}
   />
+  </div>
   <PanelStrip {panels} selected={panel} onselect={(id) => (selected = id)} />
 
   <div class="panel" role="tabpanel" id="vc-panel-{panel}" aria-labelledby="vc-tab-{panel}">
@@ -190,9 +251,12 @@ const count = $derived(tabState.tabs.length);
             bind:this={tabList}
             {tabState}
             shortcuts={settings.value.shortcuts}
+            themes={themes.all}
+            mouse={settings.value.mouse}
+            ageDays={settings.value.tabs.ageDays}
             whitelist={settings.value.suspend.whitelist}
             onWhitelist={setWhitelisted}
-            rowHeight={rowHeight(settings.value)}
+            rowHeight={rowHeight(effective)}
             search={searchPos}
             twoLine={settings.value.tabs.layout === 'double'}
             showClose={settings.value.tabs.showClose}
@@ -230,14 +294,7 @@ const count = $derived(tabState.tabs.length);
         <p class="message" role="alert">Could not load history.</p>
       {/await}
     {:else if panel === 'settings'}
-      <!-- Lazy: settings UI is rarely opened, so keep it out of the initial bundle. -->
-      {#await import('./panels/SettingsPanel.svelte')}
-        <p class="message" role="status">Loading…</p>
-      {:then m}
-        <m.default {settings} {themes} {tabState} {draft} />
-      {:catch}
-        <p class="message" role="alert">Could not load settings.</p>
-      {/await}
+      <SettingsPanel {settings} {themes} {tabState} {draft} />
     {/if}
   </div>
 
@@ -279,6 +336,10 @@ const count = $derived(tabState.tabs.length);
     font-size: 11px;
     text-align: center;
     font-variant-numeric: tabular-nums;
+  }
+
+  .wheel {
+    display: contents;
   }
 
   .add {

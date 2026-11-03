@@ -113,6 +113,20 @@ export async function runPinCommand(
     case 'renameWindow':
       await pins.mutate(msg.windowId, (l) => (l.name === msg.name ? l : { ...l, name: msg.name }));
       return null;
+    case 'setWindowLook':
+      await pins.mutate(msg.windowId, (l) => {
+        const next: Record<string, unknown> = { ...l };
+        let changed = false;
+        for (const key of ['themeId', 'icon', 'density', 'accent'] as const) {
+          const v = msg[key];
+          if (v === undefined || v === (l[key] ?? null)) continue;
+          if (v === null) delete next[key];
+          else next[key] = v;
+          changed = true;
+        }
+        return changed ? (next as unknown as typeof l) : l;
+      });
+      return null;
     case 'setWindowCollapsed': {
       // A window the store doesn't know would get an empty layout bound for nothing.
       if (!deps.windows('window', msg.otherWindowId)[0]?.tabs.length) return null;

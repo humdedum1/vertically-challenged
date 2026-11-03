@@ -1,6 +1,8 @@
 import { type Browser, browser } from 'wxt/browser';
 import { migrateSettings } from '../settings/migrate';
+import type { TabRule } from '../settings/schema';
 import { hostOf } from '../shared/host-pattern';
+import { parseImport } from '../shared/import-tabs';
 import {
   isPinMessage,
   isSyncMessage,
@@ -8,7 +10,7 @@ import {
   parsePanelMessage,
   type WorkerMessage,
 } from '../shared/protocol';
-import { SESSIONS_KEY } from '../shared/sessions';
+import { parseSessions, SESSIONS_KEY } from '../shared/sessions';
 import type { Surface } from '../shared/surface';
 import type { GroupInfo, TabInfo, WindowInfo } from '../shared/types';
 import { createBatcher } from './batcher';
@@ -16,12 +18,14 @@ import { placeChildTab } from './child-tabs';
 import { type CommandDeps, runCommand } from './commands';
 import { registerContextMenus } from './context-menus';
 import { createDisplay, POPUP_WINDOW, type TargetTab } from './display';
+import { createMruCycle } from './mru';
 import { runPinCommand } from './pins/commands';
 import { PinManager } from './pins/pin-manager';
 import { addSession, listSessions, restoreSessionValue } from './sessions';
 import { createSuspender } from './suspend/suspender';
 import { runSyncCommand, type SyncCommandDeps } from './sync/commands';
 import { createSyncPublisher } from './sync/publisher';
+import { applyTabRule } from './tab-rules';
 import { ChangeSet, type TabOp, TabStore } from './tab-store';
 import { toTabInfo as browserTabInfo, toGroupInfo } from './to-tab-info';
 import { shouldDeliver, snapshotPlan, visibleWindows } from './visibility';
@@ -258,7 +262,13 @@ export function startBackground(): void {
       console.debug('[vc] child tab placement failed', err),
     );
   });
+  // Tab rules (Settings): kept in memory, refreshed from the settings below.
+  let tabRules: TabRule[] = [];
   browser.tabs.onUpdated.addListener((_id, changeInfo, tab) => {
+    if (changeInfo.url && tabRules.length)
+      void applyTabRule(tab, tabRules).catch((err: unknown) =>
+        console.debug('[vc] tab rule failed', err),
+      );
     const info = toTabInfo(tab);
     if (!info) return;
     pending.upserts.set(info.id, info);
@@ -442,12 +452,14 @@ export function startBackground(): void {
   void settingsNow().then((s) => {
     syncPrefs = JSON.stringify(s.sync);
     display.setMode(s.display.mode);
+    tabRules = s.rules;
   });
   browser.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && SESSIONS_KEY in changes) publisher.schedule();
     if (area === 'sync' && 'settings' in changes) {
       const settings = migrateSettings(changes.settings?.newValue);
       if (settings.display.mode !== display.mode) display.setMode(settings.display.mode);
+      tabRules = settings.rules;
       const next = JSON.stringify(settings.sync);
       if (next === syncPrefs) return;
       const previous = syncPrefs
@@ -500,6 +512,11 @@ export function startBackground(): void {
       new URL(sender.url).pathname !== '/sidepanel.html'
     )
       return;
+    if (raw?.type === 'importTabs') {
+      const result = importTabs(raw);
+      void result.then(respond);
+      return true;
+    }
     if (raw?.type !== 'backupLayouts' && raw?.type !== 'restoreBackupLayouts') return;
     void (async () => {
       try {
@@ -515,6 +532,26 @@ export function startBackground(): void {
     })().then(respond);
     return true;
   });
+
+  /** A file from another tab manager → a saved session (Settings → Backup → Import). */
+  async function importTabs(raw: {
+    text?: unknown;
+    name?: unknown;
+  }): Promise<{ ok: boolean; count?: number; error?: string }> {
+    if (typeof raw.text !== 'string' || raw.text.length > 10_000_000)
+      return { ok: false, error: 'The file is too large or empty' };
+    const win = parseImport(raw.text);
+    if (!win) return { ok: false, error: 'No tabs found in this file' };
+    const name =
+      typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 100) : 'Imported';
+    // Same validation as sessions read from storage or another device.
+    const [session] = parseSessions([
+      { id: 'import', name, createdAt: Date.now(), windows: [win] },
+    ]);
+    if (!session) return { ok: false, error: 'No tabs found in this file' };
+    await addSession(session);
+    return { ok: true, count: session.windows[0]?.tabs.length ?? 0 };
+  }
 
   browser.runtime.onConnect.addListener((port) => {
     if (port.name !== PANEL_PORT_NAME || port.sender?.id !== browser.runtime.id) return;
@@ -655,6 +692,7 @@ export function startBackground(): void {
     else await runCommand({ type: 'discard', tabIds: [tab.id] }, deps);
   }
 
+  const mru = createMruCycle();
   browser.commands.onCommand.addListener((command, tab) => {
     const windowId = tab?.windowId;
     switch (command) {
@@ -671,6 +709,15 @@ export function startBackground(): void {
         }
         for (const [port] of connected)
           port.postMessage({ type: 'focusSearch' } satisfies WorkerMessage);
+        return;
+      }
+      case 'mru-back':
+      case 'mru-forward': {
+        if (windowId === undefined) return;
+        void browser.tabs.query({ windowId }).then((tabs) => {
+          const id = mru.next(windowId, tabs, Date.now(), command === 'mru-back' ? 1 : -1);
+          if (id !== undefined) return browser.tabs.update(id, { active: true });
+        });
         return;
       }
       case 'suspend-tab':

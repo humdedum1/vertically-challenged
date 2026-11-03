@@ -2,6 +2,7 @@ import { normalizeCombo } from '../lib/keymap';
 import { normalizeHostPattern } from '../shared/host-pattern';
 import { isRestorableUrl } from '../shared/sessions';
 import {
+  AGE_DAYS,
   type Appearance,
   DEFAULT_SETTINGS,
   DISPLAY_MODES,
@@ -10,8 +11,11 @@ import {
   type LayoutSettings,
   LIMITS,
   MAX_BINDINGS,
+  MOUSE_ACTIONS,
+  type MouseSettings,
   type Ordered,
   PANEL_IDS,
+  RULE_ACTIONS,
   SECTION_IDS,
   SETTINGS_VERSION,
   type SessionSettings,
@@ -21,6 +25,7 @@ import {
   SYNC_INTERVALS,
   type SyncSettings,
   type TabRowSettings,
+  type TabRule,
   UNHIDEABLE_PANELS,
 } from './schema';
 
@@ -57,7 +62,7 @@ const MIGRATIONS: readonly ((s: Raw) => Raw)[] = [
 
 const isObj = (v: unknown): v is Raw => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T =>
+const oneOf = <T extends string | number>(v: unknown, allowed: readonly T[], fallback: T): T =>
   allowed.includes(v as T) ? (v as T) : fallback;
 
 const bool = (v: unknown, fallback: boolean): boolean => (typeof v === 'boolean' ? v : fallback);
@@ -119,6 +124,33 @@ function sanitizeKeymap(raw: unknown): Keymap {
   return out;
 }
 
+/** "github.com/myorg" → host + path; a pasted URL works too. null when invalid. */
+export function parseRuleTarget(input: string): { host: string; path: string } | null {
+  let s = input.trim();
+  if (/^https?:\/\//i.test(s)) {
+    try {
+      const u = new URL(s);
+      s = u.host + u.pathname;
+    } catch {
+      return null;
+    }
+  }
+  const slash = s.indexOf('/');
+  const host = normalizeHostPattern(slash === -1 ? s : s.slice(0, slash));
+  const path = normalizeRulePath(slash === -1 ? '' : s.slice(slash));
+  return host && path !== null ? { host, path } : null;
+}
+
+/** "" for any path, else "/x..." without query or fragment; null when invalid. */
+export function normalizeRulePath(value: unknown): string | null {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value !== 'string') return null;
+  const p = value.trim().replace(/[?#].*$/, '');
+  if (p === '' || p === '/') return '';
+  if (!p.startsWith('/') || p.length > LIMITS.rulePath || /\s/.test(p)) return null;
+  return p;
+}
+
 /** Empty uses the browser default; null means the supplied URL is invalid. */
 export function normalizeNewTabUrl(value: string): string | null {
   const url = value.trim();
@@ -148,6 +180,7 @@ function sanitize(raw: Raw): Settings {
         : d.appearance.fontFamily,
     fontSize: clampInt(a.fontSize, LIMITS.fontSize, d.appearance.fontSize),
     accent: typeof a.accent === 'string' && HEX.test(a.accent) ? a.accent.toLowerCase() : null,
+    motion: oneOf(a.motion, ['system', 'reduce', 'full'] as const, d.appearance.motion),
   };
 
   const t = isObj(raw.tabs) ? raw.tabs : {};
@@ -160,6 +193,15 @@ function sanitize(raw: Raw): Settings {
     showMute: bool(t.showMute, d.tabs.showMute),
     showNewTabButton: bool(t.showNewTabButton, d.tabs.showNewTabButton),
     showCount: bool(t.showCount, d.tabs.showCount),
+    ageDays: oneOf(t.ageDays, AGE_DAYS, d.tabs.ageDays),
+    lazyFavicons: bool(t.lazyFavicons, d.tabs.lazyFavicons),
+  };
+
+  const mo = isObj(raw.mouse) ? raw.mouse : {};
+  const mouse: MouseSettings = {
+    middle: oneOf(mo.middle, MOUSE_ACTIONS, d.mouse.middle),
+    double: oneOf(mo.double, MOUSE_ACTIONS, d.mouse.double),
+    wheelSwitch: bool(mo.wheelSwitch, d.mouse.wheelSwitch),
   };
 
   const su = isObj(raw.suspend) ? raw.suspend : {};
@@ -196,6 +238,27 @@ function sanitize(raw: Raw): Settings {
     openOnLaunch: typeof di.openOnLaunch === 'boolean' ? di.openOnLaunch : d.display.openOnLaunch,
   };
 
+  const rules: TabRule[] = [];
+  for (const r of Array.isArray(raw.rules) ? raw.rules : []) {
+    if (!isObj(r) || typeof r.host !== 'string') continue;
+    const host = normalizeHostPattern(r.host);
+    // Rules saved before actions existed were all group rules.
+    const action = oneOf(r.action, RULE_ACTIONS, 'group');
+    const group =
+      action === 'group' && typeof r.group === 'string'
+        ? r.group.trim().slice(0, LIMITS.ruleGroup)
+        : '';
+    const path = normalizeRulePath(r.path);
+    if (
+      host &&
+      path !== null &&
+      (action !== 'group' || group) &&
+      !rules.some((x) => x.host === host && x.path === path) &&
+      rules.length < LIMITS.rules
+    )
+      rules.push({ host, path, action, group });
+  }
+
   const l = isObj(raw.layout) ? raw.layout : {};
   const layout: LayoutSettings = {
     panels: sanitizeOrder(l.panels, PANEL_IDS, UNHIDEABLE_PANELS),
@@ -211,6 +274,8 @@ function sanitize(raw: Raw): Settings {
     sessions,
     sync,
     display,
+    rules,
+    mouse,
     shortcuts: sanitizeKeymap(raw.shortcuts),
   };
 }

@@ -7,7 +7,19 @@
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { browserCDP, OUT, pickBuild, r2, readState, sleep, stat, waitSW, wakeSW } from './lib.mjs';
+import {
+  browserCDP,
+  median,
+  OUT,
+  pct,
+  pickBuild,
+  r2,
+  readState,
+  sleep,
+  stat,
+  waitSW,
+  wakeSW,
+} from './lib.mjs';
 
 const args = process.argv.slice(2);
 const flag = (name) => {

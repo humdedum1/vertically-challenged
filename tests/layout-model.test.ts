@@ -14,6 +14,7 @@ import {
   parseLayoutStore,
   type WindowLayout,
 } from '../src/shared/layout';
+import { parsePanelMessage } from '../src/shared/protocol';
 
 const item = (id: string, over: Record<string, unknown> = {}) => ({
   kind: 'item',
@@ -236,4 +237,38 @@ it('preserves named layouts without pins and validates bounded restart evidence'
   expect(isEmptyLayout(parsed)).toBe(false);
   expect(parsed.tabUrls?.[0]).toBe('https://work.test/');
   expect(parsed.tabUrls).toHaveLength(MAX_ITEMS);
+});
+
+describe('per-window look', () => {
+  it('keeps a valid theme id and icon, drops bad ones, and keeps a look-only layout', () => {
+    const base = { id: 'labcdefghij', name: null, essentials: [], pinned: [], collapsed: [] };
+    const store = parseLayoutStore({
+      v: 1,
+      layouts: [
+        { ...base, themeId: 'custom-x1', icon: 'code' },
+        { ...base, id: 'lbbbbbbbbbb', themeId: 'Bad Id; }', icon: 'skull' },
+      ],
+      bindings: [],
+    });
+    expect(store.layouts[0]).toMatchObject({ themeId: 'custom-x1', icon: 'code' });
+    expect(store.layouts[1]).not.toHaveProperty('themeId');
+    expect(store.layouts[1]).not.toHaveProperty('icon');
+    expect(isEmptyLayout(store.layouts[0] as WindowLayout)).toBe(false);
+    expect(isEmptyLayout(store.layouts[1] as WindowLayout)).toBe(true);
+  });
+
+  it('validates setWindowLook messages', () => {
+    expect(parsePanelMessage({ type: 'setWindowLook', windowId: 1, themeId: 'nord' })).toEqual({
+      type: 'setWindowLook',
+      windowId: 1,
+      themeId: 'nord',
+    });
+    expect(parsePanelMessage({ type: 'setWindowLook', windowId: 1, icon: null })).toEqual({
+      type: 'setWindowLook',
+      windowId: 1,
+      icon: null,
+    });
+    expect(parsePanelMessage({ type: 'setWindowLook', windowId: 1, themeId: 'x;}' })).toBeNull();
+    expect(parsePanelMessage({ type: 'setWindowLook', windowId: 1, icon: 'skull' })).toBeNull();
+  });
 });

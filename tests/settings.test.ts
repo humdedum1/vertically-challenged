@@ -37,6 +37,7 @@ describe('migrateSettings: versions', () => {
     fontFamily: 'Georgia, serif',
     fontSize: 15,
     accent: null,
+    motion: 'system' as const,
   };
   const full = { ...DEFAULT_SETTINGS, appearance: valid };
 

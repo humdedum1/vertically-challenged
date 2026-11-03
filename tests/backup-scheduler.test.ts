@@ -11,6 +11,7 @@ import {
   targetKey,
 } from '../src/background/backup/scheduler';
 import { decode } from '../src/backup/codec';
+import { makeTarget } from '../src/backup/make-target';
 import { backupName, selectToDelete } from '../src/backup/retention';
 import { DEFAULT_SETTINGS } from '../src/settings/schema';
 
@@ -151,9 +152,15 @@ describe('remote config', () => {
     const used: string[] = [];
     const t: BackupTarget = { put: async (n) => void used.push(n) };
     const { deps } = setup({ target: 's3' }, t);
-    let seen = '';
-    await runBackup({ ...deps, target: (cfg) => ((seen = cfg.target), t) });
-    expect(seen).toBe('s3');
+    const seen: string[] = [];
+    await runBackup({
+      ...deps,
+      target: (cfg) => {
+        seen.push(cfg.target);
+        return t;
+      },
+    });
+    expect(seen).toEqual(['s3']);
     expect(used).toHaveLength(1);
   });
 });
@@ -217,5 +224,18 @@ describe('audit regressions', () => {
     const mk = (s: number, dev: string) => backupName(new Date(Date.UTC(2026, 0, 1, 0, 0, s)), dev);
     const names = [mk(1, 'busy'), mk(2, 'busy'), mk(3, 'busy'), mk(4, 'busy'), mk(0, 'quiet')];
     expect(selectToDelete(names, 2).sort()).toEqual([mk(1, 'busy'), mk(2, 'busy')].sort());
+  });
+});
+
+describe('makeTarget', () => {
+  it('maps every configured kind to its own target, never silently to Downloads', () => {
+    const local: BackupTarget = { put: async () => {} };
+    const pick = (target: string) => makeTarget(parseConfig({ target }), () => local);
+    expect(pick('downloads')).toBe(local);
+    for (const kind of ['webdav', 's3', 'dropbox']) {
+      const t = pick(kind);
+      expect(t).not.toBe(local);
+      expect(typeof t.list).toBe('function');
+    }
   });
 });

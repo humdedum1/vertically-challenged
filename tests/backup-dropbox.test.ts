@@ -62,7 +62,7 @@ describe('dropbox target', () => {
     await t.delete?.('a.vcb');
     expect(calls.filter((c) => c.url.endsWith('/oauth2/token'))).toHaveLength(1);
     const up = calls.find((c) => c.url.endsWith('/files/upload'));
-    const hdr = (up?.init.headers as Record<string, string>)['Dropbox-API-Arg'] ?? '';
+    const hdr = ((up?.init.headers ?? {}) as Record<string, string>)['Dropbox-API-Arg'] ?? '';
     expect(hdr).toContain('\\u00f6');
     expect(hdr).toMatch(/^[\x20-\x7e]+$/);
     expect(JSON.parse(hdr).path).toBe('/vc-backup-ö.vcb');

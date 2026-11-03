@@ -57,6 +57,7 @@ After installing, click the toolbar icon or press **Alt+Shift+V** to open the pa
 | Suspend tabs | Discard tabs manually or after an idle interval, with pinned, audible, and site exclusions. Chrome reloads them when activated. |
 | Snooze and park | Put a tab away until later today, tomorrow, Monday or next month, or park it with no reminder. Snoozed tabs reopen on time, even if the browser was closed. |
 | Full backups | Encrypted backups of everything to Downloads, WebDAV (Nextcloud), S3-compatible storage or Dropbox, on a schedule. Restore from the server, undo a restore, and get a toolbar warning if backups stop. |
+| Tidy up | Command palette → “Tidy up tabs…” lists tabs you haven't used for 7, 30 or 90 days by site, so you can park or close a whole site at once. |
 | Export sessions | Save a session as a Markdown outline or a bookmarks file. |
 | Bookmarks and history | Search and open saved bookmarks and visited pages from dedicated panels. |
 | Recently closed | Reopen recently closed tabs and windows. |

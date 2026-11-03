@@ -58,6 +58,7 @@ const describe = (r: { action: RuleAction; group: string }) =>
           <li>
             <span class="host">{r.host}{r.path}</span>
             <span class="arrow" aria-hidden="true">→</span>
+            <span class="sr">,{r.action === 'group' ? ' put in group' : ''}</span>
             <span class="group">{describe(r)}</span>
             <button type="button" class="x" aria-label="Remove the rule for {r.host}{r.path}" onclick={() => remove(i)}>
               <Icon name="close" size={12} />
@@ -190,6 +191,14 @@ const describe = (r: { action: RuleAction; group: string }) =>
   .add > :global(*:not(button)) {
     flex: 1 1 110px;
     min-width: 0;
+  }
+
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   .error {

@@ -1330,6 +1330,14 @@ function onkeydown(e: KeyboardEvent): void {
         grid.focus();
         break;
       }
+      // Down from the last search result moves on to the bookmark/history results.
+      if (e.key === 'ArrowDown' && !e.shiftKey && searching && focusedIndex === view.length - 1) {
+        const more = document.querySelector<HTMLElement>('.search-more button');
+        if (more) {
+          more.focus();
+          break;
+        }
+      }
       const next = Math.max(
         0,
         Math.min(view.length - 1, focusedIndex + (e.key === 'ArrowDown' ? 1 : -1)),
@@ -1420,7 +1428,14 @@ function onkeydown(e: KeyboardEvent): void {
 
 function onSearchKeydown(e: KeyboardEvent): void {
   if (e.key === 'ArrowDown') {
-    if (view.length === 0) return;
+    if (view.length === 0) {
+      const more = document.querySelector<HTMLElement>('.search-more button');
+      if (more) {
+        e.preventDefault();
+        more.focus();
+      }
+      return;
+    }
     e.preventDefault();
     setFocus(0);
     tree()?.focus();
@@ -1477,6 +1492,7 @@ $effect(() => {
       placeholder="Search tabs"
       title="Filters: is:audible, is:muted, is:suspended, is:pinned, is:grouped, site:example.com, group:name. Put - in front to exclude."
       aria-label="Search tabs"
+      aria-describedby={searching && view.length === 0 ? 'vc-filter-hint' : undefined}
       spellcheck="false"
       autocomplete="off"
       onkeydown={onSearchKeydown}
@@ -1523,6 +1539,11 @@ $effect(() => {
     <div class="list" use:observeWidth>
       {#if searching && view.length === 0}
         <p class="empty" role="status">No tabs match “{needle}”</p>
+        <p class="filters-hint" id="vc-filter-hint">
+          Narrow with <code>is:audible</code> <code>is:muted</code> <code>is:suspended</code>
+          <code>is:pinned</code> <code>is:grouped</code> <code>site:example.com</code>
+          <code>group:name</code>. Put <code>-</code> in front to exclude.
+        </p>
         {#if searchMore}
           <SearchMore text={parsed.text} windowId={tabState.windowId} {openUrls} />
         {/if}
@@ -1830,6 +1851,24 @@ $effect(() => {
   .body :global([role='tree']) {
     padding: 4px;
     outline: none;
+  }
+
+  .filters-hint {
+    margin: -16px 16px 8px;
+    color: var(--mOnSurfaceVariant);
+    font-size: 12px;
+    line-height: 1.6;
+    text-align: center;
+    text-wrap: pretty;
+  }
+
+  .filters-hint code {
+    padding: 0 3px;
+    border-radius: 4px;
+    background: var(--surface-0);
+    color: var(--mOnSurface);
+    font: 11px var(--font-mono, ui-monospace, monospace);
+    white-space: nowrap;
   }
 
   .empty {

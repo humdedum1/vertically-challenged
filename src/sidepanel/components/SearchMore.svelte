@@ -54,6 +54,25 @@ $effect(() => {
   };
 });
 
+// Up/Down move between results; Up from the first goes back to the search field.
+function onkeydown(e: KeyboardEvent): void {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const all = [...(e.currentTarget as HTMLElement).querySelectorAll('button')];
+  const i = all.indexOf(e.target as HTMLButtonElement) + (e.key === 'ArrowDown' ? 1 : -1);
+  e.preventDefault();
+  if (i >= 0) all[Math.min(i, all.length - 1)]?.focus();
+  else document.querySelector<HTMLInputElement>('input[role="searchbox"]')?.focus();
+}
+
+const summary = $derived(
+  [
+    bookmarks.length && `${bookmarks.length} bookmark${bookmarks.length === 1 ? '' : 's'}`,
+    history.length && `${history.length} from history`,
+  ]
+    .filter(Boolean)
+    .join(', '),
+);
+
 function open(url: string): void {
   void browser.tabs.create({ url, ...(windowId === null ? {} : { windowId }) });
 }
@@ -75,7 +94,9 @@ function open(url: string): void {
   {/if}
 {/snippet}
 
-<div class="more" aria-live="polite">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div class="more search-more" {onkeydown}>
+  <p class="sr" role="status">{summary}</p>
   {@render section('Bookmarks', bookmarks)}
   {@render section('History', history)}
 </div>
@@ -83,6 +104,14 @@ function open(url: string): void {
 <style>
   .more {
     padding: 4px 6px 8px;
+  }
+
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   .label {

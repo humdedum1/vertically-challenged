@@ -88,17 +88,18 @@ const searchPos = $derived.by((): 'top' | 'bottom' | 'hidden' => {
 
 let tabState = $state.raw(new TabState(where));
 
-// Chrome's light-mode group colours, for a window's accent (window menu → Accent colour).
-const ACCENT_HEX: Record<GroupColor, string> = {
-  grey: '#5f6368',
-  blue: '#1a73e8',
-  red: '#d93025',
-  yellow: '#f9ab00',
-  green: '#1e8e3e',
-  pink: '#d01884',
-  purple: '#9334e6',
-  cyan: '#007b83',
-  orange: '#fa903e',
+// Chrome's group colours per mode, for a window's accent (window menu → Accent colour).
+// The light set is too dark to read on dark surfaces, so dark mode uses Chrome's own.
+const ACCENT_HEX: Record<GroupColor, { light: string; dark: string }> = {
+  grey: { light: '#5f6368', dark: '#dadce0' },
+  blue: { light: '#1a73e8', dark: '#8ab4f8' },
+  red: { light: '#d93025', dark: '#f28b82' },
+  yellow: { light: '#f9ab00', dark: '#fdd663' },
+  green: { light: '#1e8e3e', dark: '#81c995' },
+  pink: { light: '#d01884', dark: '#ff8bcb' },
+  purple: { light: '#9334e6', dark: '#c58af9' },
+  cyan: { light: '#007b83', dark: '#78d9ec' },
+  orange: { light: '#fa903e', dark: '#fcad70' },
 };
 
 // This window's own look (window menu): theme, density and accent override the settings.
@@ -108,30 +109,32 @@ const ownLook = $derived(
 const effective = $derived.by((): Settings => {
   const s = settings.value;
   const l = ownLook;
-  if (!l?.themeId && !l?.density && !l?.accent) return s;
+  if (!l?.themeId && !l?.density) return s;
   return {
     ...s,
     appearance: {
       ...s.appearance,
       themeId: l.themeId ?? s.appearance.themeId,
       density: l.density ?? s.appearance.density,
-      accent: l.accent ? ACCENT_HEX[l.accent] : s.appearance.accent,
     },
   };
 });
 
 // A theme open in the settings editor overrides the saved one so edits preview live.
 const draft = new ThemeDraft();
+const ownAccent = $derived(ownLook?.accent ? ACCENT_HEX[ownLook.accent] : undefined);
 $effect(() => {
   const s = effective;
+  const accent = ownAccent;
   if (draft.theme) {
     // Preview in the palette being edited, whatever the saved colour mode is.
     const preview = { ...s, appearance: { ...s.appearance, mode: draft.mode } };
-    applyAppearance(preview, draft.theme, { persist: false });
+    applyAppearance(preview, draft.theme, { persist: false, accent });
   } else {
     // The first-frame cache only holds the global look, not one window's.
     applyAppearance(s, themes.resolveReady(s.appearance.themeId), {
-      persist: s === settings.value,
+      persist: s === settings.value && !accent,
+      accent,
     });
   }
 });

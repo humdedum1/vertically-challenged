@@ -9,6 +9,7 @@ const SCRIPTS = [
   'tab-sync.mjs',
   'reconnect.mjs',
   'panel-recovery.mjs',
+  'settings-load.mjs',
   'child-tabs.mjs',
   'new-tab-url.mjs',
   'nest-tabs.mjs',

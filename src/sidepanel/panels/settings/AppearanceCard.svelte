@@ -227,13 +227,14 @@ const accentRatio = $derived(a.accent ? contrastRatio(a.accent, palette.mSurface
       <textarea
         id="vc-custom-css-input"
         class="css"
+        aria-describedby="vc-custom-css-hint"
         spellcheck="false"
         maxlength={MAX_CUSTOM_CSS}
         placeholder={'[role="treeitem"] { font-weight: 500; }'}
         value={customCss.value}
         oninput={(e) => customCss.set(e.currentTarget.value)}
       ></textarea>
-      <p class="hint">
+      <p class="hint" id="vc-custom-css-hint">
         Applied after the theme, in this browser only (not synced). Theme colours are CSS
         variables such as <code>var(--mPrimary)</code>.
       </p>

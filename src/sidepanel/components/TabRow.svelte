@@ -169,6 +169,7 @@ function muteClick(e: MouseEvent): void {
     {/if}
   </span>
 
+  {#if stale && !tab.active}<span class="sr">, not opened recently</span>{/if}
   {#if windowTag}<span class="wtag">{windowTag}</span>{/if}
 
   {#if tab.discarded}
@@ -215,13 +216,21 @@ function muteClick(e: MouseEvent): void {
 </div>
 
 <style>
-  .row.stale {
-    opacity: 0.55;
+  /* Muted text colour, not opacity: opacity would drop contrast below AA. */
+  .row.stale:not(:hover, .focused) :is(.label, .url) {
+    color: var(--mOnSurfaceVariant);
   }
 
-  .row.stale:hover,
-  .row.stale.focused {
-    opacity: 1;
+  .row.stale:not(:hover, .focused) .icon {
+    filter: grayscale(1);
+  }
+
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
   .row {

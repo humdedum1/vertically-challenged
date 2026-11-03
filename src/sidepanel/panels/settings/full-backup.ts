@@ -54,7 +54,8 @@ export async function openFullBackup(file: File, passphrase: string): Promise<Op
 }
 
 /** Additive parts only; settings and themes are applied by the caller (they own that state). */
-export async function restoreFullExtras(r: RestoredFull): Promise<void> {
+/** Returns how many sessions were actually added (the rest already existed or exceeded the cap). */
+export async function restoreFullExtras(r: RestoredFull): Promise<number> {
   if (r.layouts.length) {
     const res: { ok: boolean; error?: string } = await browser.runtime.sendMessage({
       type: 'restoreBackupLayouts',
@@ -62,12 +63,15 @@ export async function restoreFullExtras(r: RestoredFull): Promise<void> {
     });
     if (!res?.ok) throw new Error(res?.error ?? 'Couldn’t restore pinned layouts');
   }
+  let added = 0;
   if (r.sessions.length) {
-    const res: { ok: boolean; error?: string } = await browser.runtime.sendMessage({
+    const res: { ok: boolean; count?: number; error?: string } = await browser.runtime.sendMessage({
       type: 'restoreSessions',
       sessions: r.sessions,
     });
     if (!res?.ok) throw new Error(res?.error ?? 'Couldn’t restore sessions');
+    added = res.count ?? 0;
   }
   if (r.customCss) await browser.storage.local.set({ [CSS_KEY]: r.customCss });
+  return added;
 }

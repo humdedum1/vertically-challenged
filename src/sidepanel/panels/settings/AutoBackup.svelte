@@ -6,8 +6,8 @@ import {
   CONFIG_KEY,
   DEFAULT_CONFIG,
   type Interval,
-  originPattern,
   parseConfig,
+  requiredAccess,
   STATUS_KEY,
   type TargetKind,
 } from '../../../background/backup/scheduler';
@@ -42,30 +42,13 @@ $effect(() => {
   return () => browser.storage.onChanged.removeListener(on);
 });
 
-/** The permission to ask for with the current settings, or an error for incomplete ones. */
-function needed(c: BackupConfig): { permissions?: string[]; origins?: string[] } {
-  if (c.target === 'downloads') return { permissions: ['downloads'] };
-  if (c.target === 'dropbox') {
-    if (!c.dropbox.refreshToken) throw new Error('Connect Dropbox first');
-    return { origins: DROPBOX_ORIGINS };
-  }
-  const server = c.target === 'webdav' ? c.webdav.url : c.s3.endpoint;
-  const origin = originPattern(server);
-  if (!origin) throw new Error('Enter a valid http(s) server address first');
-  if (c.target === 'webdav' && !(c.webdav.user && c.webdav.password))
-    throw new Error('Enter the WebDAV user and password');
-  if (c.target === 's3' && !(c.s3.bucket && c.s3.accessKey && c.s3.secretKey))
-    throw new Error('Enter the bucket, access key and secret key');
-  return { origins: [origin] };
-}
-
 /** Runs on a click, because permission requests need a user gesture. */
 async function save(next: BackupConfig): Promise<void> {
   error = '';
   saved = false;
   try {
     if (next.interval !== 'off' || next.target !== 'downloads') {
-      if (!(await browser.permissions.request(needed(next) as never)))
+      if (!(await browser.permissions.request(requiredAccess(next) as never)))
         throw new Error('Permission was not granted, so nothing was saved');
     }
     await browser.storage.local.set({ [CONFIG_KEY]: parseConfig(next) });
@@ -108,6 +91,9 @@ async function runNow(): Promise<void> {
   running = true;
   error = '';
   try {
+    // Ask first, whatever the schedule: this click is the user gesture the prompt needs.
+    if (!(await browser.permissions.request(requiredAccess(cfg) as never)))
+      throw new Error('Permission was not granted');
     // Back up with what is on screen, not an older saved version.
     await save(cfg);
     if (error) return;

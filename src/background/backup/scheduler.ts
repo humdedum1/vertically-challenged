@@ -33,6 +33,8 @@ export interface BackupStatus {
   hash?: string;
   error?: string;
   skipped?: boolean;
+  /** Where the last good backup went (see targetKey), so a new target gets its first copy. */
+  to?: string;
 }
 export interface StorageLike {
   get(key: string): Promise<Record<string, unknown>>;
@@ -110,6 +112,37 @@ export function parseConfig(raw: unknown): BackupConfig {
   };
 }
 
+/** Identifies a destination without secrets. */
+export function targetKey(c: BackupConfig): string {
+  return c.target === 'webdav'
+    ? `webdav:${c.webdav.url}`
+    : c.target === 's3'
+      ? `s3:${c.s3.endpoint}/${c.s3.bucket}/${c.s3.prefix}`
+      : c.target === 'dropbox'
+        ? `dropbox:${c.dropbox.appKey}`
+        : 'downloads';
+}
+
+/** What the browser must grant before this config can back up; throws on incomplete input. */
+export function requiredAccess(
+  c: BackupConfig,
+  originOf: (url: string) => string | null = originPattern,
+  dropboxOrigins: string[] = ['https://api.dropboxapi.com/*', 'https://content.dropboxapi.com/*'],
+): { permissions?: string[]; origins?: string[] } {
+  if (c.target === 'downloads') return { permissions: ['downloads'] };
+  if (c.target === 'dropbox') {
+    if (!c.dropbox.refreshToken) throw new Error('Connect Dropbox first');
+    return { origins: dropboxOrigins };
+  }
+  const origin = originOf(c.target === 'webdav' ? c.webdav.url : c.s3.endpoint);
+  if (!origin) throw new Error('Enter a valid http(s) server address first');
+  if (c.target === 'webdav' && !(c.webdav.user && c.webdav.password))
+    throw new Error('Enter the WebDAV user and password');
+  if (c.target === 's3' && !(c.s3.bucket && c.s3.accessKey && c.s3.secretKey))
+    throw new Error('Enter the bucket, access key and secret key');
+  return { origins: [origin] };
+}
+
 export const intervalMinutes = (i: Interval): number =>
   i === 'daily' ? 1440 : i === 'weekly' ? 10080 : 0;
 
@@ -129,7 +162,7 @@ export async function runBackup(deps: SchedulerDeps, force = false): Promise<Bac
     const parts = await deps.collect();
     // Hash with a fixed clock so only real content changes count as a change.
     const hash = await sha256(JSON.stringify(buildFullBackup(parts, deps.version, new Date(0))));
-    if (!force && hash === prev.hash && !prev.error) {
+    if (!force && hash === prev.hash && prev.to === targetKey(cfg) && !prev.error) {
       status = { ...prev, skipped: true };
     } else {
       const bytes = await encode(buildFullBackup(parts, deps.version, now), cfg.passphrase);
@@ -139,7 +172,7 @@ export async function runBackup(deps: SchedulerDeps, force = false): Promise<Bac
       if (target.list && target.delete) {
         for (const old of selectToDelete(await target.list(), cfg.keep)) await target.delete(old);
       }
-      status = { at: now.getTime(), name, hash };
+      status = { at: now.getTime(), name, hash, to: targetKey(cfg) };
     }
   } catch (err) {
     status = {

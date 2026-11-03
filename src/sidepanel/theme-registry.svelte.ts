@@ -1,14 +1,17 @@
 import { browser } from 'wxt/browser';
 import { BUILTIN_THEMES } from '../themes/builtin';
-import { parseTheme, type Theme } from '../themes/palette';
-import { cleanName } from '../themes/transfer';
+import {
+  CUSTOM_ID_PREFIX,
+  isCustomId,
+  parseCustomThemes,
+  THEME_PREFIX,
+} from '../themes/custom-themes';
+import type { Theme } from '../themes/palette';
 
-const PREFIX = 'theme:';
-export const CUSTOM_ID_PREFIX = 'custom-';
 /** storage.sync caps total size at ~100 KB; a theme is ~1.2 KB, settings a few hundred bytes. */
 export const MAX_CUSTOM_THEMES = 40;
 
-export const isCustomId = (id: string): boolean => /^custom-[a-z0-9]{6,32}$/.test(id);
+export { CUSTOM_ID_PREFIX, isCustomId };
 export const newCustomId = (): string =>
   `${CUSTOM_ID_PREFIX}${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
 
@@ -36,7 +39,7 @@ export class ThemeRegistry {
 
   async start(): Promise<void> {
     browser.storage.onChanged.addListener((changes, area) => {
-      if (area === 'sync' && Object.keys(changes).some((k) => k.startsWith(PREFIX)))
+      if (area === 'sync' && Object.keys(changes).some((k) => k.startsWith(THEME_PREFIX)))
         void this.load();
     });
     await this.load();
@@ -45,14 +48,7 @@ export class ThemeRegistry {
   private async load(): Promise<void> {
     try {
       const all = await browser.storage.sync.get(null);
-      const out: Theme[] = [];
-      for (const [key, value] of Object.entries(all)) {
-        if (!key.startsWith(PREFIX)) continue;
-        const id = key.slice(PREFIX.length);
-        const name = cleanName((value as { name?: unknown } | null)?.name, 'Custom theme');
-        const r = isCustomId(id) ? parseTheme(value, { id, name }) : null;
-        if (r?.ok) out.push(r.value);
-      }
+      const out = parseCustomThemes(all);
       this.custom = out.sort((a, b) => a.name.localeCompare(b.name));
     } catch (err) {
       console.warn('[vc] custom themes failed to load', err);
@@ -70,7 +66,7 @@ export class ThemeRegistry {
     }
     const { id, name, dark, light } = theme;
     try {
-      await browser.storage.sync.set({ [PREFIX + id]: { name, dark, light } });
+      await browser.storage.sync.set({ [THEME_PREFIX + id]: { name, dark, light } });
     } catch (err) {
       throw new Error(
         `Couldn’t save the theme (${err instanceof Error ? err.message : 'storage error'})`,
@@ -81,7 +77,7 @@ export class ThemeRegistry {
 
   async remove(id: string): Promise<void> {
     if (!isCustomId(id)) return;
-    await browser.storage.sync.remove(PREFIX + id);
+    await browser.storage.sync.remove(THEME_PREFIX + id);
     await this.load();
   }
 }

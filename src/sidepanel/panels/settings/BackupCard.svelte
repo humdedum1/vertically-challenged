@@ -81,10 +81,10 @@ async function applyFull(): Promise<void> {
   applying = true;
   clear();
   try {
-    await restoreFullExtras(r);
+    const added = await restoreFullExtras(r);
     for (const t of r.themes) await themes.save(t);
     settings.update(() => r.settings);
-    status = `Restored settings, ${r.themes.length} themes, ${r.layouts.length} layouts (as Window setups) and ${r.sessions.length} sessions. Existing sessions and setups were kept.`;
+    status = `Restored settings, ${r.themes.length} themes, ${r.layouts.length} layouts (as Window setups) and ${added} new sessions${added < r.sessions.length ? ` (${r.sessions.length - added} already existed or didn’t fit the limit)` : ''}. Existing sessions and setups were kept.`;
     fullPending = null;
     fullFile = null;
   } catch (err) {
@@ -100,26 +100,6 @@ function clear(): void {
   status = '';
   error = '';
   warnings = [];
-}
-
-async function exportBackup(): Promise<void> {
-  if (exporting) return;
-  exporting = true;
-  clear();
-  try {
-    const result: { ok: boolean; layouts: WindowLayout[]; error?: string } =
-      await browser.runtime.sendMessage({ type: 'backupLayouts' });
-    if (!result?.ok) throw new Error(result?.error ?? 'Couldn’t read pinned layouts');
-    const text = createBackup(settings.value, themes.custom, new Date(), result.layouts);
-    if (new TextEncoder().encode(text).length > MAX_IMPORT_BYTES)
-      throw new Error('Backup exceeds the file size limit; no file was exported');
-    downloadText(`vertically-challenged-backup-${today()}.json`, text);
-    status = `Exported settings, ${themes.custom.length} custom themes and ${result.layouts.length} pinned layouts.`;
-  } catch (err) {
-    error = err instanceof Error ? err.message : 'Couldn’t export the backup';
-  } finally {
-    exporting = false;
-  }
 }
 
 async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<void> {
@@ -243,8 +223,7 @@ function reset(): void {
     {/if}
 
     <div class="row">
-      <Button disabled={exporting || applying} onclick={exportBackup}>{exporting ? 'Exporting…' : 'Export settings & themes (JSON)'}</Button>
-      <Button disabled={exporting || applying} onclick={() => fileInput?.click()}>Import settings & themes…</Button>
+      <Button disabled={exporting || applying} onclick={() => fileInput?.click()}>Import older settings & themes backup…</Button>
       <input
         bind:this={fileInput}
         type="file"

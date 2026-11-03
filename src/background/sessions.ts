@@ -84,8 +84,16 @@ export const listSessions = (): Promise<Session[]> => readAll();
 
 /** Keeps a copy of a session (another device's) here, under a new id, as the newest. */
 /** Backup restore: adds sessions whose id isn't stored yet; never replaces or removes any. */
-export const addSessions = (incoming: Session[]): Promise<void> =>
-  mutate((list) => mergeSessions(list, incoming));
+export async function addSessions(incoming: Session[]): Promise<number> {
+  let added = 0;
+  await mutate((list) => {
+    const merged = mergeSessions(list, incoming);
+    const had = new Set(list.map((s) => s.id));
+    added = merged.filter((s) => !had.has(s.id)).length;
+    return merged;
+  });
+  return added;
+}
 
 export const addSession = (session: Session): Promise<void> =>
   mutate((list) =>

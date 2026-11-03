@@ -16,8 +16,7 @@ import { parseSessions, SESSIONS_KEY } from '../shared/sessions';
 import type { Surface } from '../shared/surface';
 import { DEVICE_KEY } from '../shared/sync-store';
 import type { GroupInfo, TabInfo, WindowInfo } from '../shared/types';
-import { parseTheme } from '../themes/palette';
-import { cleanName } from '../themes/transfer';
+import { parseCustomThemes } from '../themes/custom-themes';
 import { downloadsTarget } from './backup/downloads';
 import {
   BACKUP_ALARM,
@@ -464,15 +463,7 @@ export function startBackground(): void {
         browser.storage.sync.get(null),
         browser.storage.local.get([SESSIONS_KEY, 'customCss']),
       ]);
-      const themes = Object.entries(sync).flatMap(([key, value]) => {
-        const id = key.startsWith('theme:') ? key.slice(6) : '';
-        if (!/^custom-[a-z0-9]{6,32}$/.test(id)) return [];
-        const r = parseTheme(value, {
-          id,
-          name: cleanName((value as { name?: unknown } | null)?.name, 'Custom theme'),
-        });
-        return r.ok ? [r.value] : [];
-      });
+      const themes = parseCustomThemes(sync);
       return {
         settings: migrateSettings(sync.settings),
         themes,
@@ -602,7 +593,7 @@ export function startBackground(): void {
       // Same validation as sessions read from storage.
       const sessions = parseSessions(raw.sessions);
       void addSessions(sessions)
-        .then(() => ({ ok: true, count: sessions.length }))
+        .then((count) => ({ ok: true, count }))
         .catch(() => ({ ok: false, error: 'Couldn’t restore sessions' }))
         .then(respond);
       return true;

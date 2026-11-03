@@ -4,9 +4,11 @@ import {
   CONFIG_KEY,
   originPattern,
   parseConfig,
+  requiredAccess,
   runBackup,
   STATUS_KEY,
   type StorageLike,
+  targetKey,
 } from '../src/background/backup/scheduler';
 import { decode } from '../src/backup/codec';
 import { backupName, selectToDelete } from '../src/backup/retention';
@@ -38,7 +40,7 @@ const setup = (cfg: unknown, t: BackupTarget, content = { css: 'a' }, clock = { 
     target: () => t,
     version: '1.0.0',
     device: async () => 'laptop',
-    now: () => new Date(2026, 0, 1, 0, 0, clock.n++),
+    now: () => new Date(Date.UTC(2026, 0, 1, 0, 0, clock.n++)),
     collect: async () => ({
       settings: DEFAULT_SETTINGS,
       themes: [],
@@ -52,7 +54,9 @@ const setup = (cfg: unknown, t: BackupTarget, content = { css: 'a' }, clock = { 
 
 describe('retention', () => {
   it('names files sortably and keeps only the newest N of our own files', () => {
-    const names = [1, 2, 3, 4].map((s) => backupName(new Date(2026, 0, 1, 0, 0, s), 'My PC!'));
+    const names = [1, 2, 3, 4].map((s) =>
+      backupName(new Date(Date.UTC(2026, 0, 1, 0, 0, s)), 'My PC!'),
+    );
     expect(names[0]).toMatch(/^vc-backup-20260101-000001-My-PC\.vcb$/);
     const all = [...names, 'holiday.jpg'];
     expect(selectToDelete(all, 2)).toEqual([names[1], names[0]]);
@@ -178,5 +182,40 @@ describe('hardening', () => {
         1,
       ),
     ).toEqual(['vc-backup-20260101-000002.vcb']);
+  });
+});
+
+describe('audit regressions', () => {
+  it('asks for the Downloads permission even when the schedule is off', () => {
+    expect(requiredAccess(parseConfig({}))).toEqual({ permissions: ['downloads'] });
+  });
+
+  it('refuses incomplete remote settings before asking for access', () => {
+    expect(() => requiredAccess(parseConfig({ target: 'webdav' }))).toThrow(/valid http/);
+    expect(() =>
+      requiredAccess(parseConfig({ target: 'webdav', webdav: { url: 'https://a.example/d' } })),
+    ).toThrow(/user and password/);
+    expect(() => requiredAccess(parseConfig({ target: 'dropbox' }))).toThrow(/Connect Dropbox/);
+  });
+
+  it('makes the first backup to a new target even when the data is unchanged', async () => {
+    const a = target();
+    const b = target();
+    const { storage, deps } = setup({ target: 'downloads' }, a);
+    await runBackup(deps);
+    storage.data[CONFIG_KEY] = {
+      target: 's3',
+      s3: { endpoint: 'https://s3.example', bucket: 'b' },
+    };
+    const s = await runBackup({ ...deps, target: () => b });
+    expect(s.skipped).toBeUndefined();
+    expect(b.files.size).toBe(1);
+    expect(s.to).toBe(targetKey(parseConfig(storage.data[CONFIG_KEY])));
+  });
+
+  it("keeps each device's newest copies instead of one shared count", () => {
+    const mk = (s: number, dev: string) => backupName(new Date(Date.UTC(2026, 0, 1, 0, 0, s)), dev);
+    const names = [mk(1, 'busy'), mk(2, 'busy'), mk(3, 'busy'), mk(4, 'busy'), mk(0, 'quiet')];
+    expect(selectToDelete(names, 2).sort()).toEqual([mk(1, 'busy'), mk(2, 'busy')].sort());
   });
 });

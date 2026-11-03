@@ -1,15 +1,33 @@
+<div align="center">
+
+<img src="public/icon/128.png" alt="Vertically Challenged icon" width="128" height="128">
+
 # Vertically Challenged
 
-Fast, customizable vertical tabs for Chrome, in the side panel or an in-page popup. Organize windows with Staples, pinned folders, tab groups, saved sessions, and themes. Local-first, no telemetry.
+**Fast, customizable vertical tabs for Chrome, in the side panel or an in-page popup.**
 
-![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
-<!-- TODO: add Chrome Web Store version/users badges and a CI badge once the store listing exists and the repository is public. -->
+Staples, pinned folders, tab groups, saved sessions and themes. Local-first, no telemetry.
 
-[Releases](https://github.com/humdedum1/vertically-challenged/releases) · [Report a bug](https://github.com/humdedum1/vertically-challenged/issues/new/choose) · [Contribute](CONTRIBUTING.md) · [Security](SECURITY.md)
+[![CI](https://github.com/humdedum1/vertically-challenged/actions/workflows/checks.yml/badge.svg)](https://github.com/humdedum1/vertically-challenged/actions/workflows/checks.yml)
+[![Release](https://img.shields.io/github/v/release/humdedum1/vertically-challenged?label=release)](https://github.com/humdedum1/vertically-challenged/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Chrome 116+](https://img.shields.io/badge/Chrome-116%2B-4285F4?logo=googlechrome&logoColor=white)
+![Free](https://img.shields.io/badge/price-free-brightgreen)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/TODO)
+[![PayPal](https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white)](https://paypal.me/TODO)
+
+[Install](#install) · [Features](#features) · [Shortcuts](#keyboard-shortcuts) · [Releases](https://github.com/humdedum1/vertically-challenged/releases) · [Report a bug](https://github.com/humdedum1/vertically-challenged/issues/new/choose) · [Contribute](CONTRIBUTING.md)
 
 <!-- TODO: screenshots or a short demo GIF of the side panel and the popup (light and dark theme). -->
+<!-- TODO: add Chrome Web Store version/users badges once the store listing exists. -->
 
-**This is a vibecoded project.** AI coding tools have been used extensively to build it. It is a personal, experimental project: bugs happen, tests do not cover everything, and releases may need follow-up fixes. Reports, code review, and focused PRs are welcome. Keep backups of anything you cannot afford to lose.
+</div>
+
+> [!WARNING]
+> **Vibecoded, lightly tested.** This extension was built with heavy use of AI coding tools. It has unit and end-to-end tests, but they come from a small sample: a few machines, a few profiles, a few workflows. Bugs happen, edge cases are untested, and releases may need follow-up fixes. Keep backups of anything you cannot afford to lose, and please report what you find.
+
+> [!NOTE]
+> **Free and open source.** Licensed under the [MIT License](LICENSE). It is free to use and will stay free for the foreseeable future. Donations are optional ([Ko-fi](https://ko-fi.com/TODO), [PayPal](https://paypal.me/TODO)) and unlock nothing.
 
 ## Install
 
@@ -157,13 +175,14 @@ See [SECURITY.md](SECURITY.md) for vulnerability reporting. Do not publish explo
 
 ## Support the project
 
-Donation links are not configured yet:
+Vertically Challenged is free, MIT licensed, and has no paywalled features. If it saves you time and you want to chip in, donations are welcome but never expected.
 
-- Patreon: **placeholder — coming later**
-- Ko-fi: **placeholder — coming later**
-- Other donations: **placeholder — coming later**
+| | |
+| --- | --- |
+| ☕ **Ko-fi** | [ko-fi.com/TODO](https://ko-fi.com/TODO) (placeholder link) |
+| 💙 **PayPal** | [paypal.me/TODO](https://paypal.me/TODO) (placeholder link) |
 
-Bug reports, testing, documentation fixes, and code review also help.
+Bug reports, testing on your own setup, documentation fixes and code review help just as much.
 
 ## License
 

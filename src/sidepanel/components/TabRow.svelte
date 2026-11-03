@@ -235,12 +235,14 @@ function muteClick(e: MouseEvent): void {
 
   .row {
     --tab-inset: 20px;
+    /* Narrow panels get a smaller step so deep child chains keep their titles. */
+    --child-step: clamp(6px, 4vw, 16px);
     position: relative;
     display: flex;
     align-items: center;
     gap: 8px;
     height: var(--row-height);
-    padding: 0 6px 0 calc(var(--tab-inset) + var(--child-depth, 0) * 16px);
+    padding: 0 6px 0 calc(var(--tab-inset) + var(--child-depth, 0) * var(--child-step));
     border-radius: var(--radius-row);
     cursor: default;
     user-select: none;
@@ -261,7 +263,7 @@ function muteClick(e: MouseEvent): void {
 
   .branch-toggle {
     position: absolute;
-    left: calc(var(--tab-inset) + var(--child-depth, 0) * 16px - 13px);
+    left: calc(var(--tab-inset) + var(--child-depth, 0) * var(--child-step) - 13px);
     display: grid;
     place-items: center;
     width: 12px;

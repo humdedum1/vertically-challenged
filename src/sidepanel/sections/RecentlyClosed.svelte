@@ -110,6 +110,8 @@ function toggleWindow(id: string): void {
 const tabLabel = (t: { title: string; url: string }): string => t.title || t.url || 'New Tab';
 </script>
 
+<!-- Nothing to restore: drop the card so the tab list gets the height. -->
+{#if !(loaded && !error && items.length === 0)}
 <SegmentCard title="Recently closed">
   {#snippet icon()}<Icon name="history" size={12} />{/snippet}
   {#snippet trailing()}
@@ -136,8 +138,6 @@ const tabLabel = (t: { title: string; url: string }): string => t.title || t.url
           {error}
           <button type="button" class="retry" onclick={() => void refresh()}>Retry</button>
         </div>
-      {:else if items.length === 0}
-        <p class="empty">Nothing closed recently</p>
       {:else}
         <ul>
           {#each items as c (c.sessionId)}
@@ -193,6 +193,7 @@ const tabLabel = (t: { title: string; url: string }): string => t.title || t.url
   {/if}
   <p class="sr" role="status" aria-live="polite">{status}</p>
 </SegmentCard>
+{/if}
 
 <style>
   .toggle,

@@ -19,9 +19,15 @@ function onkeydown(e: KeyboardEvent): void {
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div {onkeydown}>
   <ul class="commands" aria-label="Commands">
-    {#each commands as c (c.label)}
+    {#each commands as c, i (`${c.group}:${c.label}`)}
+      {#if c.group && c.group !== commands[i - 1]?.group}
+        <li class="group" role="presentation" aria-hidden="true">{c.group}</li>
+      {/if}
       <li>
-        <button type="button" class:danger={c.danger} onclick={() => onrun(c)}>{c.label}</button>
+        <button type="button" class:danger={c.danger} onclick={() => onrun(c)}
+          ><span class="label">{c.label}</span
+          >{#if c.keys}<kbd aria-label="Shortcut {c.keys}">{c.keys}</kbd>{/if}</button
+        >
       </li>
     {/each}
   </ul>
@@ -37,25 +43,49 @@ function onkeydown(e: KeyboardEvent): void {
     list-style: none;
   }
 
+  .group {
+    padding: 8px 10px 2px;
+    color: var(--mOnSurfaceVariant);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
   button {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     width: 100%;
     min-height: 30px;
     padding: 0 10px;
-    overflow: hidden;
     border: 0;
     border-radius: var(--radius-row);
     background: transparent;
     color: var(--mOnSurface);
     font: inherit;
     text-align: left;
-    text-overflow: ellipsis;
     white-space: nowrap;
     cursor: pointer;
   }
 
+  .label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  kbd {
+    flex: none;
+    color: var(--mOnSurfaceVariant);
+    font: inherit;
+    font-size: 11px;
+  }
+
   /* The first command is what Enter in the search field runs. */
-  li:first-child button {
+  li:not(.group):first-of-type button,
+  .group:first-child + li button {
     background: var(--state-hover);
   }
 

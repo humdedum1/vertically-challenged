@@ -3,6 +3,10 @@ import type { MenuItem } from '../components/menu-types';
 /** One runnable entry in the command palette (search text starting with ">"). */
 export interface Command {
   label: string;
+  /** Section the command is listed under ("Tab", "Window"). */
+  group: string;
+  /** Display text of its keyboard shortcut, if bound. */
+  keys?: string;
   run: () => void;
   danger: boolean;
 }
@@ -12,7 +16,7 @@ export interface Command {
  * apart. Submenu entries are prefixed with their parent ("Theme: Abyss"); separators,
  * disabled items and colour pickers (which need the swatch UI) are left out.
  */
-export function menuCommands(items: readonly MenuItem[], prefix = ''): Command[] {
+export function menuCommands(items: readonly MenuItem[], group = '', prefix = ''): Command[] {
   const out: Command[] = [];
   for (const item of items) {
     if (item.type === 'submenu') {
@@ -22,22 +26,28 @@ export function menuCommands(items: readonly MenuItem[], prefix = ''): Command[]
       if (only?.type === 'item') {
         out.push({
           label: prefix + item.label.slice(0, -1),
+          group,
           run: only.onselect,
           danger: only.danger === true,
         });
-      } else out.push(...menuCommands(item.items, `${prefix}${item.label}: `));
+      } else out.push(...menuCommands(item.items, group, `${prefix}${item.label}: `));
     } else if (item.type === 'item' && !item.disabled) {
-      out.push({ label: prefix + item.label, run: item.onselect, danger: item.danger === true });
+      out.push({
+        label: prefix + item.label,
+        group,
+        run: item.onselect,
+        danger: item.danger === true,
+      });
     }
   }
   return out;
 }
 
-/** Commands whose label holds every word of `text`, in any order, ignoring case. */
+/** Commands whose group and label hold every word of `text`, in any order, ignoring case. */
 export function matchCommands(commands: readonly Command[], text: string): Command[] {
   const words = text.toLowerCase().split(/\s+/).filter(Boolean);
   return commands.filter((c) => {
-    const l = c.label.toLowerCase();
+    const l = `${c.group} ${c.label}`.toLowerCase();
     return words.every((w) => l.includes(w));
   });
 }

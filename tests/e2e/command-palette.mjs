@@ -25,9 +25,7 @@ try {
   assert.equal(await search.inputValue(), '>');
   await page.keyboard.type('dup close');
   const list = page.getByRole('list', { name: 'Commands' });
-  assert.deepEqual(await list.getByRole('button').allTextContents(), [
-    'Window: Close duplicate tabs',
-  ]);
+  assert.deepEqual(await list.getByRole('button').allTextContents(), ['Close duplicate tabs']);
   await search.press('Enter');
   for (let i = 0; i < 50 && (await count()) !== 1; i++) await page.waitForTimeout(100);
   assert.equal(await count(), 1);

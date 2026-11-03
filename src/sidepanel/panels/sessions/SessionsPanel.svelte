@@ -17,6 +17,7 @@ import Toggle from '../../components/controls/Toggle.svelte';
 import Favicon from '../../components/Favicon.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
+import { notify } from '../../notify';
 import type { SettingsState } from '../../settings-state.svelte';
 import type { TabState } from '../../tab-state.svelte';
 import { downloadText, fileSafe } from '../settings/download';
@@ -40,7 +41,6 @@ let name = $state('');
 let expanded = $state.raw<ReadonlySet<string>>(new Set());
 let shown = $state.raw<ReadonlyMap<string, number>>(new Map());
 let renaming = $state<{ id: string; value: string } | null>(null);
-let confirmDelete = $state<string | null>(null);
 
 let renamingSetup = $state<{ id: string; value: string } | null>(null);
 let confirmDeleteSetup = $state<string | null>(null);
@@ -108,7 +108,6 @@ function more(key: string): void {
 }
 
 function startRename(s: Session): void {
-  confirmDelete = null;
   renaming = { id: s.id, value: s.name };
 }
 
@@ -125,9 +124,18 @@ function commitRename(): void {
 }
 
 function remove(s: Session): void {
+  const copy = $state.snapshot(s);
   tabState.send({ type: 'deleteSession', id: s.id });
-  confirmDelete = null;
   status = `Deleted “${s.name}”.`;
+  // Deleting is immediate; Undo adds the same session back (restoreSessions keeps its id).
+  notify({
+    level: 'info',
+    text: `Deleted “${s.name}”`,
+    action: {
+      label: 'Undo',
+      run: () => void browser.runtime.sendMessage({ type: 'restoreSessions', sessions: [copy] }),
+    },
+  });
 }
 
 async function openTab(url: string): Promise<void> {
@@ -399,13 +407,6 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
               {#if tabs > STRIP}<span class="more">+{tabs - STRIP}</span>{/if}
             </div>
 
-            {#if confirmDelete === s.id}
-              <div class="actions confirm" role="group" aria-label="Confirm delete">
-                <span>Delete this session?</span>
-                <Button variant="danger" onclick={() => remove(s)}>Delete</Button>
-                <Button variant="text" onclick={() => (confirmDelete = null)}>Keep</Button>
-              </div>
-            {:else}
               <div class="actions" role="group" aria-label="Actions for {s.name}">
                 <Button variant="tonal" onclick={() => restore(s, 'newWindow')}>Restore</Button>
                 <Button variant="text" onclick={() => restore(s, 'currentWindow')}>Into this window</Button>
@@ -419,10 +420,9 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
                   <Button variant="text" onclick={() => { moreId = null; startRename(s); }}>Rename</Button>
                   <Button variant="text" aria-label="Export {s.name} as Markdown" onclick={() => exportAs(s, 'md')}>Export Markdown</Button>
                   <Button variant="text" aria-label="Export {s.name} as a bookmarks file" onclick={() => exportAs(s, 'html')}>Export bookmarks</Button>
-                  <Button variant="text" onclick={() => (confirmDelete = s.id)}>Delete</Button>
+                  <Button variant="text" onclick={() => remove(s)}>Delete</Button>
                 {/if}
               </div>
-            {/if}
 
             {#if open}
               <div class="tabs" id="vc-ses-{s.id}">

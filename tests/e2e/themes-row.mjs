@@ -10,6 +10,25 @@ try {
   await page.getByRole('tab', { name: 'Settings', exact: true }).click();
   await page.locator('summary').filter({ hasText: 'Appearance' }).waitFor();
 
+  // Hovering a theme previews it; leaving restores the real one.
+  const primary = () =>
+    page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--mPrimary').trim(),
+    );
+  const original = await primary();
+  const dracula = page.getByRole('button', { name: 'Use Dracula', exact: true });
+  await dracula.hover();
+  await page.waitForFunction(
+    (o) => getComputedStyle(document.documentElement).getPropertyValue('--mPrimary').trim() !== o,
+    original,
+  );
+  await page.mouse.move(2, 2);
+  await page.waitForFunction(
+    (o) => getComputedStyle(document.documentElement).getPropertyValue('--mPrimary').trim() === o,
+    original,
+  );
+  console.log('PASS hovering a theme previews it and leaving restores the current one');
+
   const pick = page.getByRole('button', { name: 'Use Noctalia', exact: true });
   assert.equal(await pick.getAttribute('aria-pressed'), 'false');
   await pick.click();

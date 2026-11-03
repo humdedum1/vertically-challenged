@@ -132,7 +132,7 @@ $effect(() => {
           <AppearanceCard {settings} {themes} />
           <!-- Focus fallback when the theme a flow started from no longer has a button. -->
           <span id="vc-themes-anchor" tabindex="-1"></span>
-          <ThemesCard {settings} {themes} onedit={open} />
+          <ThemesCard {settings} {themes} drafts={draft} onedit={open} />
         </div>
       </details>
       <details>

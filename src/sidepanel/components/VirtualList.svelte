@@ -27,8 +27,26 @@ export function scroller(): HTMLDivElement | undefined {
   return el;
 }
 
+// Scrolling while a button is held moves rows under the pointer, so the click lands on
+// another tab. Reveals requested meanwhile (active tab changed, remote update) wait for release.
+let held = false;
+let pending: number | null = null;
+
+function release(): void {
+  held = false;
+  if (pending !== null) {
+    const i = pending;
+    pending = null;
+    reveal(i);
+  }
+}
+
 export function reveal(index: number): void {
   if (!el) return;
+  if (held) {
+    pending = index;
+    return;
+  }
   // clientHeight is read here rather than from bound state: this runs right after
   // mount/data changes, before the binding has necessarily updated.
   const top = scrollToReveal(index, el.scrollTop, el.clientHeight, rowHeight);
@@ -40,8 +58,11 @@ function onscroll(e: Event & { currentTarget: HTMLDivElement }): void {
 }
 </script>
 
+<svelte:window onpointerup={release} onpointercancel={release} />
+
 <div
   {...rest}
+  onpointerdowncapture={(e) => { held = e.target !== el; }}
   class="viewport"
   bind:this={el}
   bind:clientHeight={viewportHeight}

@@ -5,6 +5,9 @@ export const MAX_SNOOZED = 200;
 const MAX_URL = 8192;
 const DAY = 86_400_000;
 
+/** wakeAt of a parked tab: put away with no reminder, opened only when you choose. */
+export const PARKED = Number.MAX_SAFE_INTEGER;
+
 /** A tab put away until `wakeAt` (ms since the epoch), kept as just what reopening needs. */
 export interface Snoozed {
   id: string;
@@ -53,6 +56,7 @@ export function snoozePresets(now: Date): { label: string; at: number }[] {
     { label: 'Tomorrow, 9:00', at: at(tomorrow, 9) },
     { label: 'Next Monday, 9:00', at: at(monday, 9) },
     { label: 'In a month', at: at(month, 9) },
+    { label: 'Park for later (no reminder)', at: PARKED },
   ];
 }
 
@@ -86,4 +90,4 @@ export const dueSnoozed = (list: readonly Snoozed[], now: number): Snoozed[] =>
 
 /** The wake time a panel message may carry: in the future, at most about a year out. */
 export const isWakeTime = (v: unknown, now: number): v is number =>
-  typeof v === 'number' && Number.isFinite(v) && v > now && v < now + 366 * DAY;
+  v === PARKED || (typeof v === 'number' && Number.isFinite(v) && v > now && v < now + 366 * DAY);

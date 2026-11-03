@@ -16,6 +16,8 @@ const SCRIPTS = [
   'put-away-search.mjs',
   'settings-search.mjs',
   'help-and-contrast.mjs',
+  'undo-toasts.mjs',
+  'tidy-up.mjs',
   'command-palette.mjs',
   'child-tabs.mjs',
   'new-tab-url.mjs',

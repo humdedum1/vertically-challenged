@@ -11,6 +11,7 @@ import TabList from './components/TabList.svelte';
 import Toasts, { type Toast } from './components/Toasts.svelte';
 import TopBar from './components/TopBar.svelte';
 import Welcome from './components/Welcome.svelte';
+import { type Notice, setNoticeSink } from './notify';
 import { IMPLEMENTED_PANELS, PANEL_ICONS, PANEL_LABELS } from './panel-defs';
 import SettingsPanel from './panels/SettingsPanel.svelte';
 import { scrollIdle } from './scroll-idle.svelte';
@@ -131,6 +132,9 @@ $effect(() => {
     // Preview in the palette being edited, whatever the saved colour mode is.
     const preview = { ...s, appearance: { ...s.appearance, mode: draft.mode } };
     applyAppearance(preview, draft.theme, { persist: false, accent });
+  } else if (draft.hover) {
+    // Hovering a theme in the list previews it in the mode the user already has.
+    applyAppearance(s, draft.hover, { persist: false, accent });
   } else {
     // The first-frame cache only holds the global look, not one window's.
     applyAppearance(s, themes.resolveReady(s.appearance.themeId), {
@@ -147,12 +151,14 @@ let tabList: ReturnType<typeof TabList> | undefined = $state();
 let toasts = $state.raw<Toast[]>([]);
 let nextToast = 0;
 const TOAST_MS = 5000;
+/** Long enough to read the message and reach for Undo. */
+const ACTION_TOAST_MS = 10_000;
 
-function notify(n: { level: 'info' | 'error'; text: string }): void {
+function notify(n: Notice): void {
   const id = nextToast++;
   // Keep the stack short: a burst of notices shouldn't cover the list.
   toasts = [...toasts, { id, ...n }].slice(-3);
-  setTimeout(() => dismiss(id), TOAST_MS);
+  setTimeout(() => dismiss(id), n.action ? ACTION_TOAST_MS : TOAST_MS);
 }
 
 function dismiss(id: number): void {
@@ -173,6 +179,7 @@ async function focusSearch(): Promise<void> {
 $effect(() => {
   const s = tabState;
   s.onNotice = notify;
+  setNoticeSink(notify);
   s.onFocusSearch = () => void focusSearch();
   void s.start();
   return () => s.dispose();

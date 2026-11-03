@@ -1,5 +1,12 @@
 import { browser } from 'wxt/browser';
-import { dueSnoozed, parseSnoozed, planSnooze, SNOOZE_KEY, type Snoozed } from '../shared/snooze';
+import {
+  dueSnoozed,
+  PARKED,
+  parseSnoozed,
+  planSnooze,
+  SNOOZE_KEY,
+  type Snoozed,
+} from '../shared/snooze';
 import type { TabInfo } from '../shared/types';
 
 export const SNOOZE_ALARM = 'vc-snooze';
@@ -26,7 +33,13 @@ export async function scheduleSnoozeAlarm(): Promise<void> {
     await browser.alarms.clear(SNOOZE_ALARM);
     return;
   }
-  const next = Math.min(...list.map((s) => s.wakeAt));
+  // Parked tabs have no wake time, so they never set the alarm.
+  const timed = list.filter((s) => s.wakeAt !== PARKED);
+  if (!timed.length) {
+    await browser.alarms.clear(SNOOZE_ALARM);
+    return;
+  }
+  const next = Math.min(...timed.map((s) => s.wakeAt));
   await browser.alarms.create(SNOOZE_ALARM, { when: Math.max(next, Date.now() + 30_000) });
 }
 

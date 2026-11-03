@@ -10,6 +10,7 @@ import Field from '../../components/controls/Field.svelte';
 import TextInput from '../../components/controls/TextInput.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
+import { notify } from '../../notify';
 import type { SettingsState } from '../../settings-state.svelte';
 import { isCustomId, type ThemeRegistry } from '../../theme-registry.svelte';
 import AutoBackup from './AutoBackup.svelte';
@@ -28,7 +29,6 @@ let status = $state('');
 let error = $state('');
 let warnings = $state<string[]>([]);
 let pending = $state<RestoredBackup | null>(null);
-let confirmReset = $state(false);
 let applying = $state(false);
 let exporting = $state(false);
 const summary = $derived(
@@ -267,9 +267,14 @@ async function apply(): Promise<void> {
 
 function reset(): void {
   clear();
-  confirmReset = false;
+  const before = $state.snapshot(settings.value);
   settings.update(() => structuredClone(DEFAULT_SETTINGS));
   status = 'Settings reset to defaults. Custom themes were kept.';
+  notify({
+    level: 'info',
+    text: 'Settings reset to defaults',
+    action: { label: 'Undo', run: () => settings.update(() => before) },
+  });
 }
 </script>
 
@@ -369,17 +374,7 @@ function reset(): void {
       {/if}
 
       <div class="row">
-        {#if confirmReset}
-          <div class="confirm" role="group" aria-label="Confirm reset">
-            <p>Reset all settings to their defaults? Custom themes are kept.</p>
-            <div class="row">
-              <Button variant="danger" onclick={reset}>Reset</Button>
-              <Button variant="text" onclick={() => (confirmReset = false)}>Keep settings</Button>
-            </div>
-          </div>
-        {:else}
-          <Button variant="danger" onclick={() => (confirmReset = true)}>Reset to defaults</Button>
-        {/if}
+        <Button variant="danger" onclick={reset}>Reset to defaults</Button>
       </div>
     </section>
 

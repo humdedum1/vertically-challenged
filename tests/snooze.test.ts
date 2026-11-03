@@ -3,6 +3,7 @@ import { parsePanelMessage } from '../src/shared/protocol';
 import {
   dueSnoozed,
   isWakeTime,
+  PARKED,
   parseSnoozed,
   planSnooze,
   snoozePresets,
@@ -109,5 +110,21 @@ describe('planSnooze', () => {
       newId,
     );
     expect(p.tabIds).toEqual([1]);
+  });
+});
+
+describe('parked tabs', () => {
+  it('are offered as a preset, accepted by the protocol, and never come due', () => {
+    const park = snoozePresets(new Date(2026, 10, 3, 14, 0)).find((p) => p.at === PARKED);
+    expect(park?.label).toMatch(/Park/);
+    expect(isWakeTime(PARKED, Date.now())).toBe(true);
+    expect(parsePanelMessage({ type: 'snooze', tabIds: [1], wakeAt: PARKED })).toMatchObject({
+      type: 'snooze',
+    });
+    const list = parseSnoozed([
+      { id: 'p1', url: 'https://a.example/', title: 'A', wakeAt: PARKED, snoozedAt: 1 },
+    ]);
+    expect(list).toHaveLength(1);
+    expect(dueSnoozed(list, Date.now() + 1e12)).toEqual([]);
   });
 });

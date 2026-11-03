@@ -80,6 +80,7 @@ import PinRow from './PinRow.svelte';
 import SearchMore from './SearchMore.svelte';
 import ShortcutHelp from './ShortcutHelp.svelte';
 import TabRow from './TabRow.svelte';
+import TidyUp from './TidyUp.svelte';
 import TilesRow, { TILES_ROW_INSET } from './TilesRow.svelte';
 import VirtualList from './VirtualList.svelte';
 import WindowRow from './WindowRow.svelte';
@@ -1469,6 +1470,14 @@ const commands = $derived.by((): Command[] => {
       'Window',
     ),
     {
+      label: 'Tidy up tabs…',
+      group: 'Panel',
+      danger: false,
+      run: () => {
+        tidyOpen = true;
+      },
+    },
+    {
       label: 'Back up now',
       group: 'Backup',
       danger: false,
@@ -1544,6 +1553,30 @@ export function focusSearch(): boolean {
 }
 
 let helpOpen = $state(false);
+let tidyOpen = $state(false);
+const tidyTabs = $derived.by(() => {
+  const id = tabState.windowId;
+  return (id === null ? undefined : windowViewById.get(id)?.tabs) ?? [];
+});
+
+// Alt+1 to Alt+9 jump to that tab of this window, in the order the list shows them.
+$effect(() => {
+  const onJump = (e: KeyboardEvent) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return;
+    const n = /^[1-9]$/.test(e.key) ? Number(e.key) : 0;
+    if (!n) return;
+    const t = e.target as HTMLElement | null;
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t?.isContentEditable)
+      return;
+    const id = tabState.windowId;
+    const target = id === null ? undefined : windowViewById.get(id)?.tabs[n - 1];
+    if (!target) return;
+    e.preventDefault();
+    send({ type: 'activate', tabId: target.id });
+  };
+  window.addEventListener('keydown', onJump);
+  return () => window.removeEventListener('keydown', onJump);
+});
 // "?" (outside text fields) shows what the keyboard can do.
 $effect(() => {
   const onHelp = (e: KeyboardEvent) => {
@@ -1577,6 +1610,10 @@ $effect(() => {
   return () => window.removeEventListener('keydown', onKey);
 });
 </script>
+
+{#if tidyOpen}
+  <TidyUp tabs={tidyTabs} {send} onclose={() => (tidyOpen = false)} />
+{/if}
 
 {#if helpOpen}
   <ShortcutHelp {shortcuts} onclose={() => (helpOpen = false)} />
@@ -2023,7 +2060,8 @@ $effect(() => {
     position: absolute;
     left: 2px;
     right: 2px;
-    border: 2px solid var(--mPrimary);
+    /* Dashed, so a drop target never reads as the solid focus or selection ring. */
+    border: 2px dashed var(--mPrimary);
     border-radius: var(--radius-row);
     background: color-mix(in srgb, var(--mPrimary) 12%, transparent);
     pointer-events: none;

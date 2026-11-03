@@ -6,7 +6,9 @@ import { cleanName, exportTheme, importTheme, MAX_IMPORT_BYTES } from '../../../
 import Button from '../../components/controls/Button.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
+import { notify } from '../../notify';
 import type { SettingsState } from '../../settings-state.svelte';
+import type { ThemeDraft } from '../../theme-draft.svelte';
 import {
   isCustomId,
   MAX_CUSTOM_THEMES,
@@ -17,13 +19,27 @@ import { downloadText, fileSafe } from './download';
 import { SystemDark } from './system-dark.svelte';
 
 interface Props {
+  drafts: ThemeDraft;
   settings: SettingsState;
   themes: ThemeRegistry;
   /** Opens the editor on a theme; `origin` says which button to give focus back to. */
   onedit: (theme: Theme, origin: { id: string; action: 'edit' | 'duplicate' }) => void;
 }
 
-let { settings, themes, onedit }: Props = $props();
+let { settings, themes, drafts, onedit }: Props = $props();
+
+// Hovering or focusing a row previews that theme; a short delay stops it flickering as the
+// pointer crosses the list, and leaving (or choosing) puts the real theme back.
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
+function preview(t: Theme | null): void {
+  clearTimeout(previewTimer);
+  if (t === null) drafts.hover = null;
+  else previewTimer = setTimeout(() => (drafts.hover = t), 120);
+}
+$effect(() => () => {
+  clearTimeout(previewTimer);
+  drafts.hover = null;
+});
 
 const system = new SystemDark();
 $effect(system.start);
@@ -34,7 +50,6 @@ const activeId = $derived(settings.value.appearance.themeId);
 let status = $state('');
 let error = $state('');
 let notes = $state<string[]>([]);
-let confirmId = $state<string | null>(null);
 let moreId = $state<string | null>(null);
 let fileInput: HTMLInputElement | undefined = $state();
 
@@ -70,17 +85,35 @@ function exportOne(t: Theme): void {
 
 async function remove(t: Theme): Promise<void> {
   clear();
-  confirmId = null;
+  moreId = null;
+  const wasActive = activeId === t.id;
+  const copy = $state.snapshot(t) as Theme;
   try {
     await themes.remove(t.id);
     // Don't leave a dangling id selected; resolve() would silently fall back anyway.
-    if (activeId === t.id) {
+    if (wasActive) {
       settings.update((s) => ({
         ...s,
         appearance: { ...s.appearance, themeId: DEFAULT_THEME_ID },
       }));
     }
     status = `Deleted ${t.name}.`;
+    notify({
+      level: 'info',
+      text: `Deleted theme “${t.name}”`,
+      action: {
+        label: 'Undo',
+        run: () => {
+          void themes.save(copy).then(() => {
+            if (wasActive)
+              settings.update((s) => ({
+                ...s,
+                appearance: { ...s.appearance, themeId: copy.id },
+              }));
+          });
+        },
+      },
+    });
   } catch {
     error = `Couldn’t delete ${t.name}.`;
   }
@@ -136,7 +169,14 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
               data-action="use"
               aria-pressed={t.id === activeId}
               aria-label="Use {t.name}"
-              onclick={() => use(t)}
+              onclick={() => {
+                preview(null);
+                use(t);
+              }}
+              onpointerenter={() => preview(t)}
+              onpointerleave={() => preview(null)}
+              onfocus={() => preview(t)}
+              onblur={() => preview(null)}
             >
               <span class="strip" aria-hidden="true">
                 {#each [p.mPrimary, p.mSecondary, p.mTertiary, p.mSurface, p.mSurfaceVariant] as c, i (i)}
@@ -151,17 +191,11 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
               class="more"
               aria-expanded={moreId === t.id}
               aria-label="More actions for {t.name}"
-              onclick={() => { moreId = moreId === t.id ? null : t.id; confirmId = null; }}
+              onclick={() => { moreId = moreId === t.id ? null : t.id; }}
             >More</button>
           </div>
 
-          {#if confirmId === t.id}
-            <div class="actions" role="group" aria-label="Confirm deleting {t.name}">
-              <span class="ask">Delete “{t.name}”?</span>
-              <Button variant="danger" onclick={() => remove(t)}>Delete</Button>
-              <Button variant="text" onclick={() => (confirmId = null)}>Keep</Button>
-            </div>
-          {:else if moreId === t.id}
+          {#if moreId === t.id}
             <div class="actions" role="group" aria-label="{t.name} actions">
               <Button data-action="duplicate" aria-label="Duplicate {t.name}" onclick={() => duplicate(t)}>Duplicate</Button>
               {#if custom}
@@ -169,7 +203,7 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
               {/if}
               <Button data-action="export" aria-label="Export {t.name}" onclick={() => exportOne(t)}>Export</Button>
               {#if custom}
-                <Button variant="danger" data-action="delete" aria-label="Delete {t.name}" onclick={() => (confirmId = t.id)}>Delete</Button>
+                <Button variant="danger" data-action="delete" aria-label="Delete {t.name}" onclick={() => remove(t)}>Delete</Button>
               {/if}
             </div>
           {/if}
@@ -327,11 +361,6 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-  }
-
-  .ask {
-    flex: 1;
-    min-width: 0;
   }
 
   .inuse {

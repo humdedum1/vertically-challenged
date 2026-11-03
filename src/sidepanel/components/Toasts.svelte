@@ -3,6 +3,7 @@ export interface Toast {
   id: number;
   level: 'info' | 'error';
   text: string;
+  action?: { label: string; run: () => void };
 }
 </script>
 
@@ -21,6 +22,9 @@ const errors = $derived(toasts.filter((t) => t.level === 'error'));
 {#snippet item(t: Toast)}
   <div class="toast" class:error={t.level === 'error'}>
     <span class="text">{t.text}</span>
+    {#if t.action}
+      <button type="button" class="act" onclick={() => { t.action?.run(); ondismiss(t.id); }}>{t.action.label}</button>
+    {/if}
     <button type="button" aria-label="Dismiss" onclick={() => ondismiss(t.id)}>
       <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
         <path d="m4 4 8 8m0-8-8 8" />
@@ -112,5 +116,21 @@ const errors = $derived(toasts.filter((t) => t.level === 'error'));
   button:hover {
     background: var(--state-hover);
     color: var(--mOnSurface);
+  }
+
+  .act {
+    flex: none;
+    padding: 4px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    background: transparent;
+    color: var(--mPrimary);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .act:hover {
+    background: var(--state-hover);
   }
 </style>

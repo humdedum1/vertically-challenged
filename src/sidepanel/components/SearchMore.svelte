@@ -135,11 +135,11 @@ function open(url: string): void {
   {@render section('Bookmarks', bookmarks)}
   {@render section('History', history)}
   {#if snoozedHits.length}
-    <p class="label">Snoozed</p>
+    <p class="label">Put away</p>
     <ul>
       {#each snoozedHits as s (s.id)}
         <li>
-          <button type="button" title="{s.url} (snoozed; opens it now)" onclick={() => onwake(s.id)}>
+          <button type="button" title="{s.url} (put away; opens it now)" onclick={() => onwake(s.id)}>
             <Favicon url={s.url} size={14} />
             <span class="t">{s.title || s.url}</span>
           </button>

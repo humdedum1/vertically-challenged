@@ -38,6 +38,9 @@ export default defineConfig({
       'activeTab',
       'scripting',
     ],
+    // Only when "Open on launch" is switched on: Chrome won't open the panel without a
+    // user gesture, so launch shows a notification whose click opens it.
+    optional_permissions: ['notifications'],
     // The in-page popup frames the panel page. The dynamic URL changes every browser
     // session and is only known to the extension, so other sites can't frame the panel.
     web_accessible_resources: [

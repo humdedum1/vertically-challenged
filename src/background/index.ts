@@ -55,6 +55,34 @@ export function startBackground(): void {
   // Only fires in popup mode: in side-panel mode Chrome handles the click.
   browser.action.onClicked.addListener((tab) => void display.actionClicked(targetOf(tab)));
 
+  // "Open on launch": a notification whose click is the gesture sidePanel.open needs. The
+  // target is in the id, so the click opens synchronously even if the worker slept since.
+  browser.runtime.onStartup.addListener(() => void notifyLaunch());
+  browser.notifications?.onClicked.addListener((id) => {
+    const m = /^vc-launch:(\d+):(\d+):(0|1)$/.exec(id);
+    if (!m) return;
+    display.open(
+      { windowId: Number(m[1]), id: Number(m[2]), incognito: m[3] === '1' },
+      { toggle: false, sidebarOpen: false },
+    );
+    void browser.notifications.clear(id);
+  });
+  async function notifyLaunch(): Promise<void> {
+    if (!(await settingsNow()).display.openOnLaunch || !browser.notifications) return;
+    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    if (tab?.id === undefined) return;
+    await browser.notifications.create(
+      `vc-launch:${tab.windowId}:${tab.id}:${tab.incognito ? 1 : 0}`,
+      {
+        type: 'basic',
+        iconUrl: browser.runtime.getURL('/icon/128.png'),
+        title: 'Vertically Challenged',
+        message: 'Click to open your vertical tabs.',
+        requireInteraction: true,
+      },
+    );
+  }
+
   const detachedTabs = new Set<number>();
   const detachedReady = browser.storage.session.get('detachedTabs').then((stored) => {
     if (Array.isArray(stored.detachedTabs))

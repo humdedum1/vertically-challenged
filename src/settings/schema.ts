@@ -95,6 +95,8 @@ export interface DisplaySettings {
    * window on pages extensions can't run on, such as chrome:// pages and incognito).
    */
   mode: DisplayMode;
+  /** Show a notification at browser launch whose click opens the panel (Chrome won't open it unprompted). */
+  openOnLaunch: boolean;
 }
 
 export interface TabRowSettings {
@@ -173,7 +175,7 @@ export const DEFAULT_SETTINGS: Settings = {
   suspend: { auto: false, minutes: 30, skipPinned: true, skipAudible: true, whitelist: [] },
   sessions: { restoreDiscarded: true },
   sync: { workspaces: true, sessions: true, intervalMinutes: 1 },
-  display: { mode: 'sidebar' },
+  display: { mode: 'sidebar', openOnLaunch: false },
   shortcuts: {
     focusSearch: ['/', 'Ctrl+F'],
     closeTab: ['Delete'],

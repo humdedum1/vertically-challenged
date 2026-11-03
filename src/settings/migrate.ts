@@ -191,7 +191,10 @@ function sanitize(raw: Raw): Settings {
   };
 
   const di = isObj(raw.display) ? raw.display : {};
-  const display: DisplaySettings = { mode: oneOf(di.mode, DISPLAY_MODES, d.display.mode) };
+  const display: DisplaySettings = {
+    mode: oneOf(di.mode, DISPLAY_MODES, d.display.mode),
+    openOnLaunch: typeof di.openOnLaunch === 'boolean' ? di.openOnLaunch : d.display.openOnLaunch,
+  };
 
   const l = isObj(raw.layout) ? raw.layout : {};
   const layout: LayoutSettings = {

@@ -2,6 +2,7 @@
 import type { DisplayMode } from '../../../settings/schema';
 import Field from '../../components/controls/Field.svelte';
 import SegmentedControl from '../../components/controls/SegmentedControl.svelte';
+import Toggle from '../../components/controls/Toggle.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
 import type { SettingsState } from '../../settings-state.svelte';
@@ -14,6 +15,12 @@ const MODES: { value: DisplayMode; label: string }[] = [
 ];
 
 const mode = $derived(settings.value.display.mode);
+
+// Notifications are optional: asked for (in this click's gesture) only when switching on.
+async function setOpenOnLaunch(on: boolean): Promise<void> {
+  if (on && !(await browser.permissions.request({ permissions: ['notifications'] }))) return;
+  settings.update((s) => ({ ...s, display: { ...s.display, openOnLaunch: on } }));
+}
 </script>
 
 <SegmentCard title="Display">
@@ -24,7 +31,7 @@ const mode = $derived(settings.value.display.mode);
         label="Open the panel as"
         options={MODES}
         value={mode}
-        onchange={(next) => settings.update((s) => ({ ...s, display: { mode: next } }))}
+        onchange={(next) => settings.update((s) => ({ ...s, display: { ...s.display, mode: next } }))}
       />
     </Field>
     <p class="muted">
@@ -36,6 +43,12 @@ const mode = $derived(settings.value.display.mode);
         incognito) it opens in a small window.
       {/if}
     </p>
+    <Toggle
+      label="Open on browser launch"
+      hint="Chrome doesn’t let extensions open the panel on their own, so a notification appears at launch; click it to open the panel."
+      checked={settings.value.display.openOnLaunch}
+      onchange={(on) => void setOpenOnLaunch(on)}
+    />
   </div>
 </SegmentCard>
 

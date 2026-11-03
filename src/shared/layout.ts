@@ -124,6 +124,13 @@ export function emptyLayout(incognito: boolean): WindowLayout {
   };
 }
 
+/** Number of folder levels in a subtree, counting the folder itself. */
+export function folderHeight(f: PinFolder): number {
+  let h = 0;
+  for (const c of f.children) if (c.kind === 'folder') h = Math.max(h, folderHeight(c));
+  return h + 1;
+}
+
 /** Essentials in grid order, then the pinned tree depth-first (including collapsed folders). */
 export function flattenItems(l: WindowLayout): PinItem[] {
   const out: PinItem[] = [...l.essentials];

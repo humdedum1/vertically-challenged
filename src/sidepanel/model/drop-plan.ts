@@ -1,6 +1,7 @@
 import {
   findNode,
   flattenItems,
+  folderHeight,
   MAX_FOLDER_DEPTH,
   type PinDest,
   type PinFolder,
@@ -387,24 +388,17 @@ function spotFor(
   }
 }
 
-/** Number of folder levels in a subtree, counting the folder itself. */
-function height(f: PinFolder): number {
-  let h = 0;
-  for (const c of f.children) if (c.kind === 'folder') h = Math.max(h, height(c));
-  return h + 1;
-}
-
 /**
  * Mirrors moveNode in background/pins/ops.ts, so a drop the worker would ignore shows no
  * indicator: folders stay out of Essentials, out of themselves, within the depth limit.
  */
 export function folderFits(l: WindowLayout, f: PinFolder, dest: PinDest): boolean {
   if (dest.zone === 'essentials') return false;
-  if (dest.folderId === null) return height(f) <= MAX_FOLDER_DEPTH;
+  if (dest.folderId === null) return folderHeight(f) <= MAX_FOLDER_DEPTH;
   if (dest.folderId === f.id || findNode({ ...l, essentials: [], pinned: [f] }, dest.folderId))
     return false;
   const hit = findNode(l, dest.folderId);
-  return hit?.node.kind === 'folder' && hit.depth + height(f) <= MAX_FOLDER_DEPTH;
+  return hit?.node.kind === 'folder' && hit.depth + folderHeight(f) <= MAX_FOLDER_DEPTH;
 }
 
 /**

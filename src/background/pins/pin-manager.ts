@@ -320,7 +320,7 @@ export class PinManager {
     const windows = this.deps.windows();
     if (windows.length === 0) return false;
     this.pendingMatch = false;
-    const now = this.deps.now?.() ?? Date.now();
+    const now = this.now();
     this.lateUntil = now + LATE_RESTORE_MS;
     const open = windows.filter((w) => {
       const id = this.bindings.get(w.id);
@@ -374,9 +374,34 @@ export class PinManager {
     this.markDirty(true);
   }
 
+  private now(): number {
+    return this.deps.now?.() ?? Date.now();
+  }
+
+  private boundLayout(windowId: number): WindowLayout | undefined {
+    const id = this.bindings.get(windowId);
+    return id === undefined ? undefined : this.layouts.get(id);
+  }
+
+  private lateCandidateLayouts(): WindowLayout[] {
+    return [...this.lateCandidates]
+      .map((c) => this.setupLayout(c))
+      .filter((c): c is WindowLayout => c !== undefined);
+  }
+
+  /** A window as matchLayouts sees it. */
+  private lateWindow(windowId: number, tabs: readonly TabInfo[]) {
+    return {
+      windowId,
+      incognito: this.incognitoOf(windowId) ?? true,
+      urls: tabs.map((t) => t.url),
+      pinned: tabs.filter((t) => t.pinned).map((t) => ({ id: t.id, url: t.url, title: t.title })),
+    };
+  }
+
   private inLateRestore(): boolean {
     if (this.lateUntil === 0) return false;
-    if ((this.deps.now?.() ?? Date.now()) < this.lateUntil) return true;
+    if (this.now() < this.lateUntil) return true;
     this.lateUntil = 0;
     this.lateCandidates.clear();
     this.restartMatched.clear();
@@ -391,7 +416,7 @@ export class PinManager {
   private resumeLate(raw: unknown): void {
     if (typeof raw !== 'object' || raw === null) return;
     const { until, candidates, matched } = raw as Record<string, unknown>;
-    if (typeof until !== 'number' || until <= (this.deps.now?.() ?? Date.now())) return;
+    if (typeof until !== 'number' || until <= this.now()) return;
     this.lateUntil = until;
     if (Array.isArray(candidates)) {
       for (const id of candidates)
@@ -410,8 +435,7 @@ export class PinManager {
    */
   private lateEligible(windowId: number, tabs: readonly TabInfo[]): boolean {
     if (this.lateDone.has(windowId) || this.lateCandidates.size === 0) return false;
-    const id = this.bindings.get(windowId);
-    const l = id === undefined ? undefined : this.layouts.get(id);
+    const l = this.boundLayout(windowId);
     if (l && !isEmptyLayout(l)) return false;
     const pinned = tabs.filter((t) => t.pinned);
     const namedCandidates = [...this.lateCandidates].some(
@@ -428,7 +452,7 @@ export class PinManager {
    * false once it has waited long enough; the caller then matches right away.
    */
   private holdLate(windowId: number, tabs: readonly TabInfo[]): boolean {
-    const now = this.deps.now?.() ?? Date.now();
+    const now = this.now();
     const signature = JSON.stringify(tabs.map((t) => [t.id, t.url]));
     const w = this.lateWaiting.get(windowId);
     if (w && now - w.since >= LATE_SETTLE_MAX_MS) return false;
@@ -450,26 +474,13 @@ export class PinManager {
     if (ids.length === 0) return;
     for (const w of ids) this.lateDone.add(w);
     if (this.inLateRestore()) {
-      const candidates = [...this.lateCandidates]
-        .map((c) => this.setupLayout(c))
-        .filter((c): c is WindowLayout => c !== undefined);
       const windows = ids.flatMap((windowId) => {
         const tabs = this.deps.store.snapshot(windowId).tabs;
-        const id = this.bindings.get(windowId);
-        const l = id === undefined ? undefined : this.layouts.get(id);
-        if (l && !isEmptyLayout(l)) return [];
-        const pinned = tabs.filter((t) => t.pinned);
-        if (tabs.length === 0) return [];
-        return [
-          {
-            windowId,
-            incognito: this.incognitoOf(windowId) ?? true,
-            urls: tabs.map((t) => t.url),
-            pinned: pinned.map((t) => ({ id: t.id, url: t.url, title: t.title })),
-          },
-        ];
+        const l = this.boundLayout(windowId);
+        if ((l && !isEmptyLayout(l)) || tabs.length === 0) return [];
+        return [this.lateWindow(windowId, tabs)];
       });
-      const matches = matchLayouts(candidates, windows);
+      const matches = matchLayouts(this.lateCandidateLayouts(), windows);
       for (const [windowId, m] of matches) this.bindMatch(windowId, m);
       if (matches.size > 0) this.publishSetups();
     }
@@ -478,18 +489,9 @@ export class PinManager {
 
   /** resolveLate for one window that has waited LATE_SETTLE_MAX_MS. */
   private matchOneLate(windowId: number, tabs: readonly TabInfo[]): boolean {
-    const candidates = [...this.lateCandidates]
-      .map((c) => this.setupLayout(c))
-      .filter((c): c is WindowLayout => c !== undefined);
-    const pinned = tabs.filter((t) => t.pinned);
-    const m = matchLayouts(candidates, [
-      {
-        windowId,
-        incognito: this.incognitoOf(windowId) ?? true,
-        urls: tabs.map((t) => t.url),
-        pinned: pinned.map((t) => ({ id: t.id, url: t.url, title: t.title })),
-      },
-    ]).get(windowId);
+    const m = matchLayouts(this.lateCandidateLayouts(), [this.lateWindow(windowId, tabs)]).get(
+      windowId,
+    );
     if (!m) return false;
     this.bindMatch(windowId, m);
     this.publishSetups();
@@ -503,8 +505,7 @@ export class PinManager {
    */
   private pairDormant(windowId: number, tabs: readonly TabInfo[]): boolean {
     if (!this.restartMatched.has(windowId)) return false;
-    const id = this.bindings.get(windowId);
-    const l = id === undefined ? undefined : this.layouts.get(id);
+    const l = this.boundLayout(windowId);
     if (!l) return false;
     const items = flattenItems(l);
     const known = new Set(items.map((i) => i.tabId));
@@ -713,8 +714,7 @@ export class PinManager {
   onWindowFocused(windowId: number): void {
     if (windowId < 0) return;
     void this.exclusive(() => {
-      const id = this.bindings.get(windowId);
-      const l = id === undefined ? undefined : this.layouts.get(id);
+      const l = this.boundLayout(windowId);
       const now = Date.now();
       if (!l || now - l.lastUsed < LAST_USED_THROTTLE_MS) return;
       this.layouts.set(l.id, { ...l, lastUsed: now });
@@ -1365,8 +1365,7 @@ export class PinManager {
 
   private publish(changed: ReadonlySet<number>): void {
     for (const w of changed) {
-      const id = this.bindings.get(w);
-      const l = id === undefined ? undefined : this.layouts.get(id);
+      const l = this.boundLayout(w);
       if (!l) continue;
       this.markDirty(l.incognito);
       this.deps.broadcast(w, { type: 'layout', windowId: w, layout: l });

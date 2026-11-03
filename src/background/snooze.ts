@@ -8,20 +8,19 @@ import {
   type Snoozed,
 } from '../shared/snooze';
 import type { TabInfo } from '../shared/types';
+import { createWriteQueue } from './write-queue';
 
 export const SNOOZE_ALARM = 'vc-snooze';
 
 /** Writes are queued so a wake and a snooze at the same moment can't lose each other. */
-let queue: Promise<unknown> = Promise.resolve();
+const enqueue = createWriteQueue();
 function mutate<T>(fn: (list: Snoozed[]) => { list: Snoozed[]; result: T }): Promise<T> {
-  const run = queue.then(async () => {
+  return enqueue(async () => {
     const list = parseSnoozed((await browser.storage.local.get(SNOOZE_KEY))[SNOOZE_KEY]);
     const { list: next, result } = fn(list);
     await browser.storage.local.set({ [SNOOZE_KEY]: next });
     return result;
   });
-  queue = run.catch(() => {});
-  return run;
 }
 
 const newId = (): string => crypto.randomUUID().replace(/-/g, '').slice(0, 16);

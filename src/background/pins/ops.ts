@@ -8,6 +8,7 @@ import {
   type FolderIcon,
   findNode,
   flattenItems,
+  folderHeight,
   MAX_FOLDER_DEPTH,
   MAX_ITEMS,
   MAX_NAME,
@@ -36,13 +37,6 @@ function destDepth(l: WindowLayout, dest: PinnedDest): number | null {
   if (dest.folderId === null) return 0;
   const hit = findNode(l, dest.folderId);
   return hit?.zone === 'pinned' && hit.node.kind === 'folder' ? hit.depth : null;
-}
-
-/** Number of folder levels in a subtree, counting the folder itself. */
-function height(f: PinFolder): number {
-  let h = 0;
-  for (const c of f.children) if (c.kind === 'folder') h = Math.max(h, height(c));
-  return h + 1;
 }
 
 function splice(list: PinNode[] | PinItem[], index: number, nodes: PinNode[]): void {
@@ -84,7 +78,7 @@ export function moveNode(l: WindowLayout, nodeId: string, dest: PinDest): Window
         return l;
     }
     const depth = destDepth(l, dest);
-    if (depth === null || depth + height(hit.node) > MAX_FOLDER_DEPTH) return l;
+    if (depth === null || depth + folderHeight(hit.node) > MAX_FOLDER_DEPTH) return l;
   } else if (dest.zone === 'pinned' && dest.folderId === nodeId) {
     return l;
   }

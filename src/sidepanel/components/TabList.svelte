@@ -37,6 +37,7 @@ import type { PanelMessage } from '../../shared/protocol';
 import type { GroupInfo, TabInfo } from '../../shared/types';
 import { buildChildRows } from '../model/child-tabs';
 import { type Command, matchCommands, menuCommands } from '../model/commands';
+import { canBeEssential, type DragContext, dragName, dragOf } from '../model/drag-source';
 import {
   type Drag,
   type DropZone,
@@ -45,6 +46,7 @@ import {
   planDropMulti,
   planPinDrop,
 } from '../model/drop-plan';
+import { nodeName, planKeyMove } from '../model/key-move';
 import {
   dividerMenu,
   essentialMenu,
@@ -764,29 +766,6 @@ function openMenuFromKeyboard(): void {
 
 let announcement = $state('');
 
-function rowName(r: Row): string {
-  switch (r.kind) {
-    case 'window':
-      return r.name;
-    case 'group':
-      return r.group.title || 'Unnamed group';
-    case 'tab':
-      return r.tab.title || r.tab.url || 'New Tab';
-    case 'pin':
-      return r.tab?.title || r.item.title || r.item.homeUrl;
-    case 'folder':
-      return r.folder.name;
-    case 'divider':
-      return 'the pinned tabs';
-    case 'tiles':
-      return 'Staples';
-  }
-}
-
-/** Rows that keyboard moves of normal tabs step over (pins move with their own keys). */
-const isPinnedArea = (r: Row | undefined): boolean =>
-  r?.kind === 'pin' || r?.kind === 'folder' || r?.kind === 'divider' || r?.kind === 'tiles';
-
 const multiCtx: MultiDropContext = {
   ctxFor: (id) => {
     const w = windowViewById.get(id);
@@ -801,33 +780,18 @@ function planFor(drag: Drag, index: number, zone: DropZone): PanelMessage | null
   return planDropMulti(multiCtx, view, drag, index, zone);
 }
 
-/** Display name of a node of a layout (item: its tab's title first). */
-function nodeName(l: WindowLayout, id: string): string {
-  const stack: PinNode[] = [...l.essentials, ...l.pinned];
-  while (stack.length) {
-    const n = stack.pop() as PinNode;
-    if (n.id === id) {
-      if (n.kind === 'folder') return n.name;
-      const t = n.tabId === null ? undefined : tabById.get(n.tabId);
-      return t?.title || n.title || n.homeUrl;
-    }
-    if (n.kind === 'folder') stack.push(...n.children);
-  }
-  return '';
-}
-
 /** Keyboard move of a pin, folder or tile (`across`: a tile, announced as before / after). */
 function moveNodeByKey(windowId: number, nodeId: string, dir: -1 | 1, across = false): void {
   const l = layoutOf(windowId);
   const step = l && pinStep(l, nodeId, dir);
   if (!l || !step) return;
-  const what = nodeName(l, nodeId);
+  const what = nodeName(l, nodeId, tabById);
   if ('edge' in step) {
     announcement = `${what} is already ${dir < 0 ? 'first' : 'last'}`;
     return;
   }
   send({ type: 'pinMove', windowId, nodeId, toWindowId: windowId, dest: step.dest });
-  const ref = nodeName(l, step.ref);
+  const ref = nodeName(l, step.ref, tabById);
   const how =
     across && step.how !== 'into' && step.how !== 'out of'
       ? dir < 0
@@ -845,103 +809,9 @@ function moveByKey(dir: -1 | 1): void {
     return;
   }
   if (row?.kind !== 'tab' && row?.kind !== 'group') return;
-  let drag: Drag;
-  let isMoving: (r: Row) => boolean;
-  let what: string;
-  if (row.kind === 'group') {
-    const gid = row.group.id;
-    drag = { kind: 'group', groupId: gid };
-    isMoving = (r) =>
-      r.kind === 'group' ? r.group.id === gid : r.kind === 'tab' && r.tab.groupId === gid;
-    what = rowName(row);
-  } else {
-    const ids = new Set(movableTargets(row.tab));
-    if (ids.size === 0) {
-      announcement = `${rowName(row)} is pinned and can’t be moved this way`;
-      return;
-    }
-    drag = { kind: 'tabs', tabIds: [...ids] };
-    isMoving = (r) => r.kind === 'tab' && ids.has(r.tab.id);
-    what = ids.size > 1 ? `${ids.size} tabs` : rowName(row);
-  }
-  let first = -1;
-  let last = -1;
-  for (let i = 0; i < view.length; i++) {
-    if (!isMoving(view[i] as Row)) continue;
-    if (first === -1) first = i;
-    last = i;
-  }
-  let j = dir < 0 ? first - 1 : last + 1;
-  while (j >= 0 && j < view.length && isMoving(view[j] as Row)) j += dir;
-  // A tab can't move into the pinned area by keyboard (yet): going up, step over it to
-  // this window's header, which then hands the tab to the window above.
-  let skippedPinned = false;
-  if (row.kind === 'tab' && dir < 0) {
-    while (isPinnedArea(view[j])) {
-      j--;
-      skippedPinned = true;
-    }
-  }
-  let neighbour = view[j];
-  // A window header between two windows: step over it so one press crosses into the
-  // neighbouring window (top of its normal tabs, bottom of the previous one).
-  let crossZone: DropZone | null = null;
-  if (neighbour?.kind === 'window' && row.kind === 'tab') {
-    if (dir > 0) {
-      let k = j + 1;
-      while (isPinnedArea(view[k])) k++;
-      const firstThere = view[k];
-      if (firstThere && firstThere.kind !== 'window') {
-        j = k;
-        neighbour = firstThere;
-        crossZone = 'before';
-      } else {
-        // Collapsed, or no normal tabs: drop on the header, which appends.
-        crossZone = 'inside';
-      }
-    } else {
-      const beyond = view[j - 1];
-      if (beyond && !isPinnedArea(beyond)) {
-        j -= 1;
-        neighbour = beyond;
-        crossZone = 'after';
-      } else neighbour = undefined;
-    }
-  }
-  if (!neighbour) {
-    announcement = skippedPinned
-      ? `Can’t move ${what} into the pinned tabs`
-      : `${what} is already ${dir < 0 ? 'first' : 'last'}`;
-    return;
-  }
-  // Crossing a group edge takes one press of its own: the first press only changes
-  // membership (enter as last child / leave just past the group), like moving through a
-  // folder boundary, instead of jumping a row and changing membership at once.
-  let zone: DropZone = crossZone ?? (dir < 0 ? 'before' : 'after');
-  if (crossZone === null && drag.kind === 'tabs' && row.kind === 'tab') {
-    const from = row.tab.pinned ? -1 : row.tab.groupId;
-    if (
-      dir < 0 &&
-      neighbour.kind === 'tab' &&
-      isGroupedTab(neighbour.tab) &&
-      neighbour.tab.groupId !== from
-    ) {
-      zone = 'after';
-    } else if (
-      dir > 0 &&
-      from !== -1 &&
-      (neighbour.kind === 'group' || (neighbour.kind === 'tab' && neighbour.tab.groupId !== from))
-    ) {
-      zone = 'before';
-    }
-  }
-  const plan = planFor(drag, j, zone);
-  if (!plan) {
-    announcement = `Can’t move ${what} ${dir < 0 ? 'above' : 'below'} ${rowName(neighbour)}`;
-    return;
-  }
-  send(plan);
-  announcement = `Moved ${what} ${dir < 0 ? 'above' : 'below'} ${rowName(neighbour)}`;
+  const move = planKeyMove({ view, movableTargets, isGroupedTab, planFor }, row, dir);
+  if (move.plan) send(move.plan);
+  announcement = move.announcement;
 }
 
 // --- Pointer drag and drop -------------------------------------------------------------
@@ -961,98 +831,39 @@ let listHover: HoverTarget | null = null;
 let gridTarget: GridTarget | null = null;
 let dropKey = '';
 
+const dragCtx: DragContext = {
+  get view() {
+    return view;
+  },
+  get searching() {
+    return searching;
+  },
+  get selection() {
+    return selection;
+  },
+  get tabById() {
+    return tabById;
+  },
+  get groupById() {
+    return groupById;
+  },
+  get layoutTabIds() {
+    return layoutTabIds;
+  },
+  get windowIds() {
+    return tabState.windows.map((w) => w.info.id);
+  },
+  get homeId() {
+    return tabState.windowId;
+  },
+  layoutOf,
+  isIncognito: (id) => multiCtx.isIncognito(id),
+  movableTargets,
+};
+
 const placeGhost = (node: HTMLElement): void => {
   node.style.transform = `translate(${pointer.x + 14}px, ${pointer.y + 14}px)`;
 };
-
-/** The item of a pinned tab, in whichever layout has it. */
-function itemOfTab(tabId: number): { windowId: number; item: PinItem } | null {
-  for (const w of tabState.windows) {
-    const l = tabState.layoutOf(w.info.id);
-    const item = l && flattenItems(l).find((i) => i.tabId === tabId);
-    if (item) return { windowId: w.info.id, item };
-  }
-  return null;
-}
-
-/**
- * A pinned row drags its node, or the selection when every selected tab is a live pin
- * of that window (then as tabs, in layout order, which pinTabs moves as their items).
- */
-function pinDrag(row: PinRowT): Drag {
-  const tab = row.tab;
-  const l = layoutOf(row.windowId);
-  if (tab && l && selection.size > 1 && selection.has(tab.id)) {
-    const ids = flattenItems(l)
-      .map((i) => i.tabId)
-      .filter((id): id is number => id !== null && selection.has(id) && tabById.has(id));
-    if (ids.length === selection.size) return { kind: 'tabs', tabIds: ids };
-  }
-  return { kind: 'node', windowId: row.windowId, nodeId: row.item.id };
-}
-
-function dragOf(i: number, e: PointerEvent): Drag | null {
-  const row = view[i];
-  if (!row || searching) return null;
-  switch (row.kind) {
-    case 'group':
-      return { kind: 'group', groupId: row.group.id };
-    case 'folder':
-      return { kind: 'node', windowId: row.windowId, nodeId: row.folder.id };
-    case 'pin':
-      return pinDrag(row);
-    case 'tiles': {
-      const id = (e.target as Element).closest<HTMLElement>('[data-item]')?.dataset.item;
-      return id ? { kind: 'node', windowId: row.windowId, nodeId: id } : null;
-    }
-    case 'tab': {
-      // R18: anything pinned drags as a pin (its item, or the bare tab for pinTabs / unpin).
-      if (row.tab.pinned || layoutTabIds.has(row.tab.id)) {
-        const own = itemOfTab(row.tab.id);
-        return own
-          ? { kind: 'node', windowId: own.windowId, nodeId: own.item.id }
-          : { kind: 'tabs', tabIds: [row.tab.id] };
-      }
-      const tabIds = movableTargets(row.tab);
-      return tabIds.length > 0 ? { kind: 'tabs', tabIds } : null;
-    }
-    default:
-      return null;
-  }
-}
-
-function dragName(payload: Drag): string {
-  if (payload.kind === 'group') return groupById.get(payload.groupId)?.title || 'Unnamed group';
-  if (payload.kind === 'node') {
-    const l = layoutOf(payload.windowId);
-    return (l && nodeName(l, payload.nodeId)) || 'Pinned tab';
-  }
-  if (payload.tabIds.length > 1) return `${payload.tabIds.length} tabs`;
-  const t = tabById.get(payload.tabIds[0] as number);
-  return t?.title || t?.url || 'New Tab';
-}
-
-/**
- * Whether the drag could land in the home grid, which decides if the empty drop area
- * opens: not folders or groups, and nothing from a window of the other incognito kind.
- */
-function canBeEssential(payload: Drag): boolean {
-  const home = tabState.windowId;
-  if (payload.kind === 'group' || home === null) return false;
-  const incognito = multiCtx.isIncognito(home);
-  if (payload.kind === 'tabs') {
-    return payload.tabIds.every((id) => {
-      const t = tabById.get(id);
-      return t !== undefined && multiCtx.isIncognito(t.windowId) === incognito;
-    });
-  }
-  const l = layoutOf(payload.windowId);
-  return (
-    multiCtx.isIncognito(payload.windowId) === incognito &&
-    !!l &&
-    flattenItems(l).some((i) => i.id === payload.nodeId)
-  );
-}
 
 /** The slot between mini tiles of another window's row under the pointer. */
 function tilesSlot(
@@ -1139,12 +950,12 @@ const dnd = new PointerDrag<Drag>({
         !r.tab.url.startsWith('chrome-extension:'))
     );
   },
-  begin: dragOf,
+  begin: (i, e) => dragOf(dragCtx, i, e.target as Element),
   elsewhere: (x, y) => (grid?.targetAt(x, y) ?? null) !== null,
   onStart: (payload) => {
     dragPayload = payload;
-    dragLabel = dragName(payload);
-    dragWantsGrid = canBeEssential(payload);
+    dragLabel = dragName(dragCtx, payload);
+    dragWantsGrid = canBeEssential(dragCtx, payload);
     menu = null;
   },
   onHover: (t) => {

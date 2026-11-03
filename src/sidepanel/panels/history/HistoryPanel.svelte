@@ -9,6 +9,7 @@ import type { MenuItem } from '../../components/menu-types';
 import { RowHeight } from '../../components/row-height.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
 import VirtualList from '../../components/VirtualList.svelte';
+import { copyLink } from '../../copy-link';
 import type { TabState } from '../../tab-state.svelte';
 import { type HistoryRow, withDayHeaders } from './days';
 
@@ -217,15 +218,6 @@ async function openUrl(url: string, newTab: boolean): Promise<void> {
   }
 }
 
-async function copyLink(url: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(url);
-    status = 'Link copied.';
-  } catch {
-    status = 'Could not copy the link.';
-  }
-}
-
 async function removeEntry(e: Entry): Promise<void> {
   try {
     await browser.history.deleteUrl({ url: e.url });
@@ -262,7 +254,11 @@ function menuItems(e: Entry): MenuItem[] {
   return [
     { type: 'item', label: 'Open', onselect: () => void openUrl(e.url, false) },
     { type: 'item', label: 'Open in new tab', onselect: () => void openUrl(e.url, true) },
-    { type: 'item', label: 'Copy link', onselect: () => void copyLink(e.url) },
+    {
+      type: 'item',
+      label: 'Copy link',
+      onselect: () => void copyLink(e.url).then((m) => (status = m)),
+    },
     { type: 'separator' },
     {
       type: 'item',

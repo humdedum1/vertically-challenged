@@ -1,6 +1,7 @@
 <script lang="ts">
 import type { PinFolder } from '../../shared/layout';
 import Icon from './Icon.svelte';
+import RenameInput from './RenameInput.svelte';
 
 interface Props {
   folder: PinFolder;
@@ -39,32 +40,6 @@ let {
 }: Props = $props();
 
 const indent = $derived(4 + (depth - 1) * 16 + (nested ? 16 : 0));
-// Blur fires after Enter/Escape too (and not at all when the row unmounts), so a flag
-// keeps the rename from being committed twice (as in GroupRow).
-let settled = false;
-
-function focusSelect(node: HTMLInputElement) {
-  settled = false;
-  node.focus();
-  node.select();
-}
-
-function finish(input: HTMLInputElement, commit: boolean): void {
-  if (settled) return;
-  settled = true;
-  onrenamed(commit ? input.value.trim() : null);
-}
-
-function onkeydown(e: KeyboardEvent & { currentTarget: HTMLInputElement }): void {
-  e.stopPropagation();
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    finish(e.currentTarget, true);
-  } else if (e.key === 'Escape') {
-    e.preventDefault();
-    finish(e.currentTarget, false);
-  }
-}
 </script>
 
 <!-- Keyboard operation is handled on the owning tree via aria-activedescendant. -->
@@ -88,18 +63,7 @@ function onkeydown(e: KeyboardEvent & { currentTarget: HTMLInputElement }): void
   <span class="chevron" class:open={!folder.collapsed}><Icon name="chevron" size={12} /></span>
   <span class="ficon" aria-hidden="true"><Icon name={folder.icon} size={15} /></span>
   {#if renaming}
-    <input
-      class="rename"
-      type="text"
-      maxlength="100"
-      aria-label="Folder name"
-      value={folder.name}
-      use:focusSelect
-      {onkeydown}
-      onblur={(e) => finish(e.currentTarget, true)}
-      onclick={(e) => e.stopPropagation()}
-      ondblclick={(e) => e.stopPropagation()}
-    />
+    <RenameInput value={folder.name} label="Folder name" maxlength={100} {onrenamed} />
   {:else}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <span class="title" {ondblclick}>{folder.name}</span>
@@ -160,19 +124,6 @@ function onkeydown(e: KeyboardEvent & { currentTarget: HTMLInputElement }): void
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-weight: 600;
-  }
-
-  .rename {
-    flex: 1;
-    min-width: 0;
-    height: calc(var(--row-height) - 8px);
-    padding: 0 6px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-control);
-    background: var(--surface-0);
-    color: var(--mOnSurface);
-    font: inherit;
     font-weight: 600;
   }
 

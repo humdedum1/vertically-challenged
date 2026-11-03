@@ -15,6 +15,7 @@ import {
 } from '../shared/sessions';
 import type { GroupInfo, TabInfo } from '../shared/types';
 import type { RestoredLayout, RestoredNode } from './pins/pin-manager';
+import { createWriteQueue } from './write-queue';
 
 /** The slice of PinManager sessions use; optional so sessions work without layouts. */
 export interface SessionLayouts {
@@ -23,19 +24,18 @@ export interface SessionLayouts {
 }
 
 /** Writes are queued so concurrent saves/renames can't lose each other's changes. */
-let queue: Promise<unknown> = Promise.resolve();
+const enqueue = createWriteQueue();
 function mutate(fn: (list: Session[]) => Session[]): Promise<void> {
-  const run = queue.then(async () => {
+  return enqueue(async () => {
     const list = parseSessions((await browser.storage.local.get(SESSIONS_KEY))[SESSIONS_KEY]);
     await browser.storage.local.set({ [SESSIONS_KEY]: fn(list) });
   });
-  queue = run.catch(() => {});
-  return run;
 }
 
-async function readAll(): Promise<Session[]> {
-  await queue;
-  return parseSessions((await browser.storage.local.get(SESSIONS_KEY))[SESSIONS_KEY]);
+function readAll(): Promise<Session[]> {
+  return enqueue(async () =>
+    parseSessions((await browser.storage.local.get(SESSIONS_KEY))[SESSIONS_KEY]),
+  );
 }
 
 const newId = (): string => crypto.randomUUID().replace(/-/g, '').slice(0, 16);

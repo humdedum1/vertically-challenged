@@ -9,6 +9,7 @@ import type { MenuItem } from '../../components/menu-types';
 import { RowHeight } from '../../components/row-height.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
 import VirtualList from '../../components/VirtualList.svelte';
+import { copyLink } from '../../copy-link';
 import { segments } from '../../model/highlight';
 import type { TabState } from '../../tab-state.svelte';
 import {
@@ -304,15 +305,6 @@ function askDelete(n: Node): void {
   };
 }
 
-async function copyLink(url: string): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(url);
-    status = 'Link copied.';
-  } catch {
-    status = 'Could not copy the link.';
-  }
-}
-
 function toggleFolder(id: string, open?: boolean): void {
   const next = new Set(expanded);
   const want = open ?? !next.has(id);
@@ -370,7 +362,11 @@ function menuFor(r: BookmarkRow): MenuItem[] {
       disabled: blocked,
       onselect: () => void openBookmark(n, 'window'),
     },
-    { type: 'item', label: 'Copy link', onselect: () => void copyLink(url) },
+    {
+      type: 'item',
+      label: 'Copy link',
+      onselect: () => void copyLink(url).then((m) => (status = m)),
+    },
     { type: 'separator' },
     { type: 'item', label: 'Delete', danger: true, onselect: () => askDelete(n) },
   ];

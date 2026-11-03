@@ -1,6 +1,7 @@
 <script lang="ts">
 import type { GroupInfo } from '../../shared/types';
 import Icon from './Icon.svelte';
+import RenameInput from './RenameInput.svelte';
 
 interface Props {
   group: GroupInfo;
@@ -33,32 +34,6 @@ let {
 }: Props = $props();
 
 const name = $derived(group.title || 'Unnamed group');
-// Blur fires after Enter/Escape too (and not at all when the row unmounts), so a flag
-// keeps the rename from being committed twice.
-let settled = false;
-
-function focusSelect(node: HTMLInputElement) {
-  settled = false;
-  node.focus();
-  node.select();
-}
-
-function finish(input: HTMLInputElement, commit: boolean): void {
-  if (settled) return;
-  settled = true;
-  onrenamed(commit ? input.value.trim() : null);
-}
-
-function onkeydown(e: KeyboardEvent & { currentTarget: HTMLInputElement }): void {
-  e.stopPropagation();
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    finish(e.currentTarget, true);
-  } else if (e.key === 'Escape') {
-    e.preventDefault();
-    finish(e.currentTarget, false);
-  }
-}
 </script>
 
 <!-- Keyboard operation is handled on the owning tree via aria-activedescendant. -->
@@ -83,18 +58,7 @@ function onkeydown(e: KeyboardEvent & { currentTarget: HTMLInputElement }): void
   <span class="chevron" class:open={!group.collapsed}><Icon name="chevron" size={12} /></span>
   <span class="dot" aria-hidden="true"></span>
   {#if renaming}
-    <input
-      class="rename"
-      type="text"
-      maxlength="200"
-      aria-label="Group name"
-      value={group.title}
-      use:focusSelect
-      {onkeydown}
-      onblur={(e) => finish(e.currentTarget, true)}
-      onclick={(e) => e.stopPropagation()}
-      ondblclick={(e) => e.stopPropagation()}
-    />
+    <RenameInput value={group.title} label="Group name" maxlength={200} {onrenamed} />
   {:else}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <span class="title" class:empty={!group.title} {ondblclick}>{name}</span>
@@ -168,19 +132,6 @@ function onkeydown(e: KeyboardEvent & { currentTarget: HTMLInputElement }): void
     color: var(--mOnSurfaceVariant);
     font-style: italic;
     font-weight: 500;
-  }
-
-  .rename {
-    flex: 1;
-    min-width: 0;
-    height: calc(var(--row-height) - 8px);
-    padding: 0 6px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-control);
-    background: var(--surface-0);
-    color: var(--mOnSurface);
-    font: inherit;
-    font-weight: 600;
   }
 
   .count {

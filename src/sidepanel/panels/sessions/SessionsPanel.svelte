@@ -317,7 +317,7 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
 
   <OtherDevices {tabState} {now} onstatus={(s) => (status = s)} />
 
-  <SegmentCard title="Saved sessions" fill>
+  <SegmentCard title="Saved sessions" fill={sorted.length > 0}>
     {#snippet icon()}<Icon name="list" size={12} />{/snippet}
     {#snippet trailing()}
       {#if !loading && !loadError && sorted.length > 0}
@@ -333,7 +333,7 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
         <Button onclick={() => void load()}>Retry</Button>
       </div>
     {:else if sorted.length === 0}
-      <p class="message">No saved sessions yet</p>
+      <p class="message">No saved sessions yet. Use “Save this window” above to keep this window’s tabs.</p>
     {:else}
       <ul class="list" aria-label="Saved sessions">
         {#each sorted as s (s.id)}
@@ -501,8 +501,7 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
 
   .message {
     margin: 0;
-    padding: 20px 16px;
-    text-align: center;
+    padding: 12px var(--pad-card) 16px;
     color: var(--mOnSurfaceVariant);
   }
 

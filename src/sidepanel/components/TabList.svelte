@@ -1550,7 +1550,7 @@ $effect(() => {
       bind:value={query}
       type="text"
       role="searchbox"
-      placeholder="Search, or > for commands"
+      placeholder="Search or > commands"
       title="Filters: is:audible, is:muted, is:suspended, is:pinned, is:grouped, site:example.com, group:name. Put - in front to exclude."
       aria-label="Search tabs"
       aria-describedby={searching && view.length === 0 ? 'vc-filter-hint' : undefined}

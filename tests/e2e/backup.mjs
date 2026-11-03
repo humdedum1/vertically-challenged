@@ -1,5 +1,7 @@
 // File-backup import/export and applying a restored layout in real Chromium.
+
 import fs from 'node:fs/promises';
+import { gunzipSync } from 'node:zlib';
 import { check, extensionDir, finish, launch } from './harness.mjs';
 
 const { ctx, extId, close } = await launch(extensionDir(), { width: 440, height: 1400 });
@@ -119,9 +121,12 @@ try {
     .waitFor({ state: 'detached' });
 
   const waiting = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export backup', exact: true }).click();
+  await page.getByRole('button', { name: 'Save full backup', exact: true }).click();
   const download = await waiting;
-  const exported = JSON.parse(await fs.readFile(await download.path(), 'utf8'));
+  // A full backup is gzipped JSON (no passphrase here); its settings/themes/layouts sit under `backup`.
+  const full = JSON.parse(gunzipSync(await fs.readFile(await download.path())).toString('utf8'));
+  check(full.format === 'vc-full-backup', 'full backup file has its format marker');
+  const exported = full.backup;
   check(
     exported.layouts.length === 2,
     'export includes both current layout and saved setup',

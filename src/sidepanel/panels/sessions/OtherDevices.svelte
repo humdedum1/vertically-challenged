@@ -321,7 +321,7 @@ const total = $derived(docs.length + chromeDevices.length);
     margin: 0;
     padding: 16px var(--pad-card) 20px;
     color: var(--mOnSurfaceVariant);
-    text-align: center;
+    text-align: left;
   }
 
   .devices {

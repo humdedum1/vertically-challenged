@@ -1,22 +1,18 @@
 <script lang="ts">
 import { browser } from 'wxt/browser';
+import { CONFIG_KEY, parseConfig } from '../../../background/backup/scheduler';
 import type { RestoredFull } from '../../../backup/snapshot';
 import { DEFAULT_SETTINGS } from '../../../settings/schema';
-import type { WindowLayout } from '../../../shared/layout';
-import {
-  createBackup,
-  MAX_IMPORT_BYTES,
-  parseBackup,
-  type RestoredBackup,
-} from '../../../themes/transfer';
+import { MAX_IMPORT_BYTES, parseBackup, type RestoredBackup } from '../../../themes/transfer';
 import Button from '../../components/controls/Button.svelte';
+import Field from '../../components/controls/Field.svelte';
 import TextInput from '../../components/controls/TextInput.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
 import type { SettingsState } from '../../settings-state.svelte';
 import { isCustomId, type ThemeRegistry } from '../../theme-registry.svelte';
 import AutoBackup from './AutoBackup.svelte';
-import { downloadBytes, downloadText, today } from './download';
+import { downloadBytes, today } from './download';
 import { createFullBackup, openFullBackup, restoreFullExtras } from './full-backup';
 
 let { settings, themes }: { settings: SettingsState; themes: ThemeRegistry } = $props();
@@ -34,6 +30,13 @@ const summary = $derived(
     : '',
 );
 let passphrase = $state('');
+// The same passphrase serves manual and automatic backups; prefill what this device saved.
+$effect(() => {
+  void browser.storage.local.get(CONFIG_KEY).then((s) => {
+    const saved = parseConfig(s[CONFIG_KEY]).passphrase;
+    if (saved && !passphrase) passphrase = saved;
+  });
+});
 let fullPending = $state<RestoredFull | null>(null);
 let fullFile = $state<File | null>(null);
 let fullInput: HTMLInputElement | undefined = $state();
@@ -188,94 +191,102 @@ function reset(): void {
 <SegmentCard title="Backup">
   {#snippet icon()}<Icon name="settings" size={12} />{/snippet}
   <div class="body">
-    <div class="row">
-      <TextInput secret label="Backup passphrase (optional)" placeholder="Passphrase (optional)" value={passphrase} oninput={(v) => (passphrase = v)} />
-    </div>
-    <div class="row">
-      <Button variant="primary" disabled={exporting || applying} onclick={fullExport}>{exporting ? 'Saving…' : 'Full backup'}</Button>
-      <Button disabled={exporting || applying} onclick={() => fullInput?.click()}>Restore full backup…</Button>
-      <input
-        bind:this={fullInput}
-        type="file"
-        accept=".vcb,application/octet-stream"
-        hidden
-        aria-label="Full backup file"
-        onchange={onFullFile}
-      />
-    </div>
-    <p class="hint">
-      Full backup saves settings, themes, Staples, pins, folders, Window setups, sessions and
-      custom CSS. Add a passphrase to encrypt it; without one the file lists every saved URL in
-      plain form. A lost passphrase can't be recovered. Restoring adds to what you have: existing
-      sessions and setups are kept.
-    </p>
-
-    <AutoBackup />
-
-    {#if fullPending}
-      <div class="confirm" role="group" aria-label="Restore full backup">
-        <p>Restore {fullFile?.name}: settings (replaced), {fullPending.themes.length} themes, {fullPending.layouts.length} layouts, {fullPending.sessions.length} sessions{fullPending.customCss ? ' and custom CSS (replaced)' : ''}?</p>
-        <div class="row">
-          <Button variant="primary" disabled={applying} onclick={applyFull}>Restore</Button>
-          <Button variant="text" disabled={applying} onclick={() => { fullPending = null; fullFile = null; }}>Cancel</Button>
-        </div>
+    <section class="block" aria-labelledby="vc-bk-now">
+      <h3 id="vc-bk-now">Back up now</h3>
+      <Field label="Passphrase (encrypts the backup file)" for="vc-bk-pass">
+        <TextInput id="vc-bk-pass" secret label="Backup passphrase" value={passphrase} oninput={(v) => (passphrase = v)} />
+      </Field>
+      <div class="row">
+        <Button variant="primary" disabled={exporting || applying} onclick={fullExport}>{exporting ? 'Saving…' : 'Save full backup'}</Button>
+        <Button disabled={exporting || applying} onclick={() => fullInput?.click()}>Restore full backup…</Button>
+        <input
+          bind:this={fullInput}
+          type="file"
+          accept=".vcb,application/octet-stream"
+          hidden
+          aria-label="Full backup file"
+          onchange={onFullFile}
+        />
       </div>
-    {/if}
-
-    <div class="row">
-      <Button disabled={exporting || applying} onclick={() => fileInput?.click()}>Import older settings & themes backup…</Button>
-      <input
-        bind:this={fileInput}
-        type="file"
-        accept=".json,application/json"
-        hidden
-        aria-label="Backup file"
-        onchange={onFile}
-      />
-    </div>
-    <div class="row">
-      <Button disabled={exporting || applying} onclick={() => tabsInput?.click()}>
-        Import tabs from another extension…
-      </Button>
-      <input
-        bind:this={tabsInput}
-        type="file"
-        accept=".json,.md,.txt,.html,.htm,application/json,text/plain,text/markdown,text/html"
-        hidden
-        aria-label="Tab export file"
-        onchange={onTabsFile}
-      />
-    </div>
-    <p class="hint">
-      Sidebery, SideTab Pro, VertiTab and OneTab exports, bookmark files and plain URL lists
-      become a saved session you can restore from Sessions.
-    </p>
-
-    {#if pending}
-      <div class="confirm" role="group" aria-label="Restore backup">
-        <p>{summary} Your current settings are replaced; custom themes with the same id are overwritten and the rest are kept. Existing windows and setups are kept.</p>
-        <div class="row">
-          <Button variant="primary" disabled={applying} onclick={apply}>Apply</Button>
-          <Button variant="text" disabled={applying} onclick={() => (pending = null)}>Cancel</Button>
-        </div>
-      </div>
-    {/if}
-
-    <p class="status">Includes Staples, pinned tabs, nested folders and saved Window setups. Incognito layouts are excluded. Imported layouts are available in Sessions → Window setups.</p>
-
-    <div class="row">
-      {#if confirmReset}
-        <div class="confirm" role="group" aria-label="Confirm reset">
-          <p>Reset all settings to their defaults? Custom themes are kept.</p>
+      <details class="how">
+        <summary>What a full backup contains</summary>
+        <p class="hint">
+          Settings, themes, Staples, pins, folders, Window setups, sessions and custom CSS.
+          Without a passphrase the file lists every saved URL in plain form, and a lost passphrase
+          can’t be recovered. Restoring adds to what you have: existing sessions and setups are
+          kept, and incognito windows are never included.
+        </p>
+      </details>
+      {#if fullPending}
+        <div class="confirm" role="group" aria-label="Restore full backup">
+          <p>Restore {fullFile?.name}: settings (replaced), {fullPending.themes.length} themes, {fullPending.layouts.length} layouts, {fullPending.sessions.length} sessions{fullPending.customCss ? ' and custom CSS (replaced)' : ''}?</p>
           <div class="row">
-            <Button variant="danger" onclick={reset}>Reset</Button>
-            <Button variant="text" onclick={() => (confirmReset = false)}>Keep settings</Button>
+            <Button variant="primary" disabled={applying} onclick={applyFull}>Restore</Button>
+            <Button variant="text" disabled={applying} onclick={() => { fullPending = null; fullFile = null; }}>Cancel</Button>
           </div>
         </div>
-      {:else}
-        <Button variant="danger" onclick={() => (confirmReset = true)}>Reset to defaults</Button>
       {/if}
-    </div>
+    </section>
+
+    <section class="block" aria-labelledby="vc-bk-auto">
+      <h3 id="vc-bk-auto">Automatic backups</h3>
+      <AutoBackup {passphrase} />
+    </section>
+
+    <section class="block" aria-labelledby="vc-bk-import">
+      <h3 id="vc-bk-import">Import and reset</h3>
+      <div class="row">
+        <Button disabled={exporting || applying} onclick={() => fileInput?.click()}>Import older settings &amp; themes backup…</Button>
+        <input
+          bind:this={fileInput}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          aria-label="Backup file"
+          onchange={onFile}
+        />
+        <Button disabled={exporting || applying} onclick={() => tabsInput?.click()}>
+          Import tabs from another extension…
+        </Button>
+        <input
+          bind:this={tabsInput}
+          type="file"
+          accept=".json,.md,.txt,.html,.htm,application/json,text/plain,text/markdown,text/html"
+          hidden
+          aria-label="Tab export file"
+          onchange={onTabsFile}
+        />
+      </div>
+      <p class="hint">
+        Sidebery, SideTab Pro, VertiTab and OneTab exports, bookmark files and plain URL lists
+        become a saved session you can restore from Sessions. Imported layouts appear in Sessions →
+        Window setups.
+      </p>
+
+      {#if pending}
+        <div class="confirm" role="group" aria-label="Restore backup">
+          <p>{summary} Your current settings are replaced; custom themes with the same id are overwritten and the rest are kept. Existing windows and setups are kept.</p>
+          <div class="row">
+            <Button variant="primary" disabled={applying} onclick={apply}>Apply</Button>
+            <Button variant="text" disabled={applying} onclick={() => (pending = null)}>Cancel</Button>
+          </div>
+        </div>
+      {/if}
+
+      <div class="row">
+        {#if confirmReset}
+          <div class="confirm" role="group" aria-label="Confirm reset">
+            <p>Reset all settings to their defaults? Custom themes are kept.</p>
+            <div class="row">
+              <Button variant="danger" onclick={reset}>Reset</Button>
+              <Button variant="text" onclick={() => (confirmReset = false)}>Keep settings</Button>
+            </div>
+          </div>
+        {:else}
+          <Button variant="danger" onclick={() => (confirmReset = true)}>Reset to defaults</Button>
+        {/if}
+      </div>
+    </section>
 
     <p class="status" role="status">{status}</p>
     {#if warnings.length > 0}
@@ -288,6 +299,33 @@ function reset(): void {
 </SegmentCard>
 
 <style>
+  .block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
+  }
+
+  .block + .block {
+    padding-top: var(--gap);
+    border-top: 1px solid var(--border);
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .how summary {
+    cursor: pointer;
+    color: var(--mOnSurfaceVariant);
+    font-size: 12px;
+  }
+
+  .how p {
+    margin-top: 6px;
+  }
+
   .hint {
     margin: 0;
     color: var(--mOnSurfaceVariant);

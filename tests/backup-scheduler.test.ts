@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   type BackupTarget,
+  backupHealth,
   CONFIG_KEY,
   originPattern,
   parseConfig,
@@ -237,5 +238,30 @@ describe('makeTarget', () => {
       expect(t).not.toBe(local);
       expect(typeof t.list).toBe('function');
     }
+  });
+});
+
+describe('backupHealth', () => {
+  const DAY = 86_400_000;
+  const daily = parseConfig({ interval: 'daily' });
+  it('is off when no schedule is set', () => {
+    expect(backupHealth(parseConfig({}), { error: 'x' }, 0)).toBe('off');
+  });
+  it('flags a failed last run', () => {
+    expect(backupHealth(daily, { at: 1, error: 'disk full' }, 2)).toBe('failed');
+  });
+  it('gives a fresh schedule time, then flags a silent one after 2.5 intervals', () => {
+    expect(backupHealth(daily, {}, 10 * DAY)).toBe('ok');
+    expect(backupHealth(daily, { checkedAt: 0 }, 2 * DAY)).toBe('ok');
+    expect(backupHealth(daily, { checkedAt: 0 }, 3 * DAY)).toBe('stale');
+  });
+  it('counts unchanged-data skips as healthy', async () => {
+    const t = target();
+    const { storage, deps } = setup({ interval: 'daily' }, t);
+    await runBackup(deps);
+    const s = await runBackup(deps);
+    expect(s.skipped).toBe(true);
+    expect(s.checkedAt).toBeGreaterThan(s.at ?? 0);
+    expect((storage.data[STATUS_KEY] as { checkedAt: number }).checkedAt).toBe(s.checkedAt);
   });
 });

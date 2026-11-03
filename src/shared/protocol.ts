@@ -8,6 +8,7 @@ import {
   THEME_ID,
   type WindowLayout,
 } from './layout';
+import { isWakeTime } from './snooze';
 import type { Surface } from './surface';
 import {
   GROUP_COLORS,
@@ -72,6 +73,9 @@ export type PanelMessage =
   | { type: 'closeGroup'; groupId: number }
   | { type: 'discard'; tabIds: number[] }
   | { type: 'discardOthers'; tabId: number }
+  | { type: 'snooze'; tabIds: number[]; wakeAt: number }
+  | { type: 'wakeSnoozed'; id: string }
+  | { type: 'deleteSnoozed'; id: string }
   | { type: 'moveToNewWindow'; tabIds: number[] }
   | { type: 'saveSession'; scope: 'window' | 'all'; windowId: number; name: string }
   | { type: 'renameSession'; id: string; name: string }
@@ -515,6 +519,15 @@ export function parsePanelMessage(raw: unknown): PanelMessage | null {
     case 'discard':
     case 'moveToNewWindow':
       return isIds(m.tabIds) ? { type: m.type, tabIds: m.tabIds } : null;
+    case 'snooze':
+      return isIds(m.tabIds) && isWakeTime(m.wakeAt, Date.now())
+        ? { type: 'snooze', tabIds: m.tabIds, wakeAt: m.wakeAt }
+        : null;
+    case 'wakeSnoozed':
+    case 'deleteSnoozed':
+      return typeof m.id === 'string' && /^[a-z0-9-]{1,40}$/.test(m.id)
+        ? { type: m.type, id: m.id }
+        : null;
     case 'discardOthers':
       return isId(m.tabId) ? { type: 'discardOthers', tabId: m.tabId } : null;
     case 'saveSession':

@@ -2,6 +2,7 @@
 import { browser } from 'wxt/browser';
 import { CONFIG_KEY, parseConfig } from '../../../background/backup/scheduler';
 import type { RestoredFull } from '../../../backup/snapshot';
+import { buildUndo, type RestoreUndo, UNDO_KEY } from '../../../backup/undo';
 import { DEFAULT_SETTINGS } from '../../../settings/schema';
 import { MAX_IMPORT_BYTES, parseBackup, type RestoredBackup } from '../../../themes/transfer';
 import Button from '../../components/controls/Button.svelte';
@@ -13,7 +14,13 @@ import type { SettingsState } from '../../settings-state.svelte';
 import { isCustomId, type ThemeRegistry } from '../../theme-registry.svelte';
 import AutoBackup from './AutoBackup.svelte';
 import { downloadBytes, today } from './download';
-import { createFullBackup, openFullBackup, restoreFullExtras } from './full-backup';
+import {
+  createFullBackup,
+  listRemoteBackups,
+  openFullBackup,
+  openRemoteBackup,
+  restoreFullExtras,
+} from './full-backup';
 
 let { settings, themes }: { settings: SettingsState; themes: ThemeRegistry } = $props();
 
@@ -71,11 +78,78 @@ async function openFull(file: File): Promise<void> {
   warnings = r.warnings;
 }
 
+let remoteNames = $state<string[] | null>(null);
+let remoteBusy = $state(false);
+
+async function showRemote(): Promise<void> {
+  clear();
+  remoteBusy = true;
+  try {
+    remoteNames = await listRemoteBackups();
+    if (!remoteNames.length) status = 'No backups found on the server yet.';
+  } catch (err) {
+    remoteNames = null;
+    error = err instanceof Error ? err.message : 'Couldn’t reach the server';
+  } finally {
+    remoteBusy = false;
+  }
+}
+
+async function openRemote(name: string): Promise<void> {
+  clear();
+  fullPending = null;
+  remoteBusy = true;
+  try {
+    const r = await openRemoteBackup(name, passphrase);
+    if (!r.ok) {
+      error = r.needsPassphrase
+        ? 'This backup is encrypted: enter its passphrase above, then pick it again.'
+        : r.error;
+      return;
+    }
+    fullFile = { name } as File;
+    fullPending = r.value;
+    warnings = r.warnings;
+  } catch (err) {
+    error = err instanceof Error ? err.message : 'Couldn’t download the backup';
+  } finally {
+    remoteBusy = false;
+  }
+}
+
 async function onFullFile(e: Event & { currentTarget: HTMLInputElement }): Promise<void> {
   const input = e.currentTarget;
   const file = input.files?.[0];
   input.value = '';
   if (file) await openFull(file);
+}
+
+let undo = $state<RestoreUndo | null>(null);
+$effect(() => {
+  void browser.storage.local.get(UNDO_KEY).then((s) => {
+    undo = (s[UNDO_KEY] as RestoreUndo | undefined) ?? null;
+  });
+});
+
+async function undoRestore(): Promise<void> {
+  const u = undo;
+  if (!u || applying) return;
+  applying = true;
+  clear();
+  try {
+    for (const t of u.themes) await themes.save(t);
+    for (const id of u.addedThemeIds) await themes.remove(id);
+    settings.update(() => u.settings);
+    await browser.storage.local.set({ customCss: u.customCss });
+    await browser.storage.local.remove(UNDO_KEY);
+    undo = null;
+    status =
+      'Restore undone: settings, custom CSS and themes are back as they were. Sessions and setups the restore added stay; remove them in Sessions.';
+  } catch (err) {
+    error = err instanceof Error ? err.message : 'Couldn’t undo the restore';
+  } finally {
+    applying = false;
+  }
 }
 
 async function applyFull(): Promise<void> {
@@ -84,6 +158,17 @@ async function applyFull(): Promise<void> {
   applying = true;
   clear();
   try {
+    const css = (await browser.storage.local.get('customCss')).customCss;
+    const saved = buildUndo(
+      {
+        settings: $state.snapshot(settings.value),
+        customCss: typeof css === 'string' ? css : '',
+        themes: $state.snapshot(themes.custom) as typeof themes.custom,
+      },
+      r.themes,
+    );
+    await browser.storage.local.set({ [UNDO_KEY]: saved });
+    undo = saved;
     const added = await restoreFullExtras(r);
     for (const t of r.themes) await themes.save(t);
     settings.update(() => r.settings);
@@ -208,6 +293,16 @@ function reset(): void {
           onchange={onFullFile}
         />
       </div>
+      <div class="row">
+        <Button disabled={remoteBusy || applying} onclick={showRemote}>{remoteBusy ? 'Contacting server…' : 'Restore from server…'}</Button>
+      </div>
+      {#if remoteNames?.length}
+        <ul class="remote" aria-label="Backups on the server">
+          {#each remoteNames.slice(0, 10) as n (n)}
+            <li><span>{n}</span><Button disabled={remoteBusy || applying} onclick={() => openRemote(n)}>Restore</Button></li>
+          {/each}
+        </ul>
+      {/if}
       <details class="how">
         <summary>What a full backup contains</summary>
         <p class="hint">
@@ -288,6 +383,12 @@ function reset(): void {
       </div>
     </section>
 
+    {#if undo}
+      <div class="row">
+        <Button disabled={applying} onclick={undoRestore}>Undo last restore</Button>
+        <span class="hint">from {new Date(undo.at).toLocaleString()}</span>
+      </div>
+    {/if}
     <p class="status" role="status">{status}</p>
     {#if warnings.length > 0}
       <ul class="notes" aria-label="Backup notes">
@@ -299,6 +400,30 @@ function reset(): void {
 </SegmentCard>
 
 <style>
+  .remote {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 12px;
+  }
+
+  .remote li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .remote span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .block {
     display: flex;
     flex-direction: column;

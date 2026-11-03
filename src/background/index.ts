@@ -20,7 +20,10 @@ import { downloadsTarget } from './backup/downloads';
 import {
   BACKUP_ALARM,
   CONFIG_KEY as BACKUP_CONFIG_KEY,
+  STATUS_KEY as BACKUP_STATUS_KEY,
   type BackupConfig,
+  type BackupStatus,
+  backupHealth,
   intervalMinutes,
   parseConfig,
   runBackup,
@@ -34,6 +37,7 @@ import { createMruCycle } from './mru';
 import { runPinCommand } from './pins/commands';
 import { PinManager } from './pins/pin-manager';
 import { addSession, addSessions, listSessions, restoreSessionValue } from './sessions';
+import { SNOOZE_ALARM, scheduleSnoozeAlarm, wakeDue } from './snooze';
 import { createSuspender } from './suspend/suspender';
 import { runSyncCommand, type SyncCommandDeps } from './sync/commands';
 import { createSyncPublisher } from './sync/publisher';
@@ -466,6 +470,18 @@ export function startBackground(): void {
       };
     },
   };
+  /** A "!" on the toolbar icon when scheduled backups are failing or have stopped. */
+  async function refreshBackupBadge(): Promise<void> {
+    const s = await browser.storage.local.get([BACKUP_CONFIG_KEY, BACKUP_STATUS_KEY]);
+    const health = backupHealth(
+      parseConfig(s[BACKUP_CONFIG_KEY]),
+      (s[BACKUP_STATUS_KEY] ?? {}) as BackupStatus,
+      Date.now(),
+    );
+    const warn = health === 'failed' || health === 'stale';
+    await browser.action.setBadgeText({ text: warn ? '!' : '' });
+    if (warn) await browser.action.setBadgeBackgroundColor({ color: '#c0392b' });
+  }
   async function configureBackupAlarm(): Promise<void> {
     const cfg = parseConfig(
       (await browser.storage.local.get(BACKUP_CONFIG_KEY))[BACKUP_CONFIG_KEY],
@@ -479,6 +495,8 @@ export function startBackground(): void {
     }
   }
   browser.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && (changes[BACKUP_CONFIG_KEY] || changes[BACKUP_STATUS_KEY]))
+      void refreshBackupBadge().catch(() => {});
     if (area === 'local' && changes[BACKUP_CONFIG_KEY])
       void configureBackupAlarm().catch((err: unknown) =>
         console.warn('[vc] backup alarm failed', err),
@@ -487,6 +505,11 @@ export function startBackground(): void {
   void configureBackupAlarm().catch((err: unknown) =>
     console.warn('[vc] backup alarm failed', err),
   );
+  void refreshBackupBadge().catch(() => {});
+  // Tabs that came due while the browser was closed reopen now; then arm the next alarm.
+  void wakeDue()
+    .then(scheduleSnoozeAlarm)
+    .catch(() => {});
 
   const syncAlarm = 'vc-auto-sync';
   async function configureSyncAlarm(): Promise<void> {
@@ -500,7 +523,8 @@ export function startBackground(): void {
     }
   }
   browser.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === BACKUP_ALARM) void runBackup(backupDeps);
+    if (alarm.name === SNOOZE_ALARM) void wakeDue().catch(() => {});
+    if (alarm.name === BACKUP_ALARM) void runBackup(backupDeps).then(refreshBackupBadge);
     if (alarm.name === syncAlarm)
       void pins.loaded
         .then(() => publisher.auto())
@@ -579,7 +603,10 @@ export function startBackground(): void {
       return true;
     }
     if (raw?.type === 'runBackup') {
-      void runBackup(backupDeps, true).then(respond);
+      void runBackup(backupDeps, true).then((s) => {
+        respond(s);
+        void refreshBackupBadge();
+      });
       return true;
     }
     if (raw?.type === 'restoreSessions') {

@@ -20,6 +20,7 @@ import type { SettingsState } from '../../settings-state.svelte';
 import type { TabState } from '../../tab-state.svelte';
 import OtherDevices from './OtherDevices.svelte';
 import { pluralize, relativeTime } from './relative-time';
+import SnoozedCard from './SnoozedCard.svelte';
 
 let { tabState, settings }: { tabState: TabState; settings: SettingsState } = $props();
 
@@ -314,6 +315,8 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
       </ul>
     {/if}
   </SegmentCard>
+
+  <SnoozedCard {tabState} />
 
   <OtherDevices {tabState} {now} onstatus={(s) => (status = s)} />
 

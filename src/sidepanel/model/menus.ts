@@ -9,6 +9,7 @@ import {
   type WindowLayout,
 } from '../../shared/layout';
 import type { PanelMessage } from '../../shared/protocol';
+import { snoozePresets } from '../../shared/snooze';
 import { GROUP_COLORS, type GroupInfo, type TabInfo, type WindowInfo } from '../../shared/types';
 import type { MenuItem } from '../components/menu-types';
 
@@ -184,6 +185,25 @@ export function tabMenu(c: TabMenuContext): MenuItem[] {
       ],
     },
     SEP,
+    {
+      type: 'submenu',
+      label: 'Snooze',
+      // Incognito tabs are never stored, so they can't be put away.
+      items: c.tabs.some((t) => t.incognito)
+        ? [
+            {
+              type: 'item',
+              label: 'Not available in incognito',
+              disabled: true,
+              onselect: () => {},
+            },
+          ]
+        : snoozePresets(new Date()).map<MenuItem>((p) => ({
+            type: 'item',
+            label: p.label,
+            onselect: () => c.send({ type: 'snooze', tabIds: ids, wakeAt: p.at }),
+          })),
+    },
     {
       type: 'item',
       label: `Suspend${suspendable.length > 1 ? ` (${suspendable.length})` : ''}`,

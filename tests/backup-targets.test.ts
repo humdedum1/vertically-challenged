@@ -92,3 +92,24 @@ describe('s3', () => {
     expect(calls[0]?.url).toContain('list-type=2&prefix=vc%2F');
   });
 });
+
+describe('downloading backups', () => {
+  const body = () => new Response(new Uint8Array([7, 8, 9]), { status: 200 });
+  it('reads a file back from WebDAV and S3', async () => {
+    const wd = webdavTarget({ url: 'https://c.example/d', user: 'u', password: 'p' }, fake(body).f);
+    expect([...((await wd.get?.('a.vcb')) ?? [])]).toEqual([7, 8, 9]);
+    const s3 = s3Target(
+      {
+        endpoint: 'https://s3.example',
+        region: 'r',
+        bucket: 'b',
+        prefix: '',
+        accessKey: 'A',
+        secretKey: 'S',
+      },
+      fake(body).f,
+      () => new Date('2026-01-01T00:00:00Z'),
+    );
+    expect([...((await s3.get?.('a.vcb')) ?? [])]).toEqual([7, 8, 9]);
+  });
+});

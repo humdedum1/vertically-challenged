@@ -3,6 +3,7 @@ import { onMount } from 'svelte';
 import { browser } from 'wxt/browser';
 import { displayUrl } from '../../../lib/search/search-index';
 import type { SetupSummary } from '../../../shared/protocol';
+import { sessionToBookmarksHtml, sessionToMarkdown } from '../../../shared/session-export';
 import {
   isRestorableUrl,
   parseSessions,
@@ -18,8 +19,10 @@ import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
 import type { SettingsState } from '../../settings-state.svelte';
 import type { TabState } from '../../tab-state.svelte';
+import { downloadText, fileSafe } from '../settings/download';
 import OtherDevices from './OtherDevices.svelte';
 import { pluralize, relativeTime } from './relative-time';
+import SnoozedCard from './SnoozedCard.svelte';
 
 let { tabState, settings }: { tabState: TabState; settings: SettingsState } = $props();
 
@@ -133,6 +136,13 @@ async function openTab(url: string): Promise<void> {
   } catch (e) {
     status = e instanceof Error ? e.message : 'Could not open that page.';
   }
+}
+
+/** Saves a session as a Markdown outline or a bookmarks file any browser imports. */
+function exportAs(s: Session, kind: 'md' | 'html'): void {
+  const name = fileSafe(s.name) || 'session';
+  if (kind === 'md') downloadText(`${name}.md`, sessionToMarkdown(s), 'text/markdown');
+  else downloadText(`${name}.html`, sessionToBookmarksHtml(s), 'text/html');
 }
 
 function setupCounts(u: SetupSummary): string {
@@ -315,6 +325,8 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
     {/if}
   </SegmentCard>
 
+  <SnoozedCard {tabState} />
+
   <OtherDevices {tabState} {now} onstatus={(s) => (status = s)} />
 
   <SegmentCard title="Saved sessions" fill={sorted.length > 0}>
@@ -396,6 +408,8 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
                 <Button variant="tonal" onclick={() => restore(s, 'newWindow')}>Restore</Button>
                 <Button variant="text" onclick={() => restore(s, 'currentWindow')}>Into this window</Button>
                 <Button variant="text" onclick={() => startRename(s)}>Rename</Button>
+                <Button variant="text" aria-label="Export {s.name} as Markdown" onclick={() => exportAs(s, 'md')}>Markdown</Button>
+                <Button variant="text" aria-label="Export {s.name} as a bookmarks file" onclick={() => exportAs(s, 'html')}>Bookmarks</Button>
                 <Button variant="text" onclick={() => (confirmDelete = s.id)}>Delete</Button>
               </div>
             {/if}

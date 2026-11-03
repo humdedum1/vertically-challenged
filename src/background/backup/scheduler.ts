@@ -33,6 +33,8 @@ export interface BackupStatus {
   hash?: string;
   error?: string;
   skipped?: boolean;
+  /** Last time a run finished without error, even when it skipped unchanged data. */
+  checkedAt?: number;
   /** Where the last good backup went (see targetKey), so a new target gets its first copy. */
   to?: string;
 }
@@ -143,6 +145,19 @@ export function requiredAccess(
   return { origins: [origin] };
 }
 
+export type Health = 'off' | 'ok' | 'failed' | 'stale';
+
+/** Whether the schedule is working: the last run failed, or none succeeded in 2.5 intervals. */
+export function backupHealth(cfg: BackupConfig, status: BackupStatus, nowMs: number): Health {
+  const minutes = intervalMinutes(cfg.interval);
+  if (minutes === 0) return 'off';
+  if (status.error) return 'failed';
+  const last = status.checkedAt ?? status.at;
+  // Never ran yet (just switched on): give the first alarm a full period before warning.
+  if (last === undefined) return 'ok';
+  return nowMs - last > minutes * 60_000 * 2.5 ? 'stale' : 'ok';
+}
+
 export const intervalMinutes = (i: Interval): number =>
   i === 'daily' ? 1440 : i === 'weekly' ? 10080 : 0;
 
@@ -163,7 +178,7 @@ export async function runBackup(deps: SchedulerDeps, force = false): Promise<Bac
     // Hash with a fixed clock so only real content changes count as a change.
     const hash = await sha256(JSON.stringify(buildFullBackup(parts, deps.version, new Date(0))));
     if (!force && hash === prev.hash && prev.to === targetKey(cfg) && !prev.error) {
-      status = { ...prev, skipped: true };
+      status = { ...prev, skipped: true, checkedAt: now.getTime() };
     } else {
       const bytes = await encode(buildFullBackup(parts, deps.version, now), cfg.passphrase);
       const target = deps.target(cfg);
@@ -172,7 +187,7 @@ export async function runBackup(deps: SchedulerDeps, force = false): Promise<Bac
       if (target.list && target.delete) {
         for (const old of selectToDelete(await target.list(), cfg.keep)) await target.delete(old);
       }
-      status = { at: now.getTime(), name, hash, to: targetKey(cfg) };
+      status = { at: now.getTime(), checkedAt: now.getTime(), name, hash, to: targetKey(cfg) };
     }
   } catch (err) {
     status = {

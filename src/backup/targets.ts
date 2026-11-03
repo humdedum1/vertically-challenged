@@ -4,6 +4,8 @@ export interface BackupTarget {
   put(name: string, bytes: Uint8Array): Promise<void>;
   list?(): Promise<string[]>;
   delete?(name: string): Promise<void>;
+  /** Reads one backup back, for restoring from the server. */
+  get?(name: string): Promise<Uint8Array>;
 }
 
 export interface WebDavConfig {
@@ -81,6 +83,13 @@ export function webdavTarget(c: WebDavConfig, f: Fetch = fetch): BackupTarget {
     async delete(name) {
       await ok(await f(file(name), { method: 'DELETE', headers: auth }), 'WebDAV delete');
     },
+    async get(name) {
+      const res = await ok(
+        await f(file(name), { method: 'GET', headers: auth }),
+        'WebDAV download',
+      );
+      return new Uint8Array(await res.arrayBuffer());
+    },
   };
 }
 
@@ -125,6 +134,10 @@ export function s3Target(
     },
     async delete(name) {
       await ok(await send('DELETE', objectUrl(name)), 'S3 delete');
+    },
+    async get(name) {
+      const res = await ok(await send('GET', objectUrl(name)), 'S3 download');
+      return new Uint8Array(await res.arrayBuffer());
     },
   };
 }

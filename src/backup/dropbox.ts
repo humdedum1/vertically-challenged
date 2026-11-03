@@ -144,5 +144,16 @@ export function dropboxTarget(c: DropboxConfig, f: Fetch = fetch): BackupTarget 
     async delete(name) {
       await rpc('/2/files/delete_v2', { path: `/${name}` });
     },
+    async get(name) {
+      const res = await f(`${CONTENT}/2/files/download`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${await bearer()}`,
+          'Dropbox-API-Arg': arg({ path: `/${name}` }),
+        },
+      });
+      if (!res.ok) throw new Error(`Dropbox download failed (HTTP ${res.status})`);
+      return new Uint8Array(await res.arrayBuffer());
+    },
   };
 }

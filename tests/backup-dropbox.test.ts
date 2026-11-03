@@ -77,3 +77,21 @@ describe('dropbox target', () => {
     );
   });
 });
+
+describe('dropbox download', () => {
+  it('downloads by path with an ASCII-safe arg header', async () => {
+    const { calls, f } = fake((c) =>
+      c.url.endsWith('/oauth2/token')
+        ? { access_token: 'AT' }
+        : new Response(new Uint8Array([1, 2]), { status: 200 }),
+    );
+    const bytes = await dropboxTarget({ appKey: 'K', refreshToken: 'R' }, f).get?.(
+      'vc-backup-ö.vcb',
+    );
+    expect([...(bytes ?? [])]).toEqual([1, 2]);
+    const dl = calls.find((c) => c.url.endsWith('/files/download'));
+    expect(((dl?.init.headers ?? {}) as Record<string, string>)['Dropbox-API-Arg']).toContain(
+      '\\u00f6',
+    );
+  });
+});

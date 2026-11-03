@@ -10,6 +10,7 @@ import SegmentCard from './components/SegmentCard.svelte';
 import TabList from './components/TabList.svelte';
 import Toasts, { type Toast } from './components/Toasts.svelte';
 import TopBar from './components/TopBar.svelte';
+import Welcome from './components/Welcome.svelte';
 import { IMPLEMENTED_PANELS, PANEL_ICONS, PANEL_LABELS } from './panel-defs';
 import SettingsPanel from './panels/SettingsPanel.svelte';
 import { scrollIdle } from './scroll-idle.svelte';
@@ -206,6 +207,7 @@ const count = $derived(tabState.tabs.length);
   <div class="panel" role="tabpanel" id="vc-panel-{panel}" aria-labelledby="vc-tab-{panel}">
     {#if panel === 'tabs'}
       <div class="sections">
+      <Welcome {settings} {themes} />
       {#each sections as sec (sec.id)}
       {#if sec.id === 'recentlyClosed' && sec.visible}
         <RecentlyClosed {tabState} />

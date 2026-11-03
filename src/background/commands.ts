@@ -5,6 +5,7 @@ import type { GroupColor, GroupInfo, TabInfo } from '../shared/types';
 import { planGroupMove, planMoves } from './move-plan';
 import type { SessionLayouts } from './sessions';
 import { deleteSession, renameSession, restoreSession, saveSession } from './sessions';
+import { deleteSnoozed, snoozeTabs, wakeNow } from './snooze';
 import { duplicateTabIds, sortMoves } from './tab-tools';
 
 export interface CommandDeps {
@@ -251,6 +252,18 @@ export async function runCommand(
     }
     case 'discard':
       await discardTabs(msg.tabIds.map((id) => deps.tab(id)).filter((t): t is TabInfo => !!t));
+      return;
+    case 'snooze':
+      await snoozeTabs(
+        msg.tabIds.map((id) => deps.tab(id)).filter((t): t is TabInfo => !!t),
+        msg.wakeAt,
+      );
+      return;
+    case 'wakeSnoozed':
+      await wakeNow(msg.id);
+      return;
+    case 'deleteSnoozed':
+      await deleteSnoozed(msg.id);
       return;
     case 'discardOthers': {
       const self = deps.tab(msg.tabId);

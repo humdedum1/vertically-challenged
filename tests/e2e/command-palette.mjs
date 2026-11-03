@@ -1,4 +1,4 @@
-// Command palette: Ctrl+K opens it in the search field, typing filters, Enter runs.
+// Command palette: ">" (outside text fields) opens it in the search field, typing filters, Enter runs.
 import assert from 'node:assert/strict';
 import { extensionDir, launch } from './harness.mjs';
 
@@ -20,12 +20,14 @@ try {
   });
   assert.equal(await count(), 3);
 
-  await page.locator('body').press('Control+k');
+  await page.locator('body').press('>');
   const search = page.getByRole('searchbox', { name: 'Search tabs' });
   assert.equal(await search.inputValue(), '>');
   await page.keyboard.type('dup close');
   const list = page.getByRole('list', { name: 'Commands' });
-  assert.deepEqual(await list.getByRole('button').allTextContents(), ['Close duplicate tabs']);
+  assert.deepEqual(await list.getByRole('button').allTextContents(), [
+    'Window: Close duplicate tabs',
+  ]);
   await search.press('Enter');
   for (let i = 0; i < 50 && (await count()) !== 1; i++) await page.waitForTimeout(100);
   assert.equal(await count(), 1);
@@ -42,7 +44,7 @@ try {
   );
   await search.fill('>nothing-like-this');
   await page.getByRole('status').filter({ hasText: 'No matching commands' }).waitFor();
-  console.log('PASS palette opens with Ctrl+K, filters, and runs a command with Enter');
+  console.log('PASS palette opens with >, filters, and runs a command with Enter');
 } finally {
   await close();
 }

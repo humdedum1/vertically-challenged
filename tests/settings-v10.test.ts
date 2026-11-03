@@ -13,7 +13,7 @@ it('upgrades v9 with archiving off and keeps existing suspend settings', () => {
     whitelist: ['a.com'],
     archiveDays: 0,
   });
-  expect(s.shortcuts.commandPalette).toEqual(['Ctrl+K']);
+  expect(s.shortcuts.commandPalette).toEqual(['>']);
 });
 
 it('only accepts the offered archive ages', () => {

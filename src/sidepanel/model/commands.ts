@@ -15,9 +15,18 @@ export interface Command {
 export function menuCommands(items: readonly MenuItem[], prefix = ''): Command[] {
   const out: Command[] = [];
   for (const item of items) {
-    if (item.type === 'submenu')
-      out.push(...menuCommands(item.items, `${prefix}${item.label.replace(/…$/, '')}: `));
-    else if (item.type === 'item' && !item.disabled) {
+    if (item.type === 'submenu') {
+      // A one-item "Close window…" submenu is a confirm step; typing the command and
+      // pressing Enter already confirms, so it becomes plain "Close window".
+      const only = item.label.endsWith('…') && item.items.length === 1 ? item.items[0] : undefined;
+      if (only?.type === 'item') {
+        out.push({
+          label: prefix + item.label.slice(0, -1),
+          run: only.onselect,
+          danger: only.danger === true,
+        });
+      } else out.push(...menuCommands(item.items, `${prefix}${item.label}: `));
+    } else if (item.type === 'item' && !item.disabled) {
       out.push({ label: prefix + item.label, run: item.onselect, danger: item.danger === true });
     }
   }

@@ -238,7 +238,8 @@ export const DEFAULT_SETTINGS: Settings = {
   mouse: { middle: 'close', double: 'none', wheelSwitch: true },
   shortcuts: {
     focusSearch: ['/', 'Ctrl+F'],
-    commandPalette: ['Ctrl+K'],
+    // ">" like the search's own palette prefix; Ctrl+K would take Chrome's web search.
+    commandPalette: ['>'],
     closeTab: ['Delete'],
     renameGroup: ['F2'],
     moveUp: ['Alt+ArrowUp'],

@@ -20,7 +20,7 @@ it('flattens menus into commands, skipping disabled items and pickers', () => {
   expect(menuCommands(menu).map((c) => [c.label, c.danger])).toEqual([
     ['Close duplicate tabs', false],
     ['Theme: Abyss', false],
-    ['Close window: Confirm: close 3 tabs', true],
+    ['Close window', true],
   ]);
 });
 

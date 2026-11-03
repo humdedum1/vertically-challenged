@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   actionFor,
+  chromeUse,
   comboFromEvent,
   findConflicts,
   formatCombo,
@@ -224,5 +225,31 @@ describe('formatCombo', () => {
     ['Shift+F10', 'Shift + F10'],
   ])('%j -> %j', (input, out) => {
     expect(formatCombo(input)).toBe(out);
+  });
+});
+
+describe('chromeUse', () => {
+  it('names the Chrome shortcut a combo would shadow, on both platforms', () => {
+    expect(chromeUse('Ctrl+K')).toBe('search the web');
+    expect(chromeUse('Meta+W')).toBe('close tab');
+    expect(chromeUse('Ctrl+Shift+T')).toBe('reopen closed tab');
+    expect(chromeUse('F5')).toBe('reload');
+    expect(chromeUse('Alt+ArrowLeft')).toBe('back');
+  });
+
+  it('leaves panel-only keys and the defaults alone', () => {
+    for (const c of [
+      '/',
+      '>',
+      'Delete',
+      'F2',
+      'Ctrl+F',
+      'Ctrl+A',
+      'Alt+ArrowUp',
+      'Shift+F10',
+      'Ctrl+Shift+K',
+    ]) {
+      expect(chromeUse(c)).toBeNull();
+    }
   });
 });

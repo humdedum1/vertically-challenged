@@ -708,32 +708,32 @@ function openMenu(i: number, x: number, y: number): void {
     openTilesMenu(i, x, y, null);
     return;
   }
-  const winId = row.tab.windowId;
-  menu = {
-    x,
-    y,
-    label: 'Tab actions',
-    items: tabMenu({
-      target: row.tab,
-      tabs: targetTabs(row.tab),
-      essentialsCount: layoutOf(winId)?.essentials.length ?? 0,
-      pinned: layoutOf(winId)?.pinned ?? [],
-      allTabs: tabsOfWindow(winId),
-      groups: allGroups.filter((g) => g.windowId === winId),
-      send,
-      windows: tabState.windowList,
-      homeWindowId: tabState.windowId,
-      whitelist,
-      onWhitelist,
-      onNewGroup: (tabIds) => {
-        pendingGroup = {
-          tabIds,
-          known: new Set(allGroups.map((g) => g.id)),
-          until: Date.now() + 4000,
-        };
-      },
-    }),
-  };
+  menu = { x, y, label: 'Tab actions', items: tabMenuFor(row.tab) };
+}
+
+/** The tab context menu for a tab (also the palette's "Tab:" commands). */
+function tabMenuFor(tab: TabInfo): MenuItem[] {
+  const winId = tab.windowId;
+  return tabMenu({
+    target: tab,
+    tabs: targetTabs(tab),
+    essentialsCount: layoutOf(winId)?.essentials.length ?? 0,
+    pinned: layoutOf(winId)?.pinned ?? [],
+    allTabs: tabsOfWindow(winId),
+    groups: allGroups.filter((g) => g.windowId === winId),
+    send,
+    windows: tabState.windowList,
+    homeWindowId: tabState.windowId,
+    whitelist,
+    onWhitelist,
+    onNewGroup: (tabIds) => {
+      pendingGroup = {
+        tabIds,
+        known: new Set(allGroups.map((g) => g.id)),
+        until: Date.now() + 4000,
+      };
+    },
+  });
 }
 
 function onContextMenu(e: MouseEvent, i: number): void {
@@ -1431,22 +1431,27 @@ function onkeydown(e: KeyboardEvent): void {
   e.preventDefault();
 }
 
-/** Palette commands: the current window's menu, as on its header. */
+/** Palette commands: the active tab's menu, then this window's, as on their rows. */
 const commands = $derived.by((): Command[] => {
   if (!palette) return [];
   const id = tabState.windowId;
   const w = id === null ? undefined : windowViewById.get(id);
   if (!w) return [];
-  return menuCommands(
-    windowMenu({
-      info: w.info,
-      tabs: w.tabs,
-      send,
-      onRename: () => void tick().then(() => startRename(`w${w.info.id}`)),
-      layout: tabState.layouts.get(w.info.id),
-      themes,
-    }),
-  );
+  const active = w.tabs.find((t) => t.active);
+  return [
+    ...(active ? menuCommands(tabMenuFor(active), 'Tab: ') : []),
+    ...menuCommands(
+      windowMenu({
+        info: w.info,
+        tabs: w.tabs,
+        send,
+        onRename: () => void tick().then(() => startRename(`w${w.info.id}`)),
+        layout: tabState.layouts.get(w.info.id),
+        themes,
+      }),
+      'Window: ',
+    ),
+  ];
 });
 const paletteHits = $derived(matchCommands(commands, query.trimStart().slice(1)));
 
@@ -1530,7 +1535,7 @@ $effect(() => {
       bind:value={query}
       type="text"
       role="searchbox"
-      placeholder="Search tabs, or > for commands"
+      placeholder="Search, or > for commands"
       title="Filters: is:audible, is:muted, is:suspended, is:pinned, is:grouped, site:example.com, group:name. Put - in front to exclude."
       aria-label="Search tabs"
       aria-describedby={searching && view.length === 0 ? 'vc-filter-hint' : undefined}

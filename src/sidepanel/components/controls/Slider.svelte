@@ -47,7 +47,7 @@ const uid = $props.id();
   input {
     flex: 1;
     min-width: 0;
-    height: 20px;
+    height: 24px;
     margin: 0;
     appearance: none;
     background: transparent;

@@ -8,6 +8,8 @@
   --row-height: 34px;
   --font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-size: 13px;
+  /* Metadata/secondary text: follows the user's base size, never below 11.5px. */
+  --font-size-meta: max(11.5px, calc(var(--font-size) - 1.5px));
   --dur: 120ms;
   --ease: cubic-bezier(0.2, 0, 0, 1);
 
@@ -141,13 +143,15 @@ textarea {
   outline-offset: 2px;
 }
 
-/* Motion setting: "system" follows the OS preference, "reduce" always, "full" never. */
+/* Motion setting: "system" follows the OS preference, "reduce" always, "full" never.
+   Reduced motion drops movement and keyframes but keeps colour/opacity transitions so state
+   changes (hover, selection, toggles) still read. */
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-motion="full"]) *,
   :root:not([data-motion="full"]) *::before,
   :root:not([data-motion="full"]) *::after {
     /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
-    transition: none !important;
+    transition-property: color, background-color, border-color, outline-color, opacity !important;
     /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
     animation: none !important;
     /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
@@ -159,7 +163,7 @@ textarea {
 :root[data-motion="reduce"] *::before,
 :root[data-motion="reduce"] *::after {
   /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
-  transition: none !important;
+  transition-property: color, background-color, border-color, outline-color, opacity !important;
   /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */
   animation: none !important;
   /* biome-ignore lint/complexity/noImportantStyles: must beat component-scoped transitions and animations */

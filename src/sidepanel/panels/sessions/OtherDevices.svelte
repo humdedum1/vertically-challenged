@@ -312,7 +312,7 @@ const total = $derived(docs.length + chromeDevices.length);
     background: var(--surface-2);
     border: 1px solid var(--border);
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     text-align: center;
     font-variant-numeric: tabular-nums;
   }
@@ -353,13 +353,13 @@ const total = $derived(docs.length + chromeDevices.length);
     margin-left: auto;
     flex: none;
     font-weight: 400;
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   .note {
     margin: 2px 8px;
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   .list {
@@ -429,7 +429,7 @@ const total = $derived(docs.length + chromeDevices.length);
 
   .sub {
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   .strip {
@@ -441,7 +441,7 @@ const total = $derived(docs.length + chromeDevices.length);
 
   .more {
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   .actions {
@@ -503,6 +503,6 @@ const total = $derived(docs.length + chromeDevices.length);
 
   .t-url {
     color: var(--mOnSurfaceVariant);
-    font-size: 10.5px;
+    font-size: var(--font-size-meta);
   }
 </style>

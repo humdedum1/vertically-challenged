@@ -650,7 +650,7 @@ const title = (n: Node): string => n.title || (n.url ? displayUrl(n.url) : 'Unti
     border-radius: 999px;
     background: var(--state-selected);
     color: var(--mOnSurface);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     font-weight: 500;
     cursor: pointer;
     transition: background-color var(--dur) var(--ease);
@@ -821,7 +821,7 @@ const title = (n: Node): string => n.title || (n.url ? displayUrl(n.url) : 'Unti
   .url {
     display: none;
     color: var(--mOnSurfaceVariant);
-    font-size: 10.5px;
+    font-size: var(--font-size-meta);
     line-height: 1.15;
   }
 
@@ -841,7 +841,7 @@ const title = (n: Node): string => n.title || (n.url ? displayUrl(n.url) : 'Unti
     border-radius: 999px;
     background: var(--surface-2);
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     text-align: center;
     font-variant-numeric: tabular-nums;
   }

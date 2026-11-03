@@ -504,7 +504,7 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
     background: var(--surface-2);
     border: 1px solid var(--border);
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     text-align: center;
     font-variant-numeric: tabular-nums;
   }
@@ -597,7 +597,7 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
 
   .sub {
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   .rename {
@@ -621,7 +621,7 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
 
   .more {
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   .actions {
@@ -650,7 +650,7 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
 
   h3 {
     margin: 6px 0 2px;
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     font-weight: 600;
     color: var(--mOnSurfaceVariant);
     text-transform: uppercase;
@@ -707,7 +707,7 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
 
   .t-url {
     color: var(--mOnSurfaceVariant);
-    font-size: 10.5px;
+    font-size: var(--font-size-meta);
   }
 
   .sr {

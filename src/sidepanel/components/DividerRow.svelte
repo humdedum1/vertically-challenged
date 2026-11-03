@@ -99,7 +99,7 @@ const tabsWord = $derived(clearable === 1 ? 'tab' : 'tabs');
     background: transparent;
     color: var(--mOnSurfaceVariant);
     font: inherit;
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     cursor: pointer;
     transition:
       background-color var(--dur) var(--ease),

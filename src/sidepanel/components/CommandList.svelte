@@ -46,7 +46,7 @@ function onkeydown(e: KeyboardEvent): void {
   .group {
     padding: 8px 10px 2px;
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -80,7 +80,7 @@ function onkeydown(e: KeyboardEvent): void {
     flex: none;
     color: var(--mOnSurfaceVariant);
     font: inherit;
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   /* The first command is what Enter in the search field runs. */

@@ -180,7 +180,7 @@ const level = (ratio: number): { text: string; large: boolean } =>
   .hint {
     margin: 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   .roles {
@@ -243,7 +243,7 @@ const level = (ratio: number): { text: string; large: boolean } =>
   .pair small {
     margin-left: 6px;
     color: var(--mOnSurfaceVariant);
-    font-size: 10.5px;
+    font-size: var(--font-size-meta);
   }
 
   .ratio {
@@ -256,7 +256,7 @@ const level = (ratio: number): { text: string; large: boolean } =>
     border: 1px solid var(--mError);
     border-radius: 999px;
     color: var(--mError);
-    font-size: 10.5px;
+    font-size: var(--font-size-meta);
     font-weight: 600;
   }
 

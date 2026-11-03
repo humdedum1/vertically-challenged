@@ -49,7 +49,7 @@ const uid = $props.id();
 
   .hint {
     color: var(--mOnSurfaceVariant);
-    font-size: 11px;
+    font-size: var(--font-size-meta);
   }
 
   button {
@@ -63,6 +63,13 @@ const uid = $props.id();
     background: var(--surface-0);
     cursor: pointer;
     transition: background-color var(--dur) var(--ease);
+  }
+
+  /* Invisible hit area: the 22px track alone is under the 24px WCAG 2.5.8 minimum. */
+  button::after {
+    content: '';
+    position: absolute;
+    inset: -4px 0;
   }
 
   .knob {

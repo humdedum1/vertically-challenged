@@ -64,6 +64,6 @@ const when = (t: number) =>
   .actions { display: flex; gap: 6px; }
   .count {
     padding: 1px 7px; border-radius: 999px; background: var(--surface-2);
-    border: 1px solid var(--border); color: var(--mOnSurfaceVariant); font-size: 11px;
+    border: 1px solid var(--border); color: var(--mOnSurfaceVariant); font-size: var(--font-size-meta);
   }
 </style>

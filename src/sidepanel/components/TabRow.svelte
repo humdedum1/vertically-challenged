@@ -436,8 +436,8 @@ function muteClick(e: MouseEvent): void {
     flex: none;
     display: grid;
     place-items: center;
-    width: 22px;
-    height: 22px;
+    width: 24px; /* WCAG 2.5.8 minimum target */
+    height: 24px;
     padding: 0;
     border: 0;
     border-radius: 6px;

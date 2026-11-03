@@ -4,6 +4,7 @@ import { displayUrl } from '../../lib/search/search-index';
 import { faviconUrl } from '../../shared/favicon';
 import type { TabInfo } from '../../shared/types';
 import { segments } from '../model/highlight';
+import { tabTooltip } from '../model/tab-tooltip';
 import Icon from './Icon.svelte';
 
 interface Props {
@@ -126,7 +127,7 @@ function muteClick(e: MouseEvent): void {
   aria-setsize={size}
   aria-selected={selected}
   aria-current={tab.active ? 'page' : undefined}
-  title="{label}{tab.url ? `\n${tab.url}` : ''}"
+  title={tabTooltip(label, tab, Date.now())}
   {onclick}
   {oncontextmenu}
   {onauxclick}

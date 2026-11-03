@@ -6,11 +6,15 @@ import { SHORTCUT_LABELS } from '../panels/settings/shortcut-labels';
 let { shortcuts, onclose }: { shortcuts: Keymap; onclose: () => void } = $props();
 
 let closeBtn: HTMLButtonElement | undefined = $state();
+// Focus moves into the dialog, stays there, and goes back to where it was on close.
+const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 $effect(() => closeBtn?.focus());
+$effect(() => () => previous?.focus());
 
 /** Keys that always work and cannot be rebound. */
 const FIXED: [string, string][] = [
   ['↑ ↓ Home End', 'Move through tabs'],
+  ['Alt 1 to 9', 'Jump to the first nine tabs'],
   ['Enter', 'Open the tab'],
   ['Space', 'Select the tab'],
   ['Esc', 'Clear search or selection'],
@@ -19,6 +23,12 @@ const FIXED: [string, string][] = [
 ];
 
 function onkeydown(e: KeyboardEvent): void {
+  // The Close button is the only control, so Tab has nowhere else to go inside the dialog.
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    closeBtn?.focus();
+    return;
+  }
   if (e.key === 'Escape') {
     e.preventDefault();
     e.stopPropagation();

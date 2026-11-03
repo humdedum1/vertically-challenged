@@ -1,6 +1,6 @@
 <script lang="ts">
 import { browser } from 'wxt/browser';
-import { parseSnoozed, SNOOZE_KEY, type Snoozed } from '../../../shared/snooze';
+import { PARKED, parseSnoozed, SNOOZE_KEY, type Snoozed } from '../../../shared/snooze';
 import Button from '../../components/controls/Button.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
@@ -35,18 +35,18 @@ const when = (t: number) =>
 </script>
 
 {#if list.length > 0}
-  <SegmentCard title="Snoozed tabs">
+  <SegmentCard title="Put away">
     {#snippet icon()}<Icon name="history" size={12} />{/snippet}
-    {#snippet trailing()}<span class="count" role="img" aria-label="{list.length} snoozed tabs">{list.length}</span>{/snippet}
-    <ul class="list" aria-label="Snoozed tabs">
+    {#snippet trailing()}<span class="count" role="img" aria-label="{list.length} tabs put away">{list.length}</span>{/snippet}
+    <ul class="list" aria-label="Tabs put away">
       {#each list as s (s.id)}
         <li>
           <div class="meta">
             <span class="title">{s.title || s.url}</span>
-            <span class="when">Back {when(s.wakeAt)}</span>
+            <span class="when">{s.wakeAt === PARKED ? 'Parked, no reminder' : `Back ${when(s.wakeAt)}`}</span>
           </div>
           <div class="actions">
-            <Button aria-label="Wake {s.title || s.url} now" onclick={() => tabState.send({ type: 'wakeSnoozed', id: s.id })}>Wake now</Button>
+            <Button aria-label="{s.wakeAt === PARKED ? 'Open' : 'Wake'} {s.title || s.url} now" onclick={() => tabState.send({ type: 'wakeSnoozed', id: s.id })}>{s.wakeAt === PARKED ? 'Open now' : 'Wake now'}</Button>
             <Button variant="text" aria-label="Remove {s.title || s.url} from snoozed" onclick={() => tabState.send({ type: 'deleteSnoozed', id: s.id })}>Remove</Button>
           </div>
         </li>

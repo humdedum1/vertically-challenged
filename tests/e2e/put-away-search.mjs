@@ -49,7 +49,7 @@ try {
   console.log('PASS a page inside a saved session is found by search');
 
   await search.fill('zebra');
-  await page.getByText('Snoozed', { exact: true }).waitFor();
+  await page.getByText('Put away', { exact: true }).waitFor();
   await page.getByRole('button', { name: /Zebra reference page/ }).click();
   await page.waitForFunction(
     async () => (await chrome.storage.local.get('vc:snoozed'))['vc:snoozed']?.length === 0,

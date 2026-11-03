@@ -1544,6 +1544,25 @@ export function focusSearch(): boolean {
 }
 
 let helpOpen = $state(false);
+
+// Alt+1 to Alt+9 jump to that tab of this window, in the order the list shows them.
+$effect(() => {
+  const onJump = (e: KeyboardEvent) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return;
+    const n = /^[1-9]$/.test(e.key) ? Number(e.key) : 0;
+    if (!n) return;
+    const t = e.target as HTMLElement | null;
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t?.isContentEditable)
+      return;
+    const id = tabState.windowId;
+    const target = id === null ? undefined : windowViewById.get(id)?.tabs[n - 1];
+    if (!target) return;
+    e.preventDefault();
+    send({ type: 'activate', tabId: target.id });
+  };
+  window.addEventListener('keydown', onJump);
+  return () => window.removeEventListener('keydown', onJump);
+});
 // "?" (outside text fields) shows what the keyboard can do.
 $effect(() => {
   const onHelp = (e: KeyboardEvent) => {

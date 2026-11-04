@@ -218,8 +218,8 @@ const tabLabel = (t: { title: string; url: string }): string => t.title || t.url
 
   .exp {
     flex: none;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
   }
 
   .toggle:hover,

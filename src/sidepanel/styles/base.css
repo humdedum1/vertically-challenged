@@ -7,7 +7,7 @@
   --radius-control: 8px;
   --row-height: 34px;
   --font: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-size: var(--font-size);
+  --font-size: 13px; /* matches DEFAULTS.appearance.fontSize; was a self-reference (invalid) before applyAppearance ran */
   /* Metadata/secondary text: follows the user's base size, never below 11.5px. */
   --font-size-meta: max(11.5px, calc(var(--font-size) - 1.5px));
   --dur: 120ms;

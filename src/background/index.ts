@@ -287,7 +287,7 @@ export function startBackground(): void {
             target: { tabId },
             func: () => {
               const box = document.querySelector<HTMLElement>(
-                'input[type=search], [role=search] input, input[name=q], [role=searchbox], [role=combobox], input[type=text]:not([hidden]), textarea',
+                'input[type=search], [role=search] input, [name=q], [role=searchbox]',
               );
               window.focus();
               box?.focus();

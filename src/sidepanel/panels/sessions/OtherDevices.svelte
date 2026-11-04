@@ -2,6 +2,7 @@
 import { onMount } from 'svelte';
 import { type Browser, browser } from 'wxt/browser';
 import { displayUrl } from '../../../lib/search/search-index';
+import { BROWSER, FIREFOX } from '../../../shared/browser-urls';
 import { isRestorableUrl, type SavedPinNode, sessionTabCount } from '../../../shared/sessions';
 import type { SyncDoc, SyncWorkspace } from '../../../shared/sync';
 import { DEVICE_KEY, DEVICE_PREFIX, readSync } from '../../../shared/sync-store';
@@ -165,8 +166,8 @@ const total = $derived(docs.length + chromeDevices.length);
     <p class="message" role="status">Looking for your other devices…</p>
   {:else if total === 0}
     <p class="message">
-      Your other computers show up here when Chrome Sync is on there and Vertically Challenged is installed.
-      Their open tabs need Chrome’s “Open tabs” sync.
+      Your other computers show up here when {BROWSER} Sync is on there and Vertically Challenged is installed.
+      {#if !FIREFOX}Their open tabs need Chrome’s “Open tabs” sync.{/if}
     </p>
   {:else}
     <div class="devices">
@@ -230,7 +231,7 @@ const total = $derived(docs.length + chromeDevices.length);
           </ul>
           {#if d.omitted.workspaces + d.omitted.sessions > 0}
             <p class="note">
-              {pluralize(d.omitted.workspaces + d.omitted.sessions, 'more item')} didn’t fit in Chrome’s sync storage.
+              {pluralize(d.omitted.workspaces + d.omitted.sessions, 'more item')} didn’t fit in {BROWSER}’s sync storage.
             </p>
           {/if}
         </section>

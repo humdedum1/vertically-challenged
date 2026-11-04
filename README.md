@@ -4,7 +4,7 @@
 
 # Vertically Challenged
 
-**Fast, customizable vertical tabs for Chrome, in the side panel or an in-page popup.**
+**Fast, customizable vertical tabs for Chrome and Firefox, in the side panel or an in-page popup.**
 
 Staples, pinned folders, tab groups, saved sessions and themes.
 
@@ -57,9 +57,10 @@ Staples, pinned folders, tab groups, saved sessions and themes.
   </tr>
 </table>
 
-Needs Chrome 116 or newer (141 or newer to close the side panel with a shortcut).
+Needs Chrome 116 or newer (141 or newer to close the side panel with a shortcut), or Firefox 140 or newer (it uses Firefox's sidebar).
 
 - **Chrome Web Store:** not listed yet. <!-- TODO: add the Chrome Web Store listing URL once it exists. -->
+- **Firefox:** `vertically-challenged-<version>-firefox.zip` on Releases (an AMO listing isn't set up yet). Load it with `about:debugging` → Load Temporary Add-on, or install the signed `.xpi` when one is attached.
 - **GitHub Releases:** download `vertically-challenged-<version>-crx.zip` from [Releases](https://github.com/humdedum1/vertically-challenged/releases) and extract the signed `.crx`. Chrome may block extensions from outside the Web Store; if it does, use the store or an unpacked build. The ZIP isn't an unpacked source folder, so Load unpacked won't take it.
 - **Unpacked:** see [Build from source](#build-from-source).
 
@@ -135,6 +136,8 @@ The panel can be Chrome's side panel or an in-page popup (pick in Settings). Whe
 
 ## Sync and its limits
 
+Sync runs through the browser's own sync (Chrome Sync or Firefox Sync), so Chrome and Firefox don't share data with each other. On Firefox, synced open tabs from other devices aren't shown (Firefox has no API for them).
+
 Sign in to the same Google account on each computer, turn on extension sync, and install the extension everywhere. Chrome's own remote-tab list also needs its Open tabs sync setting. Settings and themes sync as soon as they change; open workspaces publish on a schedule you set, from manual to every 60 minutes.
 
 <details>
@@ -200,6 +203,8 @@ TypeScript, Svelte 5, WXT, Vitest, Playwright and Biome.
 | --- | --- |
 | `npm run dev` | Dev browser with hot reload |
 | `npm run build` | Production build in `.output/chrome-mv3` |
+| `npm run build:firefox` / `start:firefox` | Firefox build in `.output/firefox-mv3`, and run it in Firefox via web-ext (`WEB_EXT_FIREFOX` = binary) |
+| `npm run test:e2e:firefox` | Headless Firefox smoke test (`FIREFOX_BIN` = Firefox 140+ binary) |
 | `npm run zip` | Zip the unpacked build (not a signed CRX) |
 | `npm run pack:crx` | Signed CRX in a release ZIP (needs the signing key, see [CONTRIBUTING.md](CONTRIBUTING.md)) |
 | `npm run lint` | Formatting and lint |

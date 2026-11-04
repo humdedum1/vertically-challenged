@@ -7,6 +7,7 @@ import {
   SHORTCUT_ACTIONS,
   type ShortcutAction,
 } from '../../../settings/schema';
+import { SHORTCUTS_URL } from '../../../shared/browser-urls';
 import Button from '../../components/controls/Button.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
@@ -132,7 +133,7 @@ $effect(() => {
 });
 
 function openChromeShortcuts(): void {
-  void browser.tabs.create({ url: 'chrome://extensions/shortcuts' });
+  void browser.tabs.create({ url: SHORTCUTS_URL });
 }
 </script>
 

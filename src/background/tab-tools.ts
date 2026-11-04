@@ -1,3 +1,4 @@
+import { isNewTabUrl } from '../shared/browser-urls';
 export interface ToolTab {
   id?: number;
   index: number;
@@ -24,8 +25,7 @@ export function duplicateTabIds(tabs: readonly ToolTab[]): number[] {
   const rank = (t: ToolTab) => (t.active ? 0 : t.pinned ? 1 : 2);
   for (const t of [...tabs].sort((a, b) => rank(a) - rank(b) || a.index - b.index)) {
     const page = pageOf(t);
-    if (page && !page.startsWith('chrome://newtab') && page !== 'about:blank' && !keep.has(page))
-      keep.set(page, t);
+    if (page && !isNewTabUrl(page) && page !== 'about:blank' && !keep.has(page)) keep.set(page, t);
   }
   const kept = new Set(keep.values());
   return tabs

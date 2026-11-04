@@ -77,7 +77,7 @@ let {
   ondouble,
 }: Props = $props();
 
-const icon = $derived(faviconUrl(tab.url, 16));
+const icon = $derived(faviconUrl(tab.url, 16, tab.favIconUrl));
 // Tracks the URL that failed so a navigation to a new page retries the favicon.
 let failedFor: string | null = $state(null);
 const showImg = $derived(icon !== null && failedFor !== icon);

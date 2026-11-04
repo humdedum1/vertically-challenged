@@ -2,6 +2,7 @@ import { type Browser, browser } from 'wxt/browser';
 import { makeTarget } from '../backup/make-target';
 import { migrateSettings } from '../settings/migrate';
 import type { TabRule } from '../settings/schema';
+import { isNewTabUrl } from '../shared/browser-urls';
 import { hostOf } from '../shared/host-pattern';
 import { parseImport } from '../shared/import-tabs';
 import {
@@ -51,17 +52,38 @@ import { shouldDeliver, snapshotPlan, visibleWindows } from './visibility';
  * that woke the worker to listeners added in the first turn of the event loop. It is a
  * function rather than top-level code because WXT imports entrypoints at build time.
  */
+interface SidebarAction {
+  open(): Promise<void>;
+  close(): Promise<void>;
+  toggle(): Promise<void>;
+}
+
 export function startBackground(): void {
   // Side panel or in-page popup (Display setting). In side-panel mode Chrome opens the panel
   // from the toolbar button itself; the behaviour persists, and is set again on every wake.
+  // Firefox has sidebarAction instead of sidePanel; it acts on the current window.
+  const sidebar = import.meta.env.FIREFOX
+    ? (browser as unknown as { sidebarAction: SidebarAction }).sidebarAction
+    : undefined;
+  const panelApi = sidebar
+    ? {
+        setPanelBehavior: async () => {},
+        openSidePanel: () => sidebar.open(),
+        closeSidePanel: () => sidebar.close(),
+        toggleSidebar: () => sidebar.toggle(),
+      }
+    : {
+        setPanelBehavior: (b: { openPanelOnActionClick: boolean }) =>
+          browser.sidePanel.setPanelBehavior(b),
+        openSidePanel: (windowId: number) => browser.sidePanel.open({ windowId }),
+        closeSidePanel:
+          typeof browser.sidePanel.close === 'function'
+            ? (windowId: number) => browser.sidePanel.close({ windowId })
+            : undefined,
+      };
   const display = createDisplay(
     {
-      setPanelBehavior: (b) => browser.sidePanel.setPanelBehavior(b),
-      openSidePanel: (windowId) => browser.sidePanel.open({ windowId }),
-      closeSidePanel:
-        typeof browser.sidePanel.close === 'function'
-          ? (windowId) => browser.sidePanel.close({ windowId })
-          : undefined,
+      ...panelApi,
       injectToggle: async (tabId) => {
         await browser.scripting.executeScript({ target: { tabId }, files: ['/popup-toggle.js'] });
       },
@@ -310,7 +332,7 @@ export function startBackground(): void {
     );
     // Browser-opened blank tabs (Ctrl+T, + button) are swapped for the configured new-tab URL.
     const id = tab.id;
-    if (id !== undefined && (tab.pendingUrl ?? tab.url) === 'chrome://newtab/')
+    if (id !== undefined && isNewTabUrl(tab.pendingUrl ?? tab.url))
       void settingsNow()
         .then(async ({ tabs }) => {
           if (!tabs.newTabUrl) return;

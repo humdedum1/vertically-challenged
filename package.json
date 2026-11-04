@@ -8,6 +8,10 @@
     "dev": "wxt",
     "build": "wxt build",
     "zip": "wxt zip",
+    "build:firefox": "wxt build -b firefox --mv3",
+    "zip:firefox": "wxt zip -b firefox --mv3",
+    "test:e2e:firefox": "node tests/e2e-firefox/smoke.mjs",
+    "start:firefox": "npm run build:firefox && web-ext run -s .output/firefox-mv3 --no-reload",
     "pack:crx": "npm run build && node scripts/pack-crx.mjs",
     "check": "svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "lint": "biome check .",
@@ -23,10 +27,12 @@
     "@tsconfig/svelte": "^5.0.8",
     "@wxt-dev/module-svelte": "^2.0.5",
     "playwright-core": "^1.64.1",
+    "selenium-webdriver": "^4.52.0",
     "svelte": "^5.57.3",
     "svelte-check": "^4.7.7",
     "typescript": "~6.0.3",
     "vitest": "^5.0.5",
+    "web-ext": "^10.8.0",
     "wxt": "^0.21.5"
   }
 }

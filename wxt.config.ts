@@ -3,19 +3,39 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   srcDir: 'src',
   modules: ['@wxt-dev/module-svelte'],
-  manifest: {
+  manifest: ({ browser }) => ({
     name: 'Vertically Challenged',
     description:
       'Fast, customizable vertical tabs in the side panel or an in-page popup. Local-first, no telemetry.',
-    minimum_chrome_version: '116',
+    ...(browser === 'firefox'
+      ? {
+          browser_specific_settings: {
+            gecko: {
+              // Keep this id stable once published: AMO and storage.sync key on it.
+              id: 'vertically-challenged@humdedum1.github.io',
+              // 139 added the tabGroups API; 140 data_collection_permissions.
+              strict_min_version: '140.0',
+              data_collection_permissions: { required: ['none'] },
+            },
+            // Android only supports data_collection_permissions from 142.
+            gecko_android: { strict_min_version: '142.0' },
+          },
+          sidebar_action: {
+            default_panel: 'sidepanel.html',
+            default_title: 'Vertically Challenged',
+          },
+          // Match Chrome: usable in private windows when the user allows the extension there.
+          incognito: 'spanning',
+        }
+      : { minimum_chrome_version: '116' }),
     // Each permission is justified; no host permissions are requested.
     permissions: [
       // Read tab titles/URLs (needed for the list and search) and switch/close tabs.
       'tabs',
-      // Render the UI in Chrome's side panel.
-      'sidePanel',
-      // Load page favicons via chrome-extension://<id>/_favicon/ without host permissions.
-      'favicon',
+      // Chrome only: the side panel and the chrome-extension://<id>/_favicon/ endpoint.
+      // Firefox uses sidebar_action and tab.favIconUrl instead, and needs identity (Dropbox
+      // sign-in) as a required permission.
+      ...(browser === 'firefox' ? ['identity'] : ['sidePanel', 'favicon']),
       // Persist settings (sync, so they follow the user's Chrome profile) and later
       // local data such as layout and sessions.
       'storage',
@@ -45,17 +65,29 @@ export default defineConfig({
     // Block CSS network leaks through images, imports and fonts, including escaped tokens.
     // Inline styles are required by Svelte and the user's custom CSS.
     content_security_policy: {
-      extension_pages:
-        "script-src 'self'; object-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'",
+      extension_pages: `script-src 'self'; object-src 'self'; img-src 'self' data:${
+        // Firefox has no _favicon endpoint: favicons are the sites' own https icons.
+        browser === 'firefox' ? ' https:' : ''
+      }; style-src 'self' 'unsafe-inline'; font-src 'self'`,
     },
-    optional_permissions: ['notifications', 'downloads', 'identity'],
+    optional_permissions: [
+      'notifications',
+      'downloads',
+      // Firefox rejects identity as optional; it is a required permission there (no prompt).
+      ...(browser === 'firefox' ? [] : ['identity']),
+    ],
     // Remote backups (WebDAV, S3-compatible) talk to a server the user types in. Nothing is
     // granted at install: the panel requests exactly that server's origin when it is saved.
     optional_host_permissions: ['https://*/*', 'http://*/*'],
     // The in-page popup frames the panel page. The dynamic URL changes every browser
     // session and is only known to the extension, so other sites can't frame the panel.
     web_accessible_resources: [
-      { resources: ['sidepanel.html'], matches: ['<all_urls>'], use_dynamic_url: true },
+      {
+        resources: ['sidepanel.html'],
+        matches: ['<all_urls>'],
+        // Firefox already serves extensions from a per-install random host.
+        ...(browser === 'firefox' ? {} : { use_dynamic_url: true }),
+      },
     ],
     action: { default_title: 'Vertically Challenged' },
     // Users rebind these at chrome://extensions/shortcuts; only the panel toggle gets a
@@ -73,5 +105,5 @@ export default defineConfig({
       },
       'mru-forward': { description: 'Switch forward through recently used tabs' },
     },
-  },
+  }),
 });

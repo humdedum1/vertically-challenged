@@ -18,6 +18,7 @@ import {
   exchangeCode,
   newPkce,
 } from '../../../backup/dropbox';
+import { FIREFOX } from '../../../shared/browser-urls';
 import Button from '../../components/controls/Button.svelte';
 import Field from '../../components/controls/Field.svelte';
 import Select from '../../components/controls/Select.svelte';
@@ -69,7 +70,10 @@ async function connectDropbox(): Promise<void> {
     const appKey = cfg.dropbox.appKey.trim();
     if (!appKey) throw new Error('Enter your Dropbox app key first');
     if (
-      !(await browser.permissions.request({ permissions: ['identity'], origins: DROPBOX_ORIGINS }))
+      !(await browser.permissions.request({
+        permissions: FIREFOX ? [] : ['identity'],
+        origins: DROPBOX_ORIGINS,
+      }))
     )
       throw new Error('Permission was not granted');
     const redirect = browser.identity.getRedirectURL();

@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { DisplayMode } from '../../../settings/schema';
+import { APPEARANCE_URL } from '../../../shared/browser-urls';
 import Button from '../../components/controls/Button.svelte';
 import Field from '../../components/controls/Field.svelte';
 import SegmentedControl from '../../components/controls/SegmentedControl.svelte';
@@ -66,7 +67,7 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
     </p>
     {#if mode === 'sidebar'}
       <Field label="Side">
-        <Button onclick={() => void browser.tabs.create({ url: 'chrome://settings/appearance' })}>
+        <Button onclick={() => void browser.tabs.create({ url: APPEARANCE_URL })}>
           {side ? `On the ${side} · ` : ''}Change in Chrome settings
         </Button>
       </Field>

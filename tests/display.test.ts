@@ -107,6 +107,19 @@ describe('display', () => {
     expect(calls).toEqual(['side:open:1', 'behavior:true']);
   });
 
+  it('window mode: always a window, never injected, and it toggles', async () => {
+    const { api, calls } = fakeApi();
+    const d = createDisplay(api);
+    d.setMode('window');
+    await d.open(tab, { toggle: true, sidebarOpen: false });
+    await d.actionClicked(tab);
+    expect(calls).toEqual([
+      'behavior:false',
+      'window:create:chrome-extension://dyn/sidepanel.html?surface=window&windowId=1',
+      'window:remove:900',
+    ]);
+  });
+
   it('woken by the gesture in popup mode: replaces the side panel with the popup', async () => {
     const { api, calls } = fakeApi();
     const d = createDisplay(api);

@@ -92,8 +92,8 @@ export function startBackground(): void {
     if (!d.openOnLaunch) return;
     const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
     if (tab?.id === undefined) return;
-    // The popup needs no gesture (it falls back to its own window without activeTab).
-    if (d.mode === 'popup')
+    // The popup and window need no gesture (the popup falls back to a window without activeTab).
+    if (d.mode !== 'sidebar')
       return display.open(targetOf(tab), { toggle: false, sidebarOpen: false });
     if (!browser.notifications) return;
     await browser.notifications.create(
@@ -308,14 +308,25 @@ export function startBackground(): void {
     void placeChildTab(tab).catch((err: unknown) =>
       console.debug('[vc] child tab placement failed', err),
     );
-    // Browser-opened blank tabs (Ctrl+T, + button) go to the configured new-tab URL.
+    // Browser-opened blank tabs (Ctrl+T, + button) are swapped for the configured new-tab URL.
     const id = tab.id;
     if (id !== undefined && (tab.pendingUrl ?? tab.url) === 'chrome://newtab/')
       void settingsNow()
         .then(async ({ tabs }) => {
           if (!tabs.newTabUrl) return;
-          await browser.tabs.update(id, { url: tabs.newTabUrl });
-          focusPageSearch(id);
+          // A tab Chrome opened keeps the address bar focused even after navigating, so
+          // open the URL in a tab of our own (page focused) and close Chrome's blank one.
+          const next = await browser.tabs.create({
+            windowId: tab.windowId,
+            index: tab.index,
+            url: tabs.newTabUrl,
+            active: tab.active,
+          });
+          if (next.id === undefined) return;
+          if (tab.groupId !== undefined && tab.groupId !== -1)
+            await browser.tabs.group({ groupId: tab.groupId, tabIds: [next.id] });
+          await browser.tabs.remove(id);
+          focusPageSearch(next.id);
         })
         .catch((err: unknown) => console.debug('[vc] new tab redirect failed', err));
   });

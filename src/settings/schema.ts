@@ -115,13 +115,14 @@ export interface SyncSettings {
 export const SYNC_INTERVALS = [0, 1, 5, 15, 30, 60] as const;
 
 /** Where the toolbar button, the shortcuts and the toolbar menu open the panel. */
-export type DisplayMode = 'sidebar' | 'popup';
-export const DISPLAY_MODES: readonly DisplayMode[] = ['sidebar', 'popup'];
+export type DisplayMode = 'sidebar' | 'popup' | 'window';
+export const DISPLAY_MODES: readonly DisplayMode[] = ['sidebar', 'popup', 'window'];
 
 export interface DisplaySettings {
   /**
    * sidebar: Chrome's side panel. popup: floating over the current page (in a small
    * window on pages extensions can't run on, such as chrome:// pages and incognito).
+   * window: always that small window, which window managers can move.
    */
   mode: DisplayMode;
   /** Show a notification at browser launch whose click opens the panel (Chrome won't open it unprompted). */

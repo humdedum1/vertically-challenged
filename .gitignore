@@ -12,9 +12,8 @@ web-ext.config.ts
 .superpowers/
 bench/.out/
 
-# Local Claude Code skills stay private; only the shared settings file is tracked
-.claude/*
-!.claude/settings.json
+# Local Claude Code skills and settings, never published
+.claude/
 
 # Local working notes and scratch output, kept off GitHub
 AGENTS.md

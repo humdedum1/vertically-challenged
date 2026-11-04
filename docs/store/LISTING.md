@@ -19,6 +19,8 @@ images in this folder are built by `node scripts/store-assets.mjs` from the READ
    host permissions draw extra scrutiny. The justifications below are written for that.
 7. **After approval,** copy the extension ID and set up automatic uploads (next section).
 
+The Firefox equivalent is [AMO.md](AMO.md).
+
 The Web Store assigns its own extension ID and signs the package itself, so it differs from the
 CRX on GitHub Releases. Browser sync data is stored per extension ID, so someone who switches
 between the two installs starts with fresh synced data.

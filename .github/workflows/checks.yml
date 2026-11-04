@@ -32,4 +32,5 @@ jobs:
       - name: Firefox smoke test (140)
         run: |
           out=$(npx --yes @puppeteer/browsers install firefox@stable_140.0 --path "$RUNNER_TEMP/firefox" | tail -1)
-          FIREFOX_BIN="$RUNNER_TEMP/firefox/${out#* }" npm run test:e2e:firefox
+          # The tool prints "<browser>@<build> <absolute path>".
+          FIREFOX_BIN="${out#* }" npm run test:e2e:firefox

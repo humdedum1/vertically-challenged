@@ -47,6 +47,8 @@ It sits in the side panel (the sidebar on Firefox), floats over the page as a po
 
 > [!WARNING]
 > This was mostly written with AI coding tools and has only been tested lightly. It has unit and end-to-end tests, but they've run on a handful of machines and profiles, so expect rough edges. Keep backups of anything you can't lose, and please report what breaks.
+>
+> Firefox support is newer and has had much less testing than Chrome. It has been checked mainly by an automated headless smoke test, not by people using it day to day, so there will be bugs I haven't found. Pull requests that fix Firefox problems are very welcome.
 
 ## Install
 
@@ -122,7 +124,7 @@ You need Chrome 116 or newer (141 to close the side panel with the shortcut), or
 
 ### Chrome and Firefox
 
-Everything above works on both, with these exceptions.
+Everything above should work on both, with these exceptions. Firefox is the less tested of the two (see the note at the top), and fixes for it are especially welcome.
 
 | | Chrome | Firefox |
 | --- | --- | --- |

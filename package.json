@@ -1,6 +1,15 @@
 {
   "name": "vertically-challenged",
-  "description": "Fast, customizable vertical tabs in Chrome's side panel. Local-first.",
+  "description": "Vertical tabs for Chrome and Firefox. Local-first, no telemetry.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/humdedum1/vertically-challenged.git"
+  },
+  "homepage": "https://github.com/humdedum1/vertically-challenged#readme",
+  "bugs": {
+    "url": "https://github.com/humdedum1/vertically-challenged/issues"
+  },
   "private": true,
   "version": "0.1.1",
   "type": "module",

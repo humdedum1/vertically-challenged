@@ -56,8 +56,8 @@ export async function launch(
     `--load-extension=${ext}`,
     ...extra,
   ];
-  // Chromium refuses to start sandboxed as root (CI containers).
-  if (process.getuid?.() === 0) args.push('--no-sandbox');
+  // Chromium can't sandbox as root, nor on Ubuntu 24.04 CI runners (AppArmor blocks user namespaces).
+  if (process.getuid?.() === 0 || process.env.CI) args.push('--no-sandbox');
   const ctx = await chromium.launchPersistentContext(profile, {
     executablePath: chromeBinary(),
     headless: false,

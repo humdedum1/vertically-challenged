@@ -6,7 +6,7 @@
 
 **Fast, customizable vertical tabs for Chrome, in the side panel or an in-page popup.**
 
-Staples, pinned folders, tab groups, saved sessions and themes. Local-first, no telemetry.
+Staples, pinned folders, tab groups, saved sessions and themes.
 
 [![CI](https://github.com/humdedum1/vertically-challenged/actions/workflows/checks.yml/badge.svg)](https://github.com/humdedum1/vertically-challenged/actions/workflows/checks.yml)
 [![Release](https://img.shields.io/github/v/release/humdedum1/vertically-challenged?label=release&color=0071e3&labelColor=1d1d1f)](https://github.com/humdedum1/vertically-challenged/releases)
@@ -15,7 +15,20 @@ Staples, pinned folders, tab groups, saved sessions and themes. Local-first, no 
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/humdedum1)
 [![PayPal](https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white)](https://paypal.me/oddboxx)
 
-[Install](#install) · [Features](#features) · [Shortcuts](#keyboard-shortcuts) · [Releases](https://github.com/humdedum1/vertically-challenged/releases) · [Report a bug](https://github.com/humdedum1/vertically-challenged/issues/new/choose) · [Contribute](CONTRIBUTING.md)
+[Install](#install) · [Features](#features) · [Shortcuts](#keyboard-shortcuts) · [Privacy](#privacy) · [Releases](https://github.com/humdedum1/vertically-challenged/releases) · [Report a bug](https://github.com/humdedum1/vertically-challenged/issues/new/choose) · [Contribute](CONTRIBUTING.md)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/store/readme-tabs-dark.png">
+  <img src="docs/store/readme-tabs-light.png" alt="The tab list with child tabs and search" width="260">
+</picture> <picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/store/readme-history-dark.png">
+  <img src="docs/store/readme-history-light.png" alt="The History panel, grouped by day" width="260">
+</picture> <picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/store/readme-settings-dark.png">
+  <img src="docs/store/readme-settings-light.png" alt="Settings with every group collapsed" width="260">
+</picture>
+
+<sub>Tab list with child tabs and fuzzy search (type <code>&gt;</code> for commands) · History grouped by day · Settings with its own search. Noctalia theme, shown in your GitHub light or dark mode.</sub>
 
 <table>
   <tr>
@@ -27,11 +40,6 @@ Staples, pinned folders, tab groups, saved sessions and themes. Local-first, no 
     <td align="center"><b>Free, MIT</b><br><sub>And it stays free</sub></td>
   </tr>
 </table>
-
-<img src="docs/store/readme-tabs-light.png" alt="The tab list, Noctalia light" width="260"> <img src="docs/store/readme-history-light.png" alt="The History panel, Noctalia light" width="260"> <img src="docs/store/readme-settings-light.png" alt="Settings with every group collapsed, Noctalia light" width="260">
-<img src="docs/store/readme-tabs-dark.png" alt="The tab list, Noctalia dark" width="260"> <img src="docs/store/readme-history-dark.png" alt="The History panel, Noctalia dark" width="260"> <img src="docs/store/readme-settings-dark.png" alt="Settings with every group collapsed, Noctalia dark" width="260">
-
-<sub>Tab list with child tabs and fuzzy search (type <code>&gt;</code> for commands) · History grouped by day · Settings with its own search. Noctalia theme, light and dark.</sub>
 <!-- TODO: add Chrome Web Store version/users badges once the store listing exists. -->
 
 </div>
@@ -51,7 +59,7 @@ Staples, pinned folders, tab groups, saved sessions and themes. Local-first, no 
 
 Needs Chrome 116 or newer (141 or newer to close the side panel with a shortcut).
 
-- **Chrome Web Store:** [TODO: Chrome Web Store listing URL]
+- **Chrome Web Store:** not listed yet. <!-- TODO: add the Chrome Web Store listing URL once it exists. -->
 - **GitHub Releases:** download `vertically-challenged-<version>-crx.zip` from [Releases](https://github.com/humdedum1/vertically-challenged/releases) and extract the signed `.crx`. Chrome may block extensions from outside the Web Store; if it does, use the store or an unpacked build. The ZIP isn't an unpacked source folder, so Load unpacked won't take it.
 - **Unpacked:** see [Build from source](#build-from-source).
 
@@ -117,11 +125,11 @@ Alt+Shift+V toggles the panel. Change Chrome-level shortcuts at `chrome://extens
 | Chrome command | Default |
 | --- | --- |
 | Open or close the panel | Alt+Shift+V |
-| Open the panel with search focused | none |
-| Suspend the current tab | none |
-| Suspend the other tabs in the window | none |
-| Switch to the previously used tab (press again to go further back) | none |
-| Switch forward through recently used tabs | none |
+| Open the panel with search focused | Unassigned |
+| Suspend the current tab | Unassigned |
+| Suspend the other tabs in the window | Unassigned |
+| Switch to the previously used tab (press again to go further back) | Unassigned |
+| Switch forward through recently used tabs | Unassigned |
 
 The panel can be Chrome's side panel or an in-page popup (pick in Settings). Where Chrome blocks injection, the popup opens in its own window. Injection only happens after you click or press a shortcut on that tab, so the extension never asks for access to every site.
 

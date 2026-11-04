@@ -66,8 +66,8 @@ const decode = (s: string): string =>
 function fromHtml(text: string): Found[] {
   const out: Found[] = [];
   let group: string | null = null;
-  let i = 0;
-  while (out.length < MAX_TABS && (i = text.indexOf('<', i)) !== -1) {
+  let i = text.indexOf('<');
+  while (out.length < MAX_TABS && i !== -1) {
     const end = text.indexOf('>', i);
     if (end === -1) break;
     const tag = text.slice(i + 1, end);
@@ -80,7 +80,7 @@ function fromHtml(text: string): Found[] {
       if (href && isRestorableUrl(decode(href)))
         out.push({ url: decode(href), title: clean(decode(inner), MAX_TITLE), group });
     }
-    i = end + 1;
+    i = next;
   }
   return out;
 }

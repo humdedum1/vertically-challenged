@@ -222,10 +222,15 @@ $effect(() => {
     cursor: pointer;
     list-style: none;
     border-radius: var(--radius-card);
+    /* An open section's header stays pinned while its contents scroll under it. */
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--mSurface);
   }
 
   summary::-webkit-details-marker { display: none; }
-  summary:hover { background: var(--surface-1); }
+  summary:hover { background: linear-gradient(var(--surface-1), var(--surface-1)) var(--mSurface); }
   summary:focus-visible { outline: 2px solid var(--mPrimary); outline-offset: -2px; }
   summary span { display: grid; gap: 4px; min-width: 0; }
   summary strong { font-size: 13px; font-weight: 600; }

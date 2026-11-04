@@ -135,7 +135,7 @@ function patch(p: Partial<TabRowSettings>): void {
 </SegmentCard>
 
 <style>
-  .hint { margin: 0; color: var(--mOnSurfaceVariant); font-size: 12px; }
+  .hint { margin: 0; color: var(--mOnSurfaceVariant); font-size: calc(var(--font-size) - 1px); }
 
   .fields {
     display: flex;

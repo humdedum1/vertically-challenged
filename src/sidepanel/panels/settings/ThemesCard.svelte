@@ -303,7 +303,7 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
     background: none;
     color: var(--mOnSurfaceVariant);
     font: inherit;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     cursor: pointer;
   }
 
@@ -366,7 +366,7 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
   .inuse {
     flex: none;
     color: var(--mPrimary);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     font-weight: 600;
   }
 
@@ -384,7 +384,7 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
   .status,
   .error {
     margin: 0;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .status {
@@ -404,6 +404,6 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
     margin: 0;
     padding-left: 18px;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 </style>

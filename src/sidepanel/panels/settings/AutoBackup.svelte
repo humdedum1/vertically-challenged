@@ -220,9 +220,9 @@ const remote = $derived(cfg.target !== 'downloads');
 <style>
   .auto { display: flex; flex-direction: column; gap: var(--gap); }
   .row { display: flex; flex-wrap: wrap; gap: 8px; }
-  .hint, .error { margin: 0; font-size: 12px; color: var(--mOnSurfaceVariant); }
+  .hint, .error { margin: 0; font-size: calc(var(--font-size) - 1px); color: var(--mOnSurfaceVariant); }
   .error { color: var(--mError); }
   .error:empty { display: none; }
-  .how summary { cursor: pointer; font-size: 12px; color: var(--mOnSurfaceVariant); }
+  .how summary { cursor: pointer; font-size: calc(var(--font-size) - 1px); color: var(--mOnSurfaceVariant); }
   .how p { margin-top: 6px; }
 </style>

@@ -198,7 +198,7 @@ function setPref(key: 'workspaces' | 'sessions', value: boolean): void {
   .muted {
     margin: 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .name-row {
@@ -216,7 +216,7 @@ function setPref(key: 'workspaces' | 'sessions', value: boolean): void {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     color: var(--mOnSurfaceVariant);
   }
 

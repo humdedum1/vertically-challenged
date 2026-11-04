@@ -639,7 +639,7 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
 
   .confirm span {
     margin-right: 4px;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .tabs {

@@ -1809,7 +1809,7 @@ $effect(() => {
   .filters-hint {
     margin: -16px 16px 8px;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     line-height: 1.6;
     text-align: center;
     text-wrap: pretty;
@@ -1892,7 +1892,7 @@ $effect(() => {
     border-radius: 999px;
     background: var(--surface-3);
     color: var(--mOnSurface);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     box-shadow: var(--shadow-2);
     pointer-events: none;
   }

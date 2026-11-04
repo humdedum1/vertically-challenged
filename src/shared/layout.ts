@@ -191,6 +191,9 @@ const isObj = (v: unknown): v is Record<string, unknown> =>
 export const isLayoutUrl = (v: unknown): v is string => {
   if (typeof v !== 'string' || !v || v.length > MAX_URL) return false;
   try {
+    // Chrome's debug pages crash or hang the browser; a hostile backup must not store them.
+    if (/^chrome:\/\/(kill|hang|crash|quit|restart|inducebrowsercrashforrealz)/i.test(v))
+      return false;
     return SCHEMES.has(new URL(v).protocol);
   } catch {
     return false;

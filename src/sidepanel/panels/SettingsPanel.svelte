@@ -186,7 +186,7 @@ $effect(() => {
   .hint {
     margin: 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .cards {
@@ -235,14 +235,14 @@ $effect(() => {
   summary:focus-visible { outline: 2px solid var(--mPrimary); outline-offset: -2px; }
   summary span { display: grid; gap: 4px; min-width: 0; }
   summary strong { font-size: 13px; font-weight: 600; }
-  summary small { color: var(--mOnSurfaceVariant); font-size: 12px; }
+  summary small { color: var(--mOnSurfaceVariant); font-size: calc(var(--font-size) - 1px); }
   details[open] > summary :global(svg) { transform: rotate(90deg); }
   .category-content { display: grid; gap: var(--gap); padding-bottom: var(--gap); }
 
   .saved {
     margin: var(--gap) 0 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .saved:empty {

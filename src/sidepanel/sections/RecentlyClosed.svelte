@@ -304,14 +304,14 @@ const tabLabel = (t: { title: string; url: string }): string => t.title || t.url
     height: 26px;
     padding: 0 8px;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .empty {
     margin: 0;
     padding: 6px 12px 10px;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .retry {

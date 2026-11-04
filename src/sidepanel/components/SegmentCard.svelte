@@ -55,7 +55,7 @@ let { title, icon, trailing, children, fill = false }: Props = $props();
     flex: 1;
     min-width: 0;
     margin: 0;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     font-weight: 600;
   }
 

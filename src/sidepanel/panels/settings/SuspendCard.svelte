@@ -187,7 +187,7 @@ function suspendOthers(): void {
   .muted {
     margin: 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .minutes {
@@ -269,7 +269,7 @@ function suspendOthers(): void {
   .error {
     margin: 0;
     color: var(--mError);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .error:empty {

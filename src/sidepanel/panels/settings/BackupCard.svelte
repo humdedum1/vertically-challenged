@@ -402,7 +402,7 @@ function reset(): void {
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .remote li {
@@ -439,7 +439,7 @@ function reset(): void {
   .how summary {
     cursor: pointer;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .how p {
@@ -449,7 +449,7 @@ function reset(): void {
   .hint {
     margin: 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .body {
@@ -480,7 +480,7 @@ function reset(): void {
   .status,
   .error {
     margin: 0;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .status {
@@ -500,6 +500,6 @@ function reset(): void {
     margin: 0;
     padding-left: 18px;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 </style>

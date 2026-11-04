@@ -305,7 +305,7 @@ function onkeydown(e: KeyboardEvent): void {
     border: 1px dashed var(--mOutline);
     border-radius: 12px;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .empty.target {

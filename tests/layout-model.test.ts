@@ -5,6 +5,7 @@ import {
   flattenItems,
   INCOGNITO_LAYOUTS_KEY,
   isEmptyLayout,
+  isLayoutUrl,
   LAYOUTS_KEY,
   MAX_ITEMS,
   MAX_SETUPS,
@@ -270,5 +271,14 @@ describe('per-window look', () => {
     });
     expect(parsePanelMessage({ type: 'setWindowLook', windowId: 1, themeId: 'x;}' })).toBeNull();
     expect(parsePanelMessage({ type: 'setWindowLook', windowId: 1, icon: 'skull' })).toBeNull();
+  });
+});
+
+describe('isLayoutUrl', () => {
+  it('refuses Chrome debug pages that crash or hang the browser', () => {
+    expect(isLayoutUrl('chrome://crash')).toBe(false);
+    expect(isLayoutUrl('CHROME://hang/')).toBe(false);
+    expect(isLayoutUrl('chrome://settings')).toBe(true);
+    expect(isLayoutUrl('file:///home/me/notes.txt')).toBe(true);
   });
 });

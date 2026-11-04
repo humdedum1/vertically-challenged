@@ -104,6 +104,6 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
   .muted {
     margin: 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 </style>

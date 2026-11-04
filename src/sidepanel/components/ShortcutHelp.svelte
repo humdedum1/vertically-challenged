@@ -36,5 +36,5 @@ const FIXED: [string, string][] = [
   dl { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 0; }
   dt { min-width: 0; }
   dd { margin: 0; color: var(--mOnSurfaceVariant); text-align: right; font-variant-numeric: tabular-nums; }
-  .note { margin: 10px 0 0; color: var(--mOnSurfaceVariant); font-size: 12px; }
+  .note { margin: 10px 0 0; color: var(--mOnSurfaceVariant); font-size: calc(var(--font-size) - 1px); }
 </style>

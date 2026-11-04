@@ -242,7 +242,7 @@ function openChromeShortcuts(): void {
   .muted {
     margin: 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   ul {
@@ -303,7 +303,7 @@ function openChromeShortcuts(): void {
   .kbd,
   kbd {
     font: inherit;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     font-variant-numeric: tabular-nums;
   }
 
@@ -344,7 +344,7 @@ function openChromeShortcuts(): void {
     padding: 0 10px;
     border-radius: 999px;
     font: inherit;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     cursor: pointer;
   }
 
@@ -369,13 +369,13 @@ function openChromeShortcuts(): void {
   .clash {
     flex-basis: 100%;
     color: var(--mError);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .warn {
     margin: 0;
     color: var(--mTertiary);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .warn:empty {
@@ -384,7 +384,7 @@ function openChromeShortcuts(): void {
 
   h3 {
     margin: 6px 0 0;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;

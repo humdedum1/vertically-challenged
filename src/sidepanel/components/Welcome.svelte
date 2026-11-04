@@ -51,7 +51,7 @@ function done(): void {
   .lead { font-weight: 500; }
   kbd {
     padding: 0 5px; border: 1px solid var(--border-strong); border-radius: 4px;
-    background: var(--surface-0); font: inherit; font-size: 12px;
+    background: var(--surface-0); font: inherit; font-size: calc(var(--font-size) - 1px);
   }
   .row { display: flex; }
 </style>

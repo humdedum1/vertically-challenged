@@ -338,7 +338,7 @@ const total = $derived(docs.length + chromeDevices.length);
     gap: 6px;
     margin: 4px 6px 2px;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     font-weight: 600;
   }
 

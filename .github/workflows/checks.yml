@@ -25,3 +25,6 @@ jobs:
       - run: bash .github/release/validate.sh
       - run: npx playwright-core install --with-deps chromium
       - run: npm run test:e2e
+        env:
+          # Runners preset CHROME_BIN to branded Chrome, which ignores --load-extension.
+          CHROME_BIN: ''

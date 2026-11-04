@@ -10,7 +10,7 @@ import { POPUP_CLOSE } from "../shared/surface";
  * restyle or reach into it. The iframe URL is the extension's dynamic web-accessible URL:
  * other sites can't frame the panel because they can't know it.
  *
- * Closes on: a click outside it, Escape in the page, the panel's close request (Escape with
+ * Closes on: a click outside it (unless turned off in Settings), Escape in the page, the panel's close request (Escape with
  * nothing else to cancel, or its close button), the tab being hidden (switching tabs, which
  * clicking a tab in the list does) and navigation.
  */
@@ -25,7 +25,10 @@ interface PopupState {
 
 type Global = typeof globalThis & { [STATE]?: PopupState };
 
-export function togglePopupOverlay(url: string): "opened" | "closed" {
+export function togglePopupOverlay(
+  url: string,
+  closeOnClickOutside = true,
+): "opened" | "closed" {
   const g = globalThis as Global;
   const open = g[STATE];
   if (open) {
@@ -157,7 +160,9 @@ export function togglePopupOverlay(url: string): "opened" | "closed" {
 
   const state: PopupState = { close };
   g[STATE] = state;
-  backdrop.addEventListener("pointerdown", close);
+  // Off: no backdrop, so clicks reach the page and the popup stays open.
+  if (closeOnClickOutside) backdrop.addEventListener("pointerdown", close);
+  else backdrop.remove();
   window.addEventListener("message", onMessage);
   window.addEventListener("keydown", onKey, true);
   document.addEventListener("visibilitychange", onHidden);

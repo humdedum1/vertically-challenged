@@ -10,15 +10,27 @@ describe('v5 -> v6 migration', () => {
       sync: { workspaces: false, sessions: true },
     });
     expect(r.version).toBe(SETTINGS_VERSION);
-    expect(r.display).toEqual({ mode: 'sidebar', openOnLaunch: false });
+    expect(r.display).toEqual({ mode: 'sidebar', openOnLaunch: false, closeOnClickOutside: true });
     expect(r.appearance.mode).toBe('dark');
     expect(r.sync.workspaces).toBe(false);
+  });
+
+  it('keeps closeOnClickOutside and repairs bad values', () => {
+    expect(
+      migrateSettings({ version: 9, display: { closeOnClickOutside: false } }).display
+        .closeOnClickOutside,
+    ).toBe(false);
+    expect(
+      migrateSettings({ version: 9, display: { closeOnClickOutside: 'no' } }).display
+        .closeOnClickOutside,
+    ).toBe(true);
   });
 
   it('keeps the popup mode and repairs bad values', () => {
     expect(migrateSettings({ version: 6, display: { mode: 'popup' } }).display).toEqual({
       mode: 'popup',
       openOnLaunch: false,
+      closeOnClickOutside: true,
     });
     expect(
       migrateSettings({ version: 9, display: { mode: 'sidebar', openOnLaunch: true } }).display

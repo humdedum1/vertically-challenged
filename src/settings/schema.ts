@@ -126,6 +126,8 @@ export interface DisplaySettings {
   mode: DisplayMode;
   /** Show a notification at browser launch whose click opens the panel (Chrome won't open it unprompted). */
   openOnLaunch: boolean;
+  /** Popup mode: a click on the page outside the popup closes it. */
+  closeOnClickOutside: boolean;
 }
 
 /**
@@ -233,7 +235,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   sessions: { restoreDiscarded: true },
   sync: { workspaces: true, sessions: true, intervalMinutes: 1 },
-  display: { mode: 'sidebar', openOnLaunch: false },
+  display: { mode: 'sidebar', openOnLaunch: false, closeOnClickOutside: true },
   rules: [],
   mouse: { middle: 'close', double: 'none', wheelSwitch: true },
   shortcuts: {

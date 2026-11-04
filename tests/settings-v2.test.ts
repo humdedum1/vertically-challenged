@@ -87,7 +87,7 @@ describe('migration to v2/v3', () => {
         archiveDays: 0,
       },
       sessions: { restoreDiscarded: false },
-      display: { mode: 'popup', openOnLaunch: true },
+      display: { mode: 'popup', openOnLaunch: true, closeOnClickOutside: true },
       rules: [
         { host: 'github.com', path: '', action: 'group', group: 'Code' },
         { host: 'docs.rs', path: '/tokio', action: 'pin', group: '' },

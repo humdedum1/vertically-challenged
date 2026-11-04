@@ -39,7 +39,7 @@ describe('v5 -> v6 migration', () => {
     expect(
       migrateSettings({ version: 9, display: { openOnLaunch: 'yes' } }).display.openOnLaunch,
     ).toBe(false);
-    expect(migrateSettings({ version: 6, display: { mode: 'window' } }).display).toEqual(
+    expect(migrateSettings({ version: 6, display: { mode: 'floating' } }).display).toEqual(
       DEFAULT_SETTINGS.display,
     );
     expect(migrateSettings({ version: 6, display: 'popup' }).display).toEqual(

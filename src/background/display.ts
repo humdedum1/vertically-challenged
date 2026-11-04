@@ -84,6 +84,7 @@ export function createDisplay(api: DisplayApi, warn: (...a: unknown[]) => void =
    */
   function open(tab: TargetTab, opts: { toggle: boolean; sidebarOpen: boolean }): Promise<void> {
     if (mode === 'popup') return togglePopup(tab);
+    if (mode === 'window') return toggleWindow(tab.windowId);
     if (mode === 'sidebar') {
       if (opts.toggle && opts.sidebarOpen && api.closeSidePanel) {
         return api.closeSidePanel(tab.windowId).catch(() => {});
@@ -94,18 +95,19 @@ export function createDisplay(api: DisplayApi, warn: (...a: unknown[]) => void =
     // mode), then switch to the popup if that turns out to be the setting.
     const side = api.openSidePanel(tab.windowId).catch(() => {});
     return loaded.then(async () => {
-      if (mode !== 'popup') return side;
+      if (mode === 'sidebar') return side;
       await side;
       await api.closeSidePanel?.(tab.windowId).catch(() => {});
-      await togglePopup(tab);
+      await (mode === 'window' ? toggleWindow(tab.windowId) : togglePopup(tab));
     });
   }
 
   return {
     setMode,
     open,
-    /** The toolbar button in popup mode. */
-    actionClicked: (tab: TargetTab) => togglePopup(tab),
+    /** The toolbar button in popup and window modes. */
+    actionClicked: (tab: TargetTab) =>
+      mode === 'window' ? toggleWindow(tab.windowId) : togglePopup(tab),
     windowRemoved(id: number): void {
       windows.delete(id);
       for (const [target, popup] of windows) if (popup === id) windows.delete(target);

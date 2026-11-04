@@ -9,14 +9,25 @@
 Staples, pinned folders, tab groups, saved sessions and themes. Local-first, no telemetry.
 
 [![CI](https://github.com/humdedum1/vertically-challenged/actions/workflows/checks.yml/badge.svg)](https://github.com/humdedum1/vertically-challenged/actions/workflows/checks.yml)
-[![Release](https://img.shields.io/github/v/release/humdedum1/vertically-challenged?label=release)](https://github.com/humdedum1/vertically-challenged/releases)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Chrome 116+](https://img.shields.io/badge/Chrome-116%2B-4285F4?logo=googlechrome&logoColor=white)
-![Free](https://img.shields.io/badge/price-free-brightgreen)
+[![Release](https://img.shields.io/github/v/release/humdedum1/vertically-challenged?label=release&color=0071e3&labelColor=1d1d1f)](https://github.com/humdedum1/vertically-challenged/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-0071e3?labelColor=1d1d1f)](LICENSE)
+![Chrome 116+](https://img.shields.io/badge/Chrome-116%2B-0071e3?logo=googlechrome&logoColor=white&labelColor=1d1d1f)
+![Free](https://img.shields.io/badge/price-free-34c759?labelColor=1d1d1f)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/humdedum1)
 [![PayPal](https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white)](https://paypal.me/oddboxx)
 
 [Install](#install) · [Features](#features) · [Shortcuts](#keyboard-shortcuts) · [Releases](https://github.com/humdedum1/vertically-challenged/releases) · [Report a bug](https://github.com/humdedum1/vertically-challenged/issues/new/choose) · [Contribute](CONTRIBUTING.md)
+
+<table>
+  <tr>
+    <td align="center" width="50%"><b>Local-first</b><br><sub>No telemetry, no project-run server</sub></td>
+    <td align="center" width="50%"><b>Side panel or popup</b><br><sub>Your pick, in Settings</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><b>No host permissions</b><br><sub>Nothing requested at install</sub></td>
+    <td align="center"><b>Free, MIT</b><br><sub>And it stays free</sub></td>
+  </tr>
+</table>
 
 <img src="docs/store/readme-tabs-light.png" alt="The tab list, Noctalia light" width="260"> <img src="docs/store/readme-history-light.png" alt="The History panel, Noctalia light" width="260"> <img src="docs/store/readme-settings-light.png" alt="Settings with every group collapsed, Noctalia light" width="260">
 <img src="docs/store/readme-tabs-dark.png" alt="The tab list, Noctalia dark" width="260"> <img src="docs/store/readme-history-dark.png" alt="The History panel, Noctalia dark" width="260"> <img src="docs/store/readme-settings-dark.png" alt="Settings with every group collapsed, Noctalia dark" width="260">
@@ -40,31 +51,68 @@ Needs Chrome 116 or newer (141 or newer to close the side panel by shortcut).
 - GitHub Releases: download `vertically-challenged-<version>-crx.zip` from [Releases](https://github.com/humdedum1/vertically-challenged/releases) and extract the signed `.crx`. Chrome may block extensions from outside the Web Store, in which case use the store or an unpacked build. The CRX ZIP is not an unpacked source ZIP, so Load unpacked won't accept it.
 - Unpacked: see [Build from source](#build-from-source).
 
-Click the toolbar icon or press Alt+Shift+V to open the panel. Theme, display mode, layout, shortcuts and sync timing are in Settings.
+<table>
+  <tr>
+    <td valign="top" width="33%"><b>1. Get it</b><br>Web Store, Releases or an unpacked build.</td>
+    <td valign="top" width="33%"><b>2. Open it</b><br>Toolbar icon or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>.</td>
+    <td valign="top" width="33%"><b>3. Tune it</b><br>Theme, layout, shortcuts and sync are in Settings.</td>
+  </tr>
+</table>
 
 ## Features
 
-| Feature | What it does |
-| --- | --- |
-| All-window tab list | Your normal windows in one list, with window names and active tabs. Incognito windows stay separate. |
-| Staples | A compact grid of frequent pages with fixed home URLs. Dormant tiles reopen on click. |
-| Pinned tabs and folders | Nested folders for pins, custom folder icons, drag between sections or windows. |
-| Child tabs | Tabs opened from a page can sit under their opener. Drag to nest or unnest. |
-| Native tab groups | Create, rename, recolor, collapse and move Chrome groups. |
-| Search | Fuzzy search over titles and URLs, plus bookmarks, history, saved sessions and snoozed tabs. Settings has its own search box. |
-| Multiple selection | Select ranges or single tabs and act on them together. |
-| Clear | Close ordinary tabs and keep your Staples and pinned layout. |
-| Window setups | Save window names, Staples, pins and folders for reuse. |
-| Saved sessions | Save one or all windows, then restore tabs, groups and pinned layouts. Export as a Markdown outline or a bookmarks file. |
-| Other devices | Browse workspaces and sessions published from your other computers, open them, or keep copies. |
-| Suspend tabs | Discard tabs by hand or after an idle period, with exclusions for pinned, audible and chosen sites. Chrome reloads them when you switch back. |
-| Snooze and park | Put a tab away until later today, tomorrow, Monday or next month, or park it with no reminder. Snoozed tabs come back on time, even after a browser restart. |
-| Full backups | Scheduled, encrypted backups to Downloads, WebDAV (Nextcloud), S3-compatible storage or Dropbox. Restore from the server, undo a restore, and get a toolbar warning if backups stop. |
-| Tidy up | "Tidy up tabs…" in the command palette lists tabs unused for 7, 30 or 90 days, grouped by site, so you can park or close a whole site at once. |
-| Bookmarks, history, recently closed | Panels to search and open bookmarks and visited pages, and to reopen closed tabs and windows. |
-| Themes and appearance | Built-in and custom themes, accent colors, light/dark/system mode, import and export. Density, fonts, row layout, panel order, visible sections and tab actions. |
-| Shortcuts and menus | Configurable in-panel shortcuts, Chrome commands and context-menu actions. |
-| Panel recovery | Reload the panel from the button next to color mode or from its context menu. |
+<table>
+  <tr>
+    <td valign="top" width="50%">
+      <b>Organize</b>
+        <ul>
+          <li><b>All-window tab list.</b> Your normal windows in one list, with window names and active tabs. Incognito windows stay separate.</li>
+          <li><b>Staples.</b> A compact grid of frequent pages with fixed home URLs. Dormant tiles reopen on click.</li>
+          <li><b>Pinned tabs and folders.</b> Nested folders for pins, custom folder icons, drag between sections or windows.</li>
+          <li><b>Child tabs.</b> Tabs opened from a page can sit under their opener. Drag to nest or unnest.</li>
+          <li><b>Native tab groups.</b> Create, rename, recolor, collapse and move Chrome groups.</li>
+        </ul>
+    </td>
+    <td valign="top" width="50%">
+      <b>Find and select</b>
+        <ul>
+          <li><b>Search.</b> Fuzzy search over titles and URLs, plus bookmarks, history, saved sessions and snoozed tabs. Settings has its own search box.</li>
+          <li><b>Multiple selection.</b> Select ranges or single tabs and act on them together.</li>
+          <li><b>Bookmarks, history, recently closed.</b> Panels to search and open bookmarks and visited pages, and to reopen closed tabs and windows.</li>
+        </ul>
+    </td>
+  </tr>
+  <tr>
+    <td valign="top">
+      <b>Declutter</b>
+        <ul>
+          <li><b>Clear.</b> Close ordinary tabs and keep your Staples and pinned layout.</li>
+          <li><b>Suspend tabs.</b> Discard tabs by hand or after an idle period, with exclusions for pinned, audible and chosen sites. Chrome reloads them when you switch back.</li>
+          <li><b>Snooze and park.</b> Put a tab away until later today, tomorrow, Monday or next month, or park it with no reminder. Snoozed tabs come back on time, even after a browser restart.</li>
+          <li><b>Tidy up.</b> "Tidy up tabs…" in the command palette lists tabs unused for 7, 30 or 90 days, grouped by site, so you can park or close a whole site at once.</li>
+        </ul>
+    </td>
+    <td valign="top">
+      <b>Make it yours</b>
+        <ul>
+          <li><b>Themes and appearance.</b> Built-in and custom themes, accent colors, light/dark/system mode, import and export. Density, fonts, row layout, panel order, visible sections and tab actions.</li>
+          <li><b>Shortcuts and menus.</b> Configurable in-panel shortcuts, Chrome commands and context-menu actions.</li>
+          <li><b>Panel recovery.</b> Reload the panel from the button next to color mode or from its context menu.</li>
+        </ul>
+    </td>
+  </tr>
+  <tr>
+    <td valign="top" colspan="2">
+      <b>Save and move</b>
+        <ul>
+          <li><b>Window setups.</b> Save window names, Staples, pins and folders for reuse.</li>
+          <li><b>Saved sessions.</b> Save one or all windows, then restore tabs, groups and pinned layouts. Export as a Markdown outline or a bookmarks file.</li>
+          <li><b>Other devices.</b> Browse workspaces and sessions published from your other computers, open them, or keep copies.</li>
+          <li><b>Full backups.</b> Scheduled, encrypted backups to Downloads, WebDAV (Nextcloud), S3-compatible storage or Dropbox. Restore from the server, undo a restore, and get a toolbar warning if backups stop.</li>
+        </ul>
+    </td>
+  </tr>
+</table>
 
 ## Keyboard shortcuts
 

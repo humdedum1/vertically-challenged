@@ -1,6 +1,6 @@
 # Benchmarks
 
-Scripts behind the numbers in `docs/m6-profile.md`. They run Playwright's Chromium
+Load-test and profiling scripts. They run Playwright's Chromium
 headless (Google Chrome ignores `--load-extension`) or any Chromium in `CHROME_BIN`, with
 the extension loaded unpacked into a throwaway profile. Nothing leaves the machine: the
 fixture's sites are served from a local page server. Everything they write goes to

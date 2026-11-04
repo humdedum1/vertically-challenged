@@ -9,4 +9,4 @@ npm run check
 npm run test
 npm run build
 npm run build:firefox
-npx web-ext lint -s .output/firefox-mv3
+npx web-ext lint -s .output/firefox-mv3 --warnings-as-errors

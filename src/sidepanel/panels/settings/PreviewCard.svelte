@@ -6,7 +6,7 @@ import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
 import TabRow from '../../components/TabRow.svelte';
 
-let { settings }: { settings: Settings } = $props();
+let { settings, height = $bindable(0) }: { settings: Settings; height?: number } = $props();
 
 // Negative ids can't collide with real tabs or groups in the document.
 const tab = (id: number, title: string, url: string, over: Partial<TabInfo> = {}): TabInfo => ({
@@ -49,7 +49,7 @@ const noop = (): void => {};
 let open = $state(false);
 </script>
 
-<div class="sticky">
+<div class="sticky" bind:offsetHeight={height}>
   <SegmentCard title="Preview">
     {#snippet icon()}<Icon name="list" size={12} />{/snippet}
     {#snippet trailing()}

@@ -76,6 +76,7 @@ $effect(() => () => {
 });
 
 let query = $state('');
+let previewHeight = $state(0);
 let cardsEl: HTMLElement | undefined = $state();
 let matches = $state(0);
 /** The accordions the user had open, restored when the search is cleared. */
@@ -97,8 +98,8 @@ $effect(() => {
 });
 </script>
 
-<div class="settings">
-  <PreviewCard settings={settings.value} />
+<div class="settings" style:--preview-h="{previewHeight}px">
+  <PreviewCard settings={settings.value} bind:height={previewHeight} />
 
   {#if editing}
     {#key editing.theme.id}
@@ -222,9 +223,9 @@ $effect(() => {
     cursor: pointer;
     list-style: none;
     border-radius: var(--radius-card);
-    /* An open section's header stays pinned while its contents scroll under it. */
+    /* An open section's header stays pinned under the sticky preview while its contents scroll. */
     position: sticky;
-    top: 0;
+    top: var(--preview-h, 0);
     z-index: 1;
     background: var(--mSurface);
   }

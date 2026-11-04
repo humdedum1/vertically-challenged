@@ -202,6 +202,39 @@ try {
     );
     assert.equal(await inChrome('return ext.backgroundState;'), 'running');
   });
+  await check('many tabs with hostile titles: list renders, no horizontal overflow', async () => {
+    const titles = [
+      'L'.repeat(400),
+      'مرحبا بالعالم '.repeat(20),
+      '😀'.repeat(150),
+      '漢字かな交じり文'.repeat(30),
+      '<img src=x onerror=alert(1)>',
+    ];
+    await driver.get(PANEL);
+    await inPanel(
+      async (base, titles) => {
+        for (let i = 0; i < 100; i++) {
+          const t = `${titles[i % titles.length]} ${i}`;
+          await browser.tabs.create({ url: `${base}/?t=${encodeURIComponent(t)}`, active: false });
+        }
+      },
+      `http://127.0.0.1:${port}`,
+      titles,
+    );
+    await driver.manage().window().setRect({ width: 360, height: 800 });
+    const count = () =>
+      driver.executeScript(
+        "return document.querySelectorAll('[role=treeitem],[role=option],[data-tab-id]').length",
+      );
+    await waitFor(async () => (await count()) > 5, 15000);
+    const m = await driver.executeScript(`return {
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      xss: document.querySelectorAll('img[src="x"]').length,
+      text: document.body.innerText.includes('<img src=x onerror=alert(1)>'),
+    }`);
+    assert.ok(m.overflow <= 1, `horizontal overflow of ${m.overflow}px`);
+    assert.equal(m.xss, 0, 'a title was rendered as HTML');
+  });
 } finally {
   await driver.quit();
   site.close();

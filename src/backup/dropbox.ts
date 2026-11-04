@@ -1,3 +1,4 @@
+import { readBody } from './codec';
 import type { BackupTarget } from './targets';
 
 /**
@@ -153,7 +154,7 @@ export function dropboxTarget(c: DropboxConfig, f: Fetch = fetch): BackupTarget 
         },
       });
       if (!res.ok) throw new Error(`Dropbox download failed (HTTP ${res.status})`);
-      return new Uint8Array(await res.arrayBuffer());
+      return readBody(res);
     },
   };
 }

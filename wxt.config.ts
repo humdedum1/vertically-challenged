@@ -42,11 +42,11 @@ export default defineConfig({
     // user gesture, so launch shows a notification whose click opens it. `downloads` is only
     // requested when scheduled backups are switched on: they are saved to the Downloads folder.
     // `identity` is only for the Dropbox sign-in window (OAuth).
-    // Pages may load images only from the extension itself (favicons) and data: URIs. This
-    // stops CSS in a restored backup, or typed into Custom CSS, from fetching remote images
-    // and so from leaking what the panel shows. Scripts stay extension-only (the MV3 minimum).
+    // Block CSS network leaks through images, imports and fonts, including escaped tokens.
+    // Inline styles are required by Svelte and the user's custom CSS.
     content_security_policy: {
-      extension_pages: "script-src 'self'; object-src 'self'; img-src 'self' data:",
+      extension_pages:
+        "script-src 'self'; object-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'",
     },
     optional_permissions: ['notifications', 'downloads', 'identity'],
     // Remote backups (WebDAV, S3-compatible) talk to a server the user types in. Nothing is

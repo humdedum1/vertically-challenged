@@ -29,6 +29,33 @@ try {
     'a remote CSS image is blocked',
   );
   console.log('PASS panel images are limited to the extension and data: URIs');
+  await page.evaluate(() => {
+    const s = document.createElement('style');
+    s.textContent = String.raw`@\69mport "https://example.invalid/leak.css";
+      @font-face { font-family: Leak; src: u\72l("https://example.invalid/leak.woff2"); }
+      #vc-csp-probe { font-family: Leak; color: rgb(1, 2, 3); }`;
+    const probe = document.createElement('span');
+    probe.id = 'vc-csp-probe';
+    probe.textContent = 'Private tab title';
+    document.head.append(s);
+    document.body.append(probe);
+  });
+  await page.waitForFunction(() => document.fonts.status === 'loaded');
+  await page.waitForTimeout(500);
+  assert.ok(
+    violations.some((v) => v.startsWith('style-src')),
+    'escaped remote imports are blocked',
+  );
+  assert.ok(
+    violations.some((v) => v.startsWith('font-src')),
+    'escaped remote fonts are blocked',
+  );
+  assert.equal(
+    await page.locator('#vc-csp-probe').evaluate((e) => getComputedStyle(e).color),
+    'rgb(1, 2, 3)',
+    'inline custom styles still work',
+  );
+  console.log('PASS remote styles and fonts are blocked while inline styles work');
 } finally {
   await close();
 }

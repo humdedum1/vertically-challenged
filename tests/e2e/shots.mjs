@@ -10,7 +10,12 @@ const SITES = [
   'https://www.rust-lang.org/',
   'https://svelte.dev/',
 ];
-const { ctx, extId, close } = await launch(extensionDir(), { width: 360, height: 760, scale: 2, headed: true });
+const { ctx, extId, close } = await launch(extensionDir(), {
+  width: 360,
+  height: 760,
+  scale: 2,
+  headed: true,
+});
 try {
   // Background tabs often never store a favicon, so load each site in the foreground first.
   // One tab navigated in turn leaves nothing extra in Recently closed.
@@ -39,9 +44,9 @@ try {
   const tab = (n) => page.getByRole('tab', { name: n, exact: true }).click();
   await tab('Settings');
   await page.getByRole('button', { name: 'Use Noctalia', exact: true }).click();
-  await page.evaluate(() =>
-    document.querySelectorAll('details[open]').forEach((d) => d.removeAttribute('open')),
-  );
+  await page.evaluate(() => {
+    for (const d of document.querySelectorAll('details[open]')) d.removeAttribute('open');
+  });
   await page.mouse.move(2, 2);
   // Color mode defaults to system, so emulating the OS scheme flips Noctalia light/dark.
   for (const scheme of ['light', 'dark']) {
@@ -49,9 +54,9 @@ try {
     for (const n of ['Tabs', 'History', 'Settings']) {
       await tab(n);
       await sleep(1000);
-      await page.evaluate(() =>
-        document.querySelectorAll('details[open]').forEach((d) => d.removeAttribute('open')),
-      );
+      await page.evaluate(() => {
+        for (const d of document.querySelectorAll('details[open]')) d.removeAttribute('open');
+      });
       await page.mouse.move(2, 2);
       await sleep(300);
       await page.screenshot({ path: `docs/store/readme-${n.toLowerCase()}-${scheme}.png` });

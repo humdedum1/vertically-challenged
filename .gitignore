@@ -14,3 +14,13 @@ bench/.out/
 
 # Local Claude Code skills, never published
 .claude/
+
+# Local working notes and scratch output, kept off GitHub
+AGENTS.md
+docs/agents/
+docs/superpowers/
+docs/m6-profile.md
+docs/release-history.md
+docs/security-review-*.md
+docs/store-listing.md
+output/

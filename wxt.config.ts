@@ -1,8 +1,49 @@
+import type { Plugin } from 'vite';
 import { defineConfig } from 'wxt';
+
+/**
+ * Mozilla's validator warns about every `.innerHTML =`. Svelte's runtime does that in two places,
+ * both on strings fixed at compile time (the markup of a template, and a one-off feature probe),
+ * so nothing dynamic is involved. For the Firefox build they are rewritten to use DOMParser,
+ * which parses the same way. It throws when Svelte's source no longer matches, so a Svelte upgrade
+ * can't turn this into a silent no-op.
+ */
+function noInnerHtml(): Plugin {
+  const edits: Record<string, [from: string, to: string][]> = {
+    'svelte/src/internal/client/dom/reconciler.js': [
+      [
+        "\telem.innerHTML = create_trusted_html(html.replaceAll('<!>', '<!---->')); // XHTML compliance\n\treturn elem.content;",
+        "\tvar doc = new DOMParser().parseFromString(\n\t\t'<!doctype html><body><template>' + html.replaceAll('<!>', '<!---->') + '</template>',\n\t\t'text/html'\n\t);\n\treturn document.importNode(/** @type {HTMLTemplateElement} */ (doc.querySelector('template')).content, true);",
+      ],
+    ],
+    'svelte/src/internal/client/dom/elements/customizable-select.js': [
+      [
+        "\t\tvar select = create_element('select');\n\t\tselect.innerHTML = create_trusted_html('<option><span>t</span></option>');\n\t\tsupported = /** @type {Element} */ (select.firstChild)?.firstChild?.nodeType === 1;",
+        "\t\tvar doc = new DOMParser().parseFromString(\n\t\t\t'<!doctype html><body><select><option><span>t</span></option></select>',\n\t\t\t'text/html'\n\t\t);\n\t\tvar select = doc.querySelector('select');\n\t\tsupported = /** @type {Element} */ (select?.firstChild)?.firstChild?.nodeType === 1;",
+      ],
+    ],
+  };
+  return {
+    name: 'no-inner-html',
+    enforce: 'pre',
+    transform(code, id) {
+      const file = id.split('?')[0]?.replaceAll('\\', '/') ?? '';
+      const key = Object.keys(edits).find((k) => file.endsWith(k));
+      if (!key) return null;
+      let out = code;
+      for (const [from, to] of edits[key] ?? []) {
+        if (!out.includes(from)) throw new Error(`no-inner-html: ${key} changed; update the edit`);
+        out = out.replace(from, () => to);
+      }
+      return { code: out, map: null };
+    },
+  };
+}
 
 export default defineConfig({
   srcDir: 'src',
   modules: ['@wxt-dev/module-svelte'],
+  vite: ({ browser }) => ({ plugins: browser === 'firefox' ? [noInnerHtml()] : [] }),
   manifest: ({ browser }) => ({
     name: 'Vertically Challenged',
     description:

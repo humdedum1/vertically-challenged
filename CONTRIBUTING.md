@@ -58,7 +58,9 @@ Dry runs do not sign or upload anything. For local packaging, run `npm run pack:
 
 ## Branch protection
 
-`main` requires a pull request and the `check` CI job, and disallows force pushes and deletion. Maintainers merge `dev` into `main` through a PR.
+`main` disallows force pushes and deletion. Changes reach it through a pull request from `dev`, and the `check` job must pass first. Branch rules can't require a PR for everyone, because the release workflow pushes the version commit to `main` itself.
+
+When you merge a PR on GitHub, use a commit email you're happy to publish. GitHub otherwise uses your account's primary email for the merge commit.
 
 ## License
 

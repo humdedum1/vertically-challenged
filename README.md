@@ -8,6 +8,8 @@
 
 It sits in the side panel (the sidebar on Firefox), floats over the page as a popup (Chrome only), or runs in its own window. Staples, pinned folders, tab groups, saved sessions and themes come with it.
 
+I made this because I loved Sidebery and Zen Browser and couldn't get anything like them in Chromium. I kept adding the little things I wanted, and it slowly grew into this. Now there's a Firefox release too.
+
 [![CI](https://github.com/humdedum1/vertically-challenged/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/humdedum1/vertically-challenged/actions/workflows/release.yml)
 [![Release](https://img.shields.io/github/v/release/humdedum1/vertically-challenged?label=release&color=0071e3&labelColor=1d1d1f)](https://github.com/humdedum1/vertically-challenged/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-0071e3?labelColor=1d1d1f)](LICENSE)

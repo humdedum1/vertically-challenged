@@ -88,9 +88,13 @@ export function startBackground(): void {
     void browser.notifications.clear(id);
   });
   async function notifyLaunch(): Promise<void> {
-    if (!(await settingsNow()).display.openOnLaunch || !browser.notifications) return;
+    const { display: d } = await settingsNow();
+    if (!d.openOnLaunch) return;
     const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
     if (tab?.id === undefined) return;
+    // The popup needs no gesture (it falls back to its own window without activeTab).
+    if (d.mode === 'popup') return display.open(targetOf(tab), { toggle: false, sidebarOpen: false });
+    if (!browser.notifications) return;
     await browser.notifications.create(
       `vc-launch:${tab.windowId}:${tab.id}:${tab.incognito ? 1 : 0}`,
       {

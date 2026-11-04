@@ -39,7 +39,12 @@ function onWindowKeydown(e: KeyboardEvent): void {
 
 // A popup window is a launcher: it goes away once the user is back in the browser.
 function onWindowBlur(): void {
-  if (where.surface === 'window' && !document.hasFocus()) window.close();
+  if (
+    where.surface === 'window' &&
+    settings.value.display.closeOnClickOutside &&
+    !document.hasFocus()
+  )
+    window.close();
 }
 
 // The strip follows the user's order and visibility; panels not built yet are skipped.

@@ -11,3 +11,6 @@ web-ext.config.ts
 !.vscode/extensions.json
 .superpowers/
 bench/.out/
+
+# Local Claude Code skills, never published
+.claude/

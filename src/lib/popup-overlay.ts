@@ -52,7 +52,7 @@ export function togglePopupOverlay(url: string, closeOnClickOutside = true): 'op
       top: ${MARGIN}px;
       right: ${MARGIN}px;
       width: min(${WIDTH}px, calc(100vw - ${MARGIN * 2}px));
-      height: calc(100vh - ${MARGIN * 2}px);
+      height: calc(100dvh - ${MARGIN * 2}px);
     }
     .grip {
       position: absolute;

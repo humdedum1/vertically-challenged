@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { mergeSessions } from '../backup/snapshot';
+import { BROWSER } from '../shared/browser-urls';
 import type { WindowLayout } from '../shared/layout';
 import {
   captureWindow,
@@ -277,6 +278,6 @@ export async function restoreSessionValue(
   }
   const tabs = (n: number) => `${n} tab${n === 1 ? '' : 's'}`;
   return skipped
-    ? `Restored ${tabs(opened)} from “${session.name}”; skipped ${tabs(skipped)} Chrome doesn't let extensions open`
+    ? `Restored ${tabs(opened)} from “${session.name}”; skipped ${tabs(skipped)} ${BROWSER} doesn't let extensions open`
     : `Restored ${tabs(opened)} from “${session.name}”`;
 }

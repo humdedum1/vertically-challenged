@@ -32,6 +32,9 @@ const SCRIPTS = [
   'sync.mjs',
   'backup.mjs',
   'popup.mjs',
+  'hostile-titles.mjs',
+  'touch.mjs',
+  'a11y-tree.mjs',
 ];
 const results = [];
 for (const s of SCRIPTS) {

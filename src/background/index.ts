@@ -71,6 +71,7 @@ export function startBackground(): void {
         openSidePanel: () => sidebar.open(),
         closeSidePanel: () => sidebar.close(),
         toggleSidebar: () => sidebar.toggle(),
+        overlay: false,
       }
     : {
         setPanelBehavior: (b: { openPanelOnActionClick: boolean }) =>

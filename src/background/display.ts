@@ -12,6 +12,11 @@ export interface DisplayApi {
   createPopupWindow(url: string): Promise<{ id?: number } | undefined>;
   removeWindow(windowId: number): Promise<void>;
   getURL(path: string): string;
+  /**
+   * False where a panel framed in a web page gets no tabs/windows API (Firefox): the in-page
+   * popup can't work there, so that mode opens the window instead.
+   */
+  overlay?: boolean;
   /** Firefox only: the sidebar has no "open on action click" setting, so the button toggles it. */
   toggleSidebar?: () => Promise<void>;
 }
@@ -44,9 +49,9 @@ export function createDisplay(api: DisplayApi, warn: (...a: unknown[]) => void =
 
   function setMode(next: DisplayMode): void {
     const first = mode === null;
-    mode = next;
+    mode = next === 'popup' && api.overlay === false ? 'window' : next;
     if (first) ready();
-    api.setPanelBehavior({ openPanelOnActionClick: next === 'sidebar' }).catch(() => {});
+    api.setPanelBehavior({ openPanelOnActionClick: mode === 'sidebar' }).catch(() => {});
   }
 
   /** A popup window for pages that can't host the overlay; toggles like the overlay does. */

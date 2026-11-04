@@ -7,7 +7,7 @@ import {
   SHORTCUT_ACTIONS,
   type ShortcutAction,
 } from '../../../settings/schema';
-import { FIREFOX } from '../../../shared/browser-urls';
+import { BROWSER, FIREFOX } from '../../../shared/browser-urls';
 import Button from '../../components/controls/Button.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
@@ -31,7 +31,7 @@ function clashes(action: ShortcutAction): string[] {
     for (const o of others) out.push(`${formatCombo(combo)} is also bound to ${LABELS[o]}`);
     const chrome = chromeUse(combo);
     if (chrome)
-      out.push(`Chrome uses ${formatCombo(combo)} to ${chrome}; it may never reach the panel`);
+      out.push(`${BROWSER} uses ${formatCombo(combo)} to ${chrome}; it may never reach the panel`);
   }
   return out;
 }
@@ -215,7 +215,7 @@ function openChromeShortcuts(): void {
 
     <h3>Browser shortcuts</h3>
     <p class="muted">
-      These work anywhere in Chrome and are set by Chrome itself, not here: toggle the panel, focus search, suspend the current tab, suspend other tabs.
+      These work anywhere in {BROWSER} and are set by {BROWSER} itself, not here: toggle the panel, focus search, suspend the current tab, suspend other tabs.
     </p>
     {#if commands && commands.length > 0}
       <ul class="cmds">
@@ -232,7 +232,7 @@ function openChromeShortcuts(): void {
       </ul>
     {/if}
     <div class="row">
-      <Button variant="tonal" onclick={openChromeShortcuts}>Open Chrome shortcut settings</Button>
+      <Button variant="tonal" onclick={openChromeShortcuts}>Open {BROWSER} shortcut settings</Button>
     </div>
   </div>
 </SegmentCard>

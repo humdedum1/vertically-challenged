@@ -161,7 +161,7 @@ const level = (ratio: number): { text: string; large: boolean } =>
 
   h3 {
     margin: 0;
-    font-size: 15px;
+    font-size: calc(var(--font-size) + 2px);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

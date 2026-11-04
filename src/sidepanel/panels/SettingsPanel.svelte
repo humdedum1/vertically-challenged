@@ -234,7 +234,7 @@ $effect(() => {
   summary:hover { background: linear-gradient(var(--surface-1), var(--surface-1)) var(--mSurface); }
   summary:focus-visible { outline: 2px solid var(--mPrimary); outline-offset: -2px; }
   summary span { display: grid; gap: 4px; min-width: 0; }
-  summary strong { font-size: 13px; font-weight: 600; }
+  summary strong { font-size: var(--font-size); font-weight: 600; }
   summary small { color: var(--mOnSurfaceVariant); font-size: calc(var(--font-size) - 1px); }
   details[open] > summary :global(svg) { transform: rotate(90deg); }
   .category-content { display: grid; gap: var(--gap); padding-bottom: var(--gap); }

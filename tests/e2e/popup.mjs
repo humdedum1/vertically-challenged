@@ -40,10 +40,26 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 const { ctx, extId, close } = await launch(ext, { width: 1200, height: 900 });
 const [sw] = ctx.serviceWorkers();
 
+/**
+ * Every call into the service worker. A call that never returns (seen once or twice in CI, cause
+ * unknown) would stall the script until the runner kills it after 3 minutes with no clue where;
+ * this fails after 15 s and names the call.
+ */
+const swEval = (fn, arg, what = fn.toString().slice(0, 60).replace(/\s+/g, ' ')) =>
+  Promise.race([
+    sw.evaluate(fn, arg),
+    new Promise((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`service worker call did not return in 15 s: ${what}`)),
+        15_000,
+      ),
+    ),
+  ]);
+
 const behavior = () =>
-  sw.evaluate(async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick);
+  swEval(async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick);
 const setMode = (mode) =>
-  sw.evaluate(async (m) => {
+  swEval(async (m) => {
     const { settings = {} } = await chrome.storage.sync.get('settings');
     await chrome.storage.sync.set({
       settings: { ...settings, version: 6, display: { mode: m } },
@@ -81,11 +97,10 @@ const other = await ctx.newPage();
 await other.goto(`${origin}/two`);
 await page.bringToFront();
 
-const tabIdOf = (url) =>
-  sw.evaluate(async (u) => (await chrome.tabs.query({ url: u }))[0]?.id, url);
+const tabIdOf = (url) => swEval(async (u) => (await chrome.tabs.query({ url: u }))[0]?.id, url);
 const pageTab = await tabIdOf(`${origin}/one`);
 const toggle = () =>
-  sw.evaluate(
+  swEval(
     (id) => chrome.scripting.executeScript({ target: { tabId: id }, files: ['/popup-toggle.js'] }),
     pageTab,
   );
@@ -177,8 +192,7 @@ if (f2) {
   const otherTab = await tabIdOf(`${origin}/two`);
   await f2.click(`#vc-row-t${otherTab}`);
   const active = await until(
-    async () =>
-      (await sw.evaluate(async (id) => (await chrome.tabs.get(id)).active, otherTab)) || null,
+    async () => (await swEval(async (id) => (await chrome.tabs.get(id)).active, otherTab)) || null,
   );
   check(active === true, 'clicking a tab in the popup activates it');
   // Playwright emulates focus, so its pages stay "visible" after a tab switch; the popup's
@@ -199,7 +213,7 @@ if (f2) {
 const strict = await ctx.newPage();
 await strict.goto(`${origin}/strict`);
 const strictTab = await tabIdOf(`${origin}/strict`);
-await sw.evaluate(
+await swEval(
   (id) => chrome.scripting.executeScript({ target: { tabId: id }, files: ['/popup-toggle.js'] }),
   strictTab,
 );
@@ -254,11 +268,8 @@ check(
 await framed.close();
 
 // --- The popup window fallback ------------------------------------------------------------
-const browserWindow = await sw.evaluate(
-  async (id) => (await chrome.tabs.get(id)).windowId,
-  pageTab,
-);
-const popupWin = await sw.evaluate(
+const browserWindow = await swEval(async (id) => (await chrome.tabs.get(id)).windowId, pageTab);
+const popupWin = await swEval(
   async ([u, w]) =>
     (await chrome.windows.create({ url: `${u}?surface=window&windowId=${w}`, type: 'popup' })).id,
   [`chrome-extension://${extId}/sidepanel.html`, browserWindow],

@@ -83,13 +83,23 @@ jobs:
       - run: npm ci
       # Produces the extension zip and the sources zip AMO asks for.
       - run: npm run zip:firefox
-      - name: Sign with AMO (unlisted) when credentials exist
+      # Unlisted (the default): signed for self-distribution; the .xpi is attached to the release.
+      # Listed (repository variable AMO_CHANNEL=listed): submitted to addons.mozilla.org for review
+      # with docs/store/amo-metadata.json. The review isn't waited for, so no .xpi is attached.
+      # See docs/store/AMO.md.
+      - name: Sign or submit with AMO when credentials exist
         env:
           WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+          AMO_CHANNEL: ${{ vars.AMO_CHANNEL }}
         run: |
           if [ -z "$WEB_EXT_API_KEY" ]; then echo 'AMO credentials not set; skipping signing'; exit 0; fi
-          npx web-ext sign --channel unlisted -s .output/firefox-mv3 --upload-source-code "$(ls .output/*-sources.zip)" -a .output/signed
+          sources="$(ls .output/*-sources.zip)"
+          if [ "$AMO_CHANNEL" = listed ]; then
+            npx web-ext sign --channel listed --amo-metadata docs/store/amo-metadata.json -s .output/firefox-mv3 --upload-source-code "$sources" --approval-timeout 0 -a .output/signed
+          else
+            npx web-ext sign --channel unlisted -s .output/firefox-mv3 --upload-source-code "$sources" -a .output/signed
+          fi
       - name: Upload Firefox ZIPs to the release
         env:
           GH_TOKEN: ${{ github.token }}

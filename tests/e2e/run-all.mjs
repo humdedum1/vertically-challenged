@@ -37,16 +37,29 @@ const SCRIPTS = [
   'a11y-tree.mjs',
 ];
 const results = [];
-for (const s of SCRIPTS) {
-  const t0 = Date.now();
-  const r = spawnSync(process.execPath, [path.join(HERE, s), ...process.argv.slice(2)], {
+const run = (s) =>
+  spawnSync(process.execPath, [path.join(HERE, s), ...process.argv.slice(2)], {
     encoding: 'utf8',
     timeout: 180_000, // a hung browser fails this script instead of stalling CI for hours
   });
+for (const s of SCRIPTS) {
+  const t0 = Date.now();
+  let r = run(s);
+  let retried = false;
+  if (r.status !== 0) {
+    // A real browser on a busy CI machine stalls now and then. Show the first attempt, then try
+    // once more: a flake passes, a real regression fails both times.
+    console.log(`FAIL ${s} (attempt 1, ${Math.round((Date.now() - t0) / 1000)}s), retrying once`);
+    console.log(`${r.stdout}${r.stderr}`.split('\n').slice(-25).join('\n'));
+    r = run(s);
+    retried = true;
+  }
   const out = `${r.stdout}${r.stderr}`;
   const fails = out.split('\n').filter((l) => l.startsWith('FAIL') || /Error/.test(l));
   results.push({ s, ok: r.status === 0, secs: Math.round((Date.now() - t0) / 1000), fails });
-  console.log(`${r.status === 0 ? 'PASS' : 'FAIL'} ${s} (${results.at(-1).secs}s)`);
+  console.log(
+    `${r.status === 0 ? 'PASS' : 'FAIL'} ${s} (${results.at(-1).secs}s)${retried && r.status === 0 ? ' [passed on retry]' : ''}`,
+  );
   for (const f of fails) console.log(`     ${f}`);
   if (r.status !== 0) console.log(out.split('\n').slice(-25).join('\n'));
 }

@@ -44,6 +44,7 @@ for (const s of SCRIPTS) {
   results.push({ s, ok: r.status === 0, secs: Math.round((Date.now() - t0) / 1000), fails });
   console.log(`${r.status === 0 ? 'PASS' : 'FAIL'} ${s} (${results.at(-1).secs}s)`);
   for (const f of fails) console.log(`     ${f}`);
+  if (r.status !== 0) console.log(out.split('\n').slice(-25).join('\n'));
 }
 const failed = results.filter((r) => !r.ok);
 console.log(

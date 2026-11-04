@@ -47,7 +47,9 @@ export default defineConfig({
   manifest: ({ browser }) => ({
     name: 'Vertically Challenged',
     description:
-      'Fast, customizable vertical tabs in the side panel, the sidebar or a window. Local-first, no telemetry.',
+      browser === 'firefox'
+        ? 'Fast, customizable vertical tabs in the sidebar or a window. Local-first, no telemetry.'
+        : 'Fast, customizable vertical tabs in the side panel, a popup or a window. Local-first, no telemetry.',
     ...(browser === 'firefox'
       ? {
           browser_specific_settings: {

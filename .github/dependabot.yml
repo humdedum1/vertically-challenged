@@ -5,6 +5,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # svelte-check doesn't support TypeScript 7 yet (npm ERESOLVE); revisit when it does.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
     commit-message:
       prefix: chore(deps)
     groups:

@@ -58,9 +58,9 @@ export function togglePopupOverlay(url: string, closeOnClickOutside = true): 'op
       position: absolute;
       top: -${MARGIN}px;
       left: 50%;
-      width: 48px;
-      height: 14px;
-      margin-left: -24px;
+      width: 88px;
+      height: 16px;
+      margin-left: -44px;
       cursor: grab;
       touch-action: none;
       z-index: 1;
@@ -68,10 +68,13 @@ export function togglePopupOverlay(url: string, closeOnClickOutside = true): 'op
     .grip::after {
       content: '';
       position: absolute;
-      inset: 5px 4px;
-      border-radius: 2px;
-      background: rgba(127, 127, 127, 0.6);
+      inset: 5px 8px;
+      border-radius: 3px;
+      /* Light bar with a dark outline reads on both light and dark pages. */
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
     }
+    .grip:hover::after { background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7); }
     .grip:active { cursor: grabbing; }
     iframe {
       width: 100%;

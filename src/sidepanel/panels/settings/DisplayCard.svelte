@@ -56,7 +56,7 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
         The toolbar button and the shortcut open the panel over the current page; press Esc{settings
           .value.display.closeOnClickOutside
           ? ' or click outside it'
-          : ''} to close it. Where pages can’t show it (Chrome pages, the Web Store,
+          : ''} to close it. Drag the bar on its top edge to move it. Where pages can’t show it (Chrome pages, the Web Store,
         incognito) it opens in a small window.
       {/if}
     </p>

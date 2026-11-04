@@ -234,6 +234,12 @@ const accentRatio = $derived(a.accent ? contrastRatio(a.accent, palette.mSurface
         value={customCss.value}
         oninput={(e) => customCss.set(e.currentTarget.value)}
       ></textarea>
+      {#if customCss.blocked}
+        <p class="hint" role="alert">
+          Not applied: Firefox doesn’t allow custom CSS to load remote images or use <code>@import</code>,
+          <code>image-set</code> or backslash escapes. <code>url(data:…)</code> is fine.
+        </p>
+      {/if}
       <p class="hint" id="vc-custom-css-hint">
         Applied after the theme, in this browser only (not synced). Theme colours are CSS
         variables such as <code>var(--mPrimary)</code>.

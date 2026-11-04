@@ -1,9 +1,9 @@
 /** Browser-internal pages the UI links to or recognises; they differ between Chrome and Firefox. */
 const firefox = !!import.meta.env.FIREFOX;
 export const FIREFOX = firefox;
+/** Scheme of this browser's own extension pages. */
+export const EXTENSION_SCHEME = firefox ? 'moz-extension:' : 'chrome-extension:';
 
-export const SHORTCUTS_URL = firefox ? 'about:addons' : 'chrome://extensions/shortcuts';
-export const APPEARANCE_URL = firefox ? 'about:preferences' : 'chrome://settings/appearance';
 /** Where the user rebinds the panel toggle, for help text. */
 export const SHORTCUTS_HINT = firefox
   ? 'about:addons (gear menu → Manage Extension Shortcuts)'

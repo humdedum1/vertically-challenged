@@ -119,6 +119,23 @@ try {
     });
     assert.equal(r, 'smoke');
   });
+  await check('background accepts runtime messages from the panel page', async () => {
+    const r = await inPanel(() =>
+      browser.runtime.sendMessage({ type: 'restoreSessions', sessions: [] }),
+    );
+    assert.equal(r?.ok, true, JSON.stringify(r));
+  });
+  await check('shortcut settings can be opened (about: URLs are refused)', async () => {
+    const r = await inPanel(async () => {
+      try {
+        await browser.commands.openShortcutSettings();
+        return 'ok';
+      } catch (e) {
+        return String(e);
+      }
+    });
+    assert.equal(r, 'ok');
+  });
   await check('storage.sync round-trips', async () => {
     const r = await inPanel(async () => {
       await browser.storage.sync.set({ 'vc-smoke': 1 });

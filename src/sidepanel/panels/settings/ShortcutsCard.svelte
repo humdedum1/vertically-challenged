@@ -7,7 +7,7 @@ import {
   SHORTCUT_ACTIONS,
   type ShortcutAction,
 } from '../../../settings/schema';
-import { SHORTCUTS_URL } from '../../../shared/browser-urls';
+import { FIREFOX } from '../../../shared/browser-urls';
 import Button from '../../components/controls/Button.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
@@ -133,7 +133,12 @@ $effect(() => {
 });
 
 function openChromeShortcuts(): void {
-  void browser.tabs.create({ url: SHORTCUTS_URL });
+  // Firefox refuses tabs.create to about: pages but has a call for this one.
+  if (FIREFOX)
+    void (
+      browser.commands as unknown as { openShortcutSettings(): Promise<void> }
+    ).openShortcutSettings();
+  else void browser.tabs.create({ url: 'chrome://extensions/shortcuts' });
 }
 </script>
 

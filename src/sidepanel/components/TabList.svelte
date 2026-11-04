@@ -1,5 +1,6 @@
 <script lang="ts">
 import { browser } from 'wxt/browser';
+import { EXTENSION_SCHEME } from '../../shared/browser-urls';
 /*
  * Keyboard map (focus stays on the tree; rows are addressed with aria-activedescendant).
  * Fixed navigation keys:
@@ -947,7 +948,7 @@ const dnd = new PointerDrag<Drag>({
         dragPayload.tabIds.length === 1 &&
         r?.kind === 'tab' &&
         !r.tab.pinned &&
-        !r.tab.url.startsWith('chrome-extension:'))
+        !r.tab.url.startsWith(EXTENSION_SCHEME))
     );
   },
   begin: (i, e) => dragOf(dragCtx, i, e.target as Element),

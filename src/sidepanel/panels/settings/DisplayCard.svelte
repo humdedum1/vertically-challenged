@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { DisplayMode } from '../../../settings/schema';
-import { APPEARANCE_URL } from '../../../shared/browser-urls';
+import { FIREFOX } from '../../../shared/browser-urls';
 import Button from '../../components/controls/Button.svelte';
 import Field from '../../components/controls/Field.svelte';
 import SegmentedControl from '../../components/controls/SegmentedControl.svelte';
@@ -65,9 +65,9 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
         incognito) it opens in a small window.
       {/if}
     </p>
-    {#if mode === 'sidebar'}
+    {#if mode === 'sidebar' && !FIREFOX}
       <Field label="Side">
-        <Button onclick={() => void browser.tabs.create({ url: APPEARANCE_URL })}>
+        <Button onclick={() => void browser.tabs.create({ url: 'chrome://settings/appearance' })}>
           {side ? `On the ${side} · ` : ''}Change in Chrome settings
         </Button>
       </Field>

@@ -2,7 +2,7 @@ import { type Browser, browser } from 'wxt/browser';
 import { makeTarget } from '../backup/make-target';
 import { migrateSettings } from '../settings/migrate';
 import type { TabRule } from '../settings/schema';
-import { isNewTabUrl } from '../shared/browser-urls';
+import { EXTENSION_SCHEME, isNewTabUrl } from '../shared/browser-urls';
 import { hostOf } from '../shared/host-pattern';
 import { parseImport } from '../shared/import-tabs';
 import {
@@ -671,7 +671,7 @@ export function startBackground(): void {
     if (
       sender.id !== browser.runtime.id ||
       !sender.url ||
-      new URL(sender.url).protocol !== 'chrome-extension:' ||
+      new URL(sender.url).protocol !== EXTENSION_SCHEME ||
       new URL(sender.url).pathname !== '/sidepanel.html'
     )
       return;

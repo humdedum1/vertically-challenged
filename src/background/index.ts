@@ -93,7 +93,8 @@ export function startBackground(): void {
     const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
     if (tab?.id === undefined) return;
     // The popup needs no gesture (it falls back to its own window without activeTab).
-    if (d.mode === 'popup') return display.open(targetOf(tab), { toggle: false, sidebarOpen: false });
+    if (d.mode === 'popup')
+      return display.open(targetOf(tab), { toggle: false, sidebarOpen: false });
     if (!browser.notifications) return;
     await browser.notifications.create(
       `vc-launch:${tab.windowId}:${tab.id}:${tab.incognito ? 1 : 0}`,
@@ -274,6 +275,32 @@ export function startBackground(): void {
     batcher.schedule();
   }
 
+  // 0.3s after the redirected page loads, move focus from the address bar to the page's
+  // search box. Needs the optional site access; without it the script is refused and skipped.
+  function focusPageSearch(tabId: number): void {
+    const onLoaded = (id: number, change: { status?: string }) => {
+      if (id !== tabId || change.status !== 'complete') return;
+      browser.tabs.onUpdated.removeListener(onLoaded);
+      setTimeout(() => {
+        browser.scripting
+          .executeScript({
+            target: { tabId },
+            func: () => {
+              const box = document.querySelector<HTMLElement>(
+                'input[type=search], [role=search] input, input[name=q], [role=searchbox], [role=combobox], input[type=text]:not([hidden]), textarea',
+              );
+              window.focus();
+              box?.focus();
+            },
+          })
+          .catch((err: unknown) => console.debug('[vc] new tab search focus skipped', err));
+      }, 300);
+    };
+    browser.tabs.onUpdated.addListener(onLoaded);
+    // Stop waiting if the page never finishes loading.
+    setTimeout(() => browser.tabs.onUpdated.removeListener(onLoaded), 30_000);
+  }
+
   browser.tabs.onCreated.addListener((tab) => {
     const info = toTabInfo(tab);
     if (info) logOp({ kind: 'create', windowId: tab.windowId, tab: info, index: tab.index });
@@ -286,7 +313,9 @@ export function startBackground(): void {
     if (id !== undefined && (tab.pendingUrl ?? tab.url) === 'chrome://newtab/')
       void settingsNow()
         .then(async ({ tabs }) => {
-          if (tabs.newTabUrl) await browser.tabs.update(id, { url: tabs.newTabUrl });
+          if (!tabs.newTabUrl) return;
+          await browser.tabs.update(id, { url: tabs.newTabUrl });
+          focusPageSearch(id);
         })
         .catch((err: unknown) => console.debug('[vc] new tab redirect failed', err));
   });

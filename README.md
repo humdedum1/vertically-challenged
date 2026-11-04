@@ -8,7 +8,7 @@
 
 It sits in the side panel (the sidebar on Firefox), floats over the page as a popup (Chrome only), or runs in its own window. Staples, pinned folders, tab groups, saved sessions and themes come with it.
 
-[![CI](https://github.com/humdedum1/vertically-challenged/actions/workflows/checks.yml/badge.svg)](https://github.com/humdedum1/vertically-challenged/actions/workflows/checks.yml)
+[![CI](https://github.com/humdedum1/vertically-challenged/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/humdedum1/vertically-challenged/actions/workflows/release.yml)
 [![Release](https://img.shields.io/github/v/release/humdedum1/vertically-challenged?label=release&color=0071e3&labelColor=1d1d1f)](https://github.com/humdedum1/vertically-challenged/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-0071e3?labelColor=1d1d1f)](LICENSE)
 ![Chrome 116+](https://img.shields.io/badge/Chrome-116%2B-0071e3?logo=googlechrome&logoColor=white&labelColor=1d1d1f)

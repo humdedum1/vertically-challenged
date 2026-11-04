@@ -30,7 +30,9 @@ $effect(() => {
 // notification click as its gesture; the in-page popup needs site access to inject at launch.
 async function setOpenOnLaunch(on: boolean): Promise<void> {
   const perm =
-    mode === 'popup' ? { origins: ['https://*/*', 'http://*/*'] } : { permissions: ['notifications' as const] };
+    mode === 'popup'
+      ? { origins: ['https://*/*', 'http://*/*'] }
+      : { permissions: ['notifications' as const] };
   if (on && !(await browser.permissions.request(perm))) return;
   settings.update((s) => ({ ...s, display: { ...s.display, openOnLaunch: on } }));
 }
@@ -51,8 +53,10 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
       {#if mode === 'sidebar'}
         The toolbar button and the shortcut open Chrome’s side panel.
       {:else}
-        The toolbar button and the shortcut open the panel over the current page; click outside
-        it or press Esc to close it. Where pages can’t show it (Chrome pages, the Web Store,
+        The toolbar button and the shortcut open the panel over the current page; press Esc{settings
+          .value.display.closeOnClickOutside
+          ? ' or click outside it'
+          : ''} to close it. Where pages can’t show it (Chrome pages, the Web Store,
         incognito) it opens in a small window.
       {/if}
     </p>
@@ -71,6 +75,15 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
       checked={settings.value.display.openOnLaunch}
       onchange={(on) => void setOpenOnLaunch(on)}
     />
+    {#if mode === 'popup'}
+      <Toggle
+        label="Close when clicking outside"
+        hint="Off: the popup stays open while you use the page behind it."
+        checked={settings.value.display.closeOnClickOutside}
+        onchange={(on) =>
+          settings.update((s) => ({ ...s, display: { ...s.display, closeOnClickOutside: on } }))}
+      />
+    {/if}
   </div>
 </SegmentCard>
 

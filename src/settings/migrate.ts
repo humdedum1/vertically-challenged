@@ -240,6 +240,10 @@ function sanitize(raw: Raw): Settings {
   const display: DisplaySettings = {
     mode: oneOf(di.mode, DISPLAY_MODES, d.display.mode),
     openOnLaunch: typeof di.openOnLaunch === 'boolean' ? di.openOnLaunch : d.display.openOnLaunch,
+    closeOnClickOutside:
+      typeof di.closeOnClickOutside === 'boolean'
+        ? di.closeOnClickOutside
+        : d.display.closeOnClickOutside,
   };
 
   const rules: TabRule[] = [];

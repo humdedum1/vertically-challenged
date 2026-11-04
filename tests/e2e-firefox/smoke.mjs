@@ -192,7 +192,8 @@ try {
     // Leaving the panel drops its port, so nothing keeps the background page alive.
     await driver.get('about:blank');
     await inChrome('await new Promise((r) => setTimeout(r, 1)); return 1;');
-    const end = Date.now() + 20000;
+    // Firefox restarts its idle timer on every event; a loaded CI machine can take a while.
+    const end = Date.now() + 60000;
     let state = '';
     while (Date.now() < end) {
       state = await inChrome('return ext.backgroundState;');

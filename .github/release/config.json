@@ -5,7 +5,7 @@
   "prereleaseBranches": [],
   "tagFormat": "v${version}",
   "firstRelease": "allow",
-  "initialDevelopment": true,
+  "initialDevelopment": false,
   "versionFiles": [
     {
       "path": "package.json",

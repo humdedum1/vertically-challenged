@@ -121,7 +121,7 @@ const describe = (r: { action: RuleAction; group: string }) =>
   .muted {
     margin: 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .list {
@@ -215,6 +215,6 @@ const describe = (r: { action: RuleAction; group: string }) =>
   .error {
     margin: 0;
     color: var(--mError);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 </style>

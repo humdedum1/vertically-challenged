@@ -58,15 +58,51 @@ const decode = (s: string): string =>
     .replace(/&#39;/g, "'")
     .replace(/&amp;/g, '&');
 
+/**
+ * Linear scans, not backtracking regexes: the file is hostile input, and `<a [^>]*href=` or
+ * `\[[^\]]*\]\(` take quadratic time on a long run of `<a ` or `[` (240 KB hung for 10-40 s).
+ * Bookmark exports carry multi-KB ICON="data:..." attributes, so tag length can't be bounded.
+ */
 function fromHtml(text: string): Found[] {
   const out: Found[] = [];
   let group: string | null = null;
-  const re = /<h3[^>]*>([^<]*)<\/h3>|<a\s[^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/gi;
-  for (const m of text.matchAll(re)) {
-    if (m[1] !== undefined) group = clean(decode(m[1]), MAX_GROUP) || null;
-    else if (m[2] && isRestorableUrl(decode(m[2])))
-      out.push({ url: decode(m[2]), title: clean(decode(m[3] ?? ''), MAX_TITLE), group });
-    if (out.length >= MAX_TABS) break;
+  let i = text.indexOf('<');
+  while (out.length < MAX_TABS && i !== -1) {
+    const end = text.indexOf('>', i);
+    if (end === -1) break;
+    const tag = text.slice(i + 1, end);
+    const next = text.indexOf('<', end + 1);
+    const inner = text.slice(end + 1, next === -1 ? undefined : next);
+    if (/^h3[\s/]|^h3$/i.test(tag)) {
+      group = clean(decode(inner), MAX_GROUP) || null;
+    } else if (/^a\s/i.test(tag)) {
+      const href = /\bhref="([^"]+)"/i.exec(tag)?.[1];
+      if (href && isRestorableUrl(decode(href)))
+        out.push({ url: decode(href), title: clean(decode(inner), MAX_TITLE), group });
+    }
+    i = next;
+  }
+  return out;
+}
+
+/** `[label](url)` links in a line, found from each `](` with a bounded look back. */
+function markdownLinks(line: string): { label: string; url: string }[] {
+  const out: { label: string; url: string }[] = [];
+  const stopper = /[)\s]/g;
+  let stop = -1; // next `)` or whitespace, reused while it is still ahead: keeps this linear
+  for (let at = line.indexOf(']('); at !== -1; at = line.indexOf('](', at + 2)) {
+    const from = Math.max(0, at - 300);
+    const open = line.slice(from, at).lastIndexOf('[');
+    if (open === -1) continue;
+    const label = line.slice(from + open + 1, at);
+    if (label.includes(']')) continue;
+    const start = at + 2;
+    if (stop < start) {
+      stopper.lastIndex = start;
+      stop = stopper.exec(line)?.index ?? line.length;
+    }
+    if (stop > start && stop - start <= 2000 && line[stop] === ')')
+      out.push({ label, url: line.slice(start, stop) });
   }
   return out;
 }
@@ -82,16 +118,21 @@ function fromText(text: string): Found[] {
       group = clean(heading[1], MAX_GROUP) || null;
       continue;
     }
-    const md = [...line.matchAll(/\[([^\]]*)\]\(([^)\s]+)\)/g)];
+    const md = markdownLinks(line);
     if (md.length) {
       for (const m of md)
-        if (isRestorableUrl(m[2] as string))
-          out.push({ url: m[2] as string, title: clean(m[1], MAX_TITLE), group });
+        if (isRestorableUrl(m.url))
+          out.push({ url: m.url, title: clean(m.label, MAX_TITLE), group });
       continue;
     }
-    const pipe = /^\s*(\S+:\/\/\S+)\s+\|\s+(.*)$/.exec(line);
-    if (pipe && isRestorableUrl(pipe[1] as string)) {
-      out.push({ url: pipe[1] as string, title: clean(pipe[2], MAX_TITLE), group });
+    const bar = line.search(/\s\|\s/);
+    const head = bar === -1 ? '' : line.slice(0, bar).trim();
+    if (/^\S+:\/\/\S+$/.test(head) && isRestorableUrl(head)) {
+      out.push({
+        url: head,
+        title: clean(line.slice(bar + 1).replace(/^\s*\|\s*/, ''), MAX_TITLE),
+        group,
+      });
       continue;
     }
     for (const m of line.matchAll(/\b(?:https?|file):\/\/[^\s<>"')\]]+/g)) {
@@ -112,7 +153,7 @@ export function parseImport(text: string): SavedWindow | null {
     } catch {
       found = fromText(trimmed);
     }
-  } else if (/<a\s[^>]*href=/i.test(trimmed)) found = fromHtml(trimmed);
+  } else if (/<a\s/i.test(trimmed) && /href=/i.test(trimmed)) found = fromHtml(trimmed);
   else found = fromText(trimmed);
   if (found.length === 0) return null;
 

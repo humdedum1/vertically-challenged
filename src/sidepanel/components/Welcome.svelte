@@ -1,5 +1,6 @@
 <script lang="ts">
 import { browser } from 'wxt/browser';
+import { SHORTCUTS_HINT } from '../../shared/browser-urls';
 import type { SettingsState } from '../settings-state.svelte';
 import type { ThemeRegistry } from '../theme-registry.svelte';
 import Button from './controls/Button.svelte';
@@ -38,7 +39,7 @@ function done(): void {
           {#each themes.all as t (t.id)}<option value={t.id}>{t.name}</option>{/each}
         </Select>
       </Field>
-      <p>Press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> to open or close this panel. You can change it at chrome://extensions/shortcuts.</p>
+      <p>Press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> to open or close this panel. You can change it at {SHORTCUTS_HINT}.</p>
       <p>Type <kbd>&gt;</kbd> in the search box to run commands. Right-click a tab for snooze, suspend and more.</p>
       <div class="row"><Button variant="primary" onclick={done}>Got it</Button></div>
     </div>
@@ -51,7 +52,7 @@ function done(): void {
   .lead { font-weight: 500; }
   kbd {
     padding: 0 5px; border: 1px solid var(--border-strong); border-radius: 4px;
-    background: var(--surface-0); font: inherit; font-size: 12px;
+    background: var(--surface-0); font: inherit; font-size: calc(var(--font-size) - 1px);
   }
   .row { display: flex; }
 </style>

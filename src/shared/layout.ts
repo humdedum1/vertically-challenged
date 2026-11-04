@@ -95,9 +95,17 @@ const LAYOUT_ID = /^l[a-z0-9]{10}$/;
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
 /**
  * Only schemes the panel may open. Anything else (javascript:, data:, ...) is never stored.
- * chrome-extension: covers common pinned targets such as tab-suspender and vault pages.
+ * chrome-extension: and moz-extension: cover common pinned targets such as tab-suspender and vault pages.
  */
-const SCHEMES = new Set(['http:', 'https:', 'file:', 'chrome:', 'chrome-extension:', 'about:']);
+const SCHEMES = new Set([
+  'http:',
+  'https:',
+  'file:',
+  'chrome:',
+  'chrome-extension:',
+  'moz-extension:',
+  'about:',
+]);
 
 /** Ids are prefix + 10 chars; the random byte is rejected above 252 (= 36 * 7) to avoid modulo bias. */
 export function newId(prefix: 'l' | 'i' | 'f'): string {
@@ -191,6 +199,9 @@ const isObj = (v: unknown): v is Record<string, unknown> =>
 export const isLayoutUrl = (v: unknown): v is string => {
   if (typeof v !== 'string' || !v || v.length > MAX_URL) return false;
   try {
+    // Chrome's debug pages crash or hang the browser; a hostile backup must not store them.
+    if (/^chrome:\/\/(kill|hang|crash|quit|restart|inducebrowsercrashforrealz)/i.test(v))
+      return false;
     return SCHEMES.has(new URL(v).protocol);
   } catch {
     return false;

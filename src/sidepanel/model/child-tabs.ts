@@ -1,3 +1,4 @@
+import { EXTENSION_SCHEME } from '../../shared/browser-urls';
 import type { Row, TabRow } from './rows';
 
 /** Nest contiguous opener branches, keeping browser order and native group boundaries. */
@@ -21,7 +22,7 @@ export function buildChildRows(source: readonly Row[], collapsed: ReadonlySet<nu
     )
       trim(0);
     const at = row.tab.openerTabId === undefined ? undefined : positions.get(row.tab.openerTabId);
-    trim(at === undefined || branch[at]?.tab.url.startsWith('chrome-extension:') ? 0 : at + 1);
+    trim(at === undefined || branch[at]?.tab.url.startsWith(EXTENSION_SCHEME) ? 0 : at + 1);
     const parent = branch.at(-1);
     const next: TabRow = {
       ...row,

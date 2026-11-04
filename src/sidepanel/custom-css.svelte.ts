@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import { fetchesRemote } from './remote-css';
 
 const KEY = 'customCss';
 const CACHE_KEY = 'vc:custom-css';
@@ -10,6 +11,7 @@ import { MAX_CUSTOM_CSS } from '../backup/snapshot';
 const WRITE_DELAY_MS = 400;
 
 function apply(css: string): void {
+  if (fetchesRemote(css)) css = '';
   let el = document.getElementById('vc-custom-css');
   if (!el) {
     el = document.createElement('style');
@@ -30,6 +32,10 @@ function apply(css: string): void {
  */
 export class CustomCss {
   value = $state('');
+  /** Firefox only: the stylesheet is kept but not applied. */
+  get blocked(): boolean {
+    return fetchesRemote(this.value);
+  }
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   start(): void {

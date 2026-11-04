@@ -1,3 +1,4 @@
+import { readBody } from './codec';
 import { sha256Hex, signRequest } from './sigv4';
 
 export interface BackupTarget {
@@ -88,7 +89,7 @@ export function webdavTarget(c: WebDavConfig, f: Fetch = fetch): BackupTarget {
         await f(file(name), { method: 'GET', headers: auth }),
         'WebDAV download',
       );
-      return new Uint8Array(await res.arrayBuffer());
+      return readBody(res);
     },
   };
 }
@@ -137,7 +138,7 @@ export function s3Target(
     },
     async get(name) {
       const res = await ok(await send('GET', objectUrl(name)), 'S3 download');
-      return new Uint8Array(await res.arrayBuffer());
+      return readBody(res);
     },
   };
 }

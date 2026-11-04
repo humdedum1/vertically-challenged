@@ -30,7 +30,7 @@ let { label, for: forId, children }: Props = $props();
   label,
   .label {
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     font-weight: 500;
   }
 </style>

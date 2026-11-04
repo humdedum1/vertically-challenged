@@ -60,7 +60,7 @@ const when = (t: number) =>
   li { display: flex; flex-direction: column; gap: 4px; }
   .meta { display: flex; flex-direction: column; min-width: 0; }
   .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-  .when { color: var(--mOnSurfaceVariant); font-size: 12px; }
+  .when { color: var(--mOnSurfaceVariant); font-size: calc(var(--font-size) - 1px); }
   .actions { display: flex; gap: 6px; }
   .count {
     padding: 1px 7px; border-radius: 999px; background: var(--surface-2);

@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import { EXTENSION_SCHEME } from '../shared/browser-urls';
 import type { MoveTarget, PanelMessage, PinMessage } from '../shared/protocol';
 import { saveSummary } from '../shared/sessions';
 import type { GroupColor, GroupInfo, TabInfo } from '../shared/types';
@@ -134,7 +135,7 @@ export async function runCommand(
         moving.pinned ||
         parent.pinned ||
         moving.incognito !== parent.incognito ||
-        parent.url?.startsWith('chrome-extension:')
+        parent.url?.startsWith(EXTENSION_SCHEME)
       )
         return;
       const tabs = (await browser.tabs.query({ windowId: parent.windowId })).sort(

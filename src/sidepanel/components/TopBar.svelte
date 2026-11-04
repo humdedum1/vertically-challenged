@@ -60,7 +60,7 @@ const next = $derived(ORDER[(ORDER.indexOf(mode) + 1) % ORDER.length] as ColorMo
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-size: 15px;
+    font-size: calc(var(--font-size) + 2px);
     font-weight: 600;
   }
 

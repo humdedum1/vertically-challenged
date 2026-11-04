@@ -43,6 +43,10 @@ export interface RestoredFull extends RestoredBackup {
  */
 export function stripRemoteCss(css: string): { css: string; stripped: boolean } {
   const out = css.replace(/@import\b[^;]*;?/gi, '').replace(/url\s*\([^)]*\)/gi, 'none');
+  // What the pass above can't see: image-set("https://…"), src(), and escapes such as \75rl(.
+  // Such a file is not worth repairing: drop the stylesheet.
+  if (/\\|image-set|\bsrc\(/i.test(out.replace(/\/\*[\s\S]*?\*\//g, '')))
+    return { css: '', stripped: true };
   return { css: out, stripped: out !== css };
 }
 
@@ -83,7 +87,10 @@ export function parseFullBackup(
   const css = stripRemoteCss(
     typeof b.customCss === 'string' ? b.customCss.slice(0, MAX_CUSTOM_CSS) : '',
   );
-  if (css.stripped) warnings.push('Removed url() and @import from the custom CSS');
+  if (css.stripped)
+    warnings.push(
+      'Removed remote-loading rules (url, @import, image-set, escapes) from the custom CSS',
+    );
   return { ok: true, value: { ...inner.value, sessions, customCss: css.css }, warnings };
 }
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createDisplay, type DisplayApi } from '../src/background/display';
 import { parseSurface } from '../src/shared/surface';
 
-function fakeApi(opts: { injectFails?: boolean; noClose?: boolean } = {}) {
+function fakeApi(opts: { injectFails?: boolean; noClose?: boolean; noOverlay?: boolean } = {}) {
   const calls: string[] = [];
   let nextWindow = 900;
   const api: DisplayApi = {
@@ -19,12 +19,27 @@ function fakeApi(opts: { injectFails?: boolean; noClose?: boolean } = {}) {
     },
     removeWindow: async (w) => void calls.push(`window:remove:${w}`),
     getURL: (p) => `chrome-extension://dyn${p}`,
+    ...(opts.noOverlay ? { overlay: false } : {}),
   };
   return { api, calls };
 }
 
 const tab = { id: 7, windowId: 1, incognito: false };
 const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe('display without the in-page popup (Firefox)', () => {
+  it('a popup setting opens the window instead, and never injects', async () => {
+    const { api, calls } = fakeApi({ noOverlay: true });
+    const d = createDisplay(api);
+    d.setMode('popup');
+    expect(d.mode).toBe('window');
+    await d.actionClicked(tab);
+    expect(calls.some((c) => c.startsWith('inject:'))).toBe(false);
+    expect(calls).toContain(
+      'window:create:chrome-extension://dyn/sidepanel.html?surface=window&windowId=1',
+    );
+  });
+});
 
 describe('display', () => {
   it('side panel mode: the toolbar button stays Chrome-handled and open() opens the panel', async () => {

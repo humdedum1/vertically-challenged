@@ -161,7 +161,7 @@ const level = (ratio: number): { text: string; large: boolean } =>
 
   h3 {
     margin: 0;
-    font-size: 15px;
+    font-size: calc(var(--font-size) + 2px);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -173,7 +173,7 @@ const level = (ratio: number): { text: string; large: boolean } =>
 
   h4 {
     margin: 0;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     font-weight: 600;
   }
 
@@ -216,7 +216,7 @@ const level = (ratio: number): { text: string; large: boolean } =>
   .summary {
     margin: 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .issues {
@@ -226,7 +226,7 @@ const level = (ratio: number): { text: string; large: boolean } =>
     margin: 0;
     padding: 0;
     list-style: none;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .issues li {
@@ -268,7 +268,7 @@ const level = (ratio: number): { text: string; large: boolean } =>
   .error {
     margin: 0;
     color: var(--mError);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .error:empty {

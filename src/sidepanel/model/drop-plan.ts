@@ -1,3 +1,4 @@
+import { EXTENSION_SCHEME } from '../../shared/browser-urls';
 import {
   findNode,
   flattenItems,
@@ -55,7 +56,7 @@ export function planDrop(
       drag.kind !== 'tabs' ||
       drag.tabIds.length !== 1 ||
       target.tab.pinned ||
-      target.tab.url.startsWith('chrome-extension:')
+      target.tab.url.startsWith(EXTENSION_SCHEME)
     )
       return null;
     const tabId = drag.tabIds[0] as number;

@@ -32,12 +32,16 @@ const SCRIPTS = [
   'sync.mjs',
   'backup.mjs',
   'popup.mjs',
+  'hostile-titles.mjs',
+  'touch.mjs',
+  'a11y-tree.mjs',
 ];
 const results = [];
 for (const s of SCRIPTS) {
   const t0 = Date.now();
   const r = spawnSync(process.execPath, [path.join(HERE, s), ...process.argv.slice(2)], {
     encoding: 'utf8',
+    timeout: 180_000, // a hung browser fails this script instead of stalling CI for hours
   });
   const out = `${r.stdout}${r.stderr}`;
   const fails = out.split('\n').filter((l) => l.startsWith('FAIL') || /Error/.test(l));

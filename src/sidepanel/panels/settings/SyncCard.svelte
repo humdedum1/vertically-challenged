@@ -2,6 +2,7 @@
 import { onMount } from 'svelte';
 import { browser } from 'wxt/browser';
 import { SYNC_INTERVALS } from '../../../settings/schema';
+import { ACCOUNT, BROWSER } from '../../../shared/browser-urls';
 import { SYNC_QUOTA } from '../../../shared/sync';
 import {
   DEVICE_KEY,
@@ -99,7 +100,7 @@ function setPref(key: 'workspaces' | 'sessions', value: boolean): void {
   {#snippet icon()}<Icon name="sync" size={12} />{/snippet}
   <div class="fields">
     <p class="muted">
-      Through Chrome Sync, so your other computers signed in to the same Google account see this one.
+      Through {BROWSER} Sync, so your other computers signed in to the same {ACCOUNT} see this one.
       Settings and themes always sync.
     </p>
 
@@ -116,11 +117,11 @@ function setPref(key: 'workspaces' | 'sessions', value: boolean): void {
           <option value={String(minutes)}>{minutes === 0 ? 'Manual only' : `Every ${minutes} minute${minutes === 1 ? '' : 's'}`}</option>
         {/each}
       </Select>
-      <p class="muted">Applies to workspace and session snapshots. Chrome controls delivery to other devices; settings and themes sync whenever changed. Synced tabs open only when you choose to restore them.</p>
+      <p class="muted">Applies to workspace and session snapshots. {BROWSER} controls delivery to other devices; settings and themes sync whenever changed. Synced tabs open only when you choose to restore them.</p>
     </Field>
     <Toggle
       label="Sync saved sessions"
-      hint="As many as fit in Chrome’s sync storage, newest first"
+      hint="As many as fit in {BROWSER}’s sync storage, newest first"
       checked={prefs.sessions}
       onchange={(v) => setPref('sessions', v)}
     />
@@ -198,7 +199,7 @@ function setPref(key: 'workspaces' | 'sessions', value: boolean): void {
   .muted {
     margin: 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .name-row {
@@ -216,7 +217,7 @@ function setPref(key: 'workspaces' | 'sessions', value: boolean): void {
     flex-direction: column;
     align-items: flex-start;
     gap: 4px;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     color: var(--mOnSurfaceVariant);
   }
 

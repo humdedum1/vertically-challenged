@@ -1,6 +1,7 @@
 <script lang="ts">
 import { formatCombo } from '../../lib/keymap';
 import { type Keymap, SHORTCUT_ACTIONS } from '../../settings/schema';
+import { SHORTCUTS_HINT } from '../../shared/browser-urls';
 import { SHORTCUT_LABELS } from '../panels/settings/shortcut-labels';
 import Modal from './Modal.svelte';
 
@@ -29,12 +30,12 @@ const FIXED: [string, string][] = [
       <dd>{keys}</dd>
     {/each}
   </dl>
-  <p class="note">Change these in Settings → Shortcuts. The panel toggle is set at chrome://extensions/shortcuts.</p>
+  <p class="note">Change these in Settings → Shortcuts. The panel toggle is set at {SHORTCUTS_HINT}.</p>
 </Modal>
 
 <style>
   dl { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 0; }
   dt { min-width: 0; }
   dd { margin: 0; color: var(--mOnSurfaceVariant); text-align: right; font-variant-numeric: tabular-nums; }
-  .note { margin: 10px 0 0; color: var(--mOnSurfaceVariant); font-size: 12px; }
+  .note { margin: 10px 0 0; color: var(--mOnSurfaceVariant); font-size: calc(var(--font-size) - 1px); }
 </style>

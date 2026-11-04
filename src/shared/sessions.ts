@@ -331,7 +331,7 @@ export function isRestorableUrl(url: string): boolean {
   if (/^(javascript|data|file|chrome-error|devtools):/i.test(url)) return false;
   if (/^chrome:\/\/(kill|hang|crash|quit|restart|inducebrowsercrashforrealz)/i.test(url))
     return false;
-  return /^(https?|chrome|chrome-extension|about|ftp):/i.test(url);
+  return /^(https?|chrome|chrome-extension|moz-extension|about|ftp):/i.test(url);
 }
 
 /**

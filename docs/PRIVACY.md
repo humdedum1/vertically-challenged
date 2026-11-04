@@ -14,9 +14,14 @@ the developer or to any third party.
 
 ## What can leave your computer, and only when you choose it
 
-- **Chrome Sync.** If Chrome Sync is on, settings, custom themes, and (if you leave them on) tab
-  workspaces and saved sessions are stored in your Google account through Chrome's own sync
-  service. Google's privacy policy covers that storage. Incognito tabs are never included.
+- **Browser sync.** If Chrome Sync or Firefox Sync is on, settings, custom themes, and (if you
+  leave them on) tab workspaces and saved sessions are stored in your Google or Firefox account
+  through the browser's own sync service. Google's or Mozilla's privacy policy covers that
+  storage. Incognito and private tabs are never included. Chrome and Firefox don't share data
+  with each other.
+- **Favicons on Firefox.** Chrome gives the extension its cached favicons. Firefox doesn't, so on
+  Firefox the panel loads each tab's icon from that site's own server, the same site the tab
+  already talks to. Nothing goes anywhere else.
 - **Backups.** Automatic or manual backups contain your settings, themes, layouts, sessions and
   custom CSS. They are saved only where you point them: your Downloads folder, a WebDAV server
   (such as Nextcloud), an S3-compatible bucket, or your own Dropbox app folder. The extension
@@ -37,12 +42,14 @@ to one bucket or folder.
 
 Each permission exists for one feature; the README lists them. The extension asks for no website
 access when you install it. Optional permissions (downloads, notifications, identity, and one
-server address) are requested only when you turn on the feature that needs them.
+server address) are requested only when you turn on the feature that needs them. Firefox doesn't
+allow `identity` as optional, so it is declared at install there and used only for Dropbox
+sign-in.
 
 ## Your control
 
 You can export or delete your data at any time: remove the extension to delete its local data,
-clear Chrome Sync data from your Google account settings, and delete backup files from wherever
+clear synced data from your Google or Firefox account settings, and delete backup files from wherever
 you saved them. Uninstalling does not delete backup files you stored elsewhere.
 
 ## Children

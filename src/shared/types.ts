@@ -19,6 +19,8 @@ export interface TabInfo {
   /** Browser-reported opener; absent once the opener no longer exists. */
   openerTabId?: number;
   incognito: boolean;
+  /** Firefox only (no _favicon endpoint there): the icon the browser reports for the tab. */
+  favIconUrl?: string;
   /** When the tab was last active, rounded to the minute (tab age indicator). */
   lastAccessed?: number;
 }

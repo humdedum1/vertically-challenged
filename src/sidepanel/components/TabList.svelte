@@ -1,5 +1,6 @@
 <script lang="ts">
 import { browser } from 'wxt/browser';
+import { EXTENSION_SCHEME } from '../../shared/browser-urls';
 /*
  * Keyboard map (focus stays on the tree; rows are addressed with aria-activedescendant).
  * Fixed navigation keys:
@@ -947,7 +948,7 @@ const dnd = new PointerDrag<Drag>({
         dragPayload.tabIds.length === 1 &&
         r?.kind === 'tab' &&
         !r.tab.pinned &&
-        !r.tab.url.startsWith('chrome-extension:'))
+        !r.tab.url.startsWith(EXTENSION_SCHEME))
     );
   },
   begin: (i, e) => dragOf(dragCtx, i, e.target as Element),
@@ -1772,8 +1773,8 @@ $effect(() => {
     top: 5px;
     display: grid;
     place-items: center;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     border: 0;
     border-radius: 50%;
@@ -1809,7 +1810,7 @@ $effect(() => {
   .filters-hint {
     margin: -16px 16px 8px;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     line-height: 1.6;
     text-align: center;
     text-wrap: pretty;
@@ -1892,7 +1893,7 @@ $effect(() => {
     border-radius: 999px;
     background: var(--surface-3);
     color: var(--mOnSurface);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     box-shadow: var(--shadow-2);
     pointer-events: none;
   }

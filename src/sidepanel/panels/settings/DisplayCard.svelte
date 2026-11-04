@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { DisplayMode } from '../../../settings/schema';
+import { BROWSER, FIREFOX } from '../../../shared/browser-urls';
 import Button from '../../components/controls/Button.svelte';
 import Field from '../../components/controls/Field.svelte';
 import SegmentedControl from '../../components/controls/SegmentedControl.svelte';
@@ -10,13 +11,17 @@ import type { SettingsState } from '../../settings-state.svelte';
 
 let { settings }: { settings: SettingsState } = $props();
 
+// Firefox gives a panel framed in a web page no tabs or windows API, so it has no in-page popup.
 const MODES: { value: DisplayMode; label: string }[] = [
-  { value: 'sidebar', label: 'Side panel' },
-  { value: 'popup', label: 'In-page popup' },
+  { value: 'sidebar', label: FIREFOX ? 'Sidebar' : 'Side panel' },
+  ...(FIREFOX ? [] : [{ value: 'popup' as const, label: 'In-page popup' }]),
   { value: 'window', label: 'Window' },
 ];
 
-const mode = $derived(settings.value.display.mode);
+// A popup setting that arrived by sync or a backup from Chrome behaves as a window here.
+const mode = $derived(
+  FIREFOX && settings.value.display.mode === 'popup' ? 'window' : settings.value.display.mode,
+);
 
 // Chrome lets extensions read the side (getLayout, Chrome 140+) but not set it.
 let side: 'left' | 'right' | null = $state(null);
@@ -52,7 +57,7 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
     </Field>
     <p class="muted">
       {#if mode === 'sidebar'}
-        The toolbar button and the shortcut open Chrome’s side panel.
+        The toolbar button and the shortcut open {FIREFOX ? 'the Firefox sidebar' : 'Chrome’s side panel'}.
       {:else if mode === 'window'}
         The toolbar button and the shortcut open the panel in its own small window, which your
         window manager can move and size like any other.
@@ -64,7 +69,7 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
         incognito) it opens in a small window.
       {/if}
     </p>
-    {#if mode === 'sidebar'}
+    {#if mode === 'sidebar' && !FIREFOX}
       <Field label="Side">
         <Button onclick={() => void browser.tabs.create({ url: 'chrome://settings/appearance' })}>
           {side ? `On the ${side} · ` : ''}Change in Chrome settings
@@ -77,7 +82,7 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
         ? 'Opens the panel window at launch.'
         : mode === 'popup'
         ? 'Opens the popup over the first page at launch; needs access to sites. Chrome pages (like the New Tab page) get the small window instead.'
-        : 'Chrome doesn’t let extensions open the panel on their own, so a notification appears at launch; click it to open the panel.'}
+        : `${BROWSER} doesn’t let extensions open the panel on their own, so a notification appears at launch; click it to open the panel.`}
       checked={settings.value.display.openOnLaunch}
       onchange={(on) => void setOpenOnLaunch(on)}
     />
@@ -104,6 +109,6 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
   .muted {
     margin: 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 </style>

@@ -1,3 +1,4 @@
+import { EXTENSION_SCHEME } from './browser-urls';
 /**
  * Sync between a user's machines. Every device publishes one document describing itself
  * (its workspaces and saved sessions) and only ever reads the others': nothing is merged,
@@ -75,7 +76,7 @@ export function savedFromLayout(
   const extra = captureWindow(
     tabs.filter((t) => !t.incognito && !bound.has(t.id)),
     groups,
-    'chrome-extension://',
+    EXTENSION_SCHEME,
   );
   const index = new Map(items.map((i, n) => [i.id, n]));
   const tree = (nodes: readonly PinNode[]): SavedPinNode[] =>

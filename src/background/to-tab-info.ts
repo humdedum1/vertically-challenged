@@ -1,6 +1,11 @@
 import type { Browser } from 'wxt/browser';
 import { GROUP_COLORS, type GroupColor, type GroupInfo, type TabInfo } from '../shared/types';
 
+/** Only icons the panel's CSP can show (https and small data:); skips Firefox-internal chrome:// icons and huge data: URIs. */
+function usableFavicon(u: string | undefined): u is string {
+  return !!u && (/^https:/i.test(u) || (u.startsWith('data:') && u.length <= 4096));
+}
+
 /** Returns null for tabs without an id (devtools windows, some session-restore states). */
 export function toTabInfo(tab: Browser.tabs.Tab): TabInfo | null {
   if (tab.id === undefined || tab.id < 0) return null;
@@ -18,6 +23,9 @@ export function toTabInfo(tab: Browser.tabs.Tab): TabInfo | null {
     groupId: tab.groupId ?? -1,
     ...(tab.openerTabId === undefined ? {} : { openerTabId: tab.openerTabId }),
     incognito: tab.incognito,
+    ...(import.meta.env.FIREFOX && usableFavicon(tab.favIconUrl)
+      ? { favIconUrl: tab.favIconUrl }
+      : {}),
     // Rounded so a value that only moved by seconds doesn't count as a change.
     ...(tab.lastAccessed ? { lastAccessed: Math.floor(tab.lastAccessed / 60_000) * 60_000 } : {}),
   };

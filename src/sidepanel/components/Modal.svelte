@@ -96,7 +96,7 @@ function onkeydown(e: KeyboardEvent): void {
   }
   h2 {
     margin: 0;
-    font-size: 14px;
+    font-size: calc(var(--font-size) + 1px);
   }
   .close {
     padding: 4px 10px;

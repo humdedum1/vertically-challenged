@@ -52,10 +52,10 @@ const total = $derived(groups.reduce((n, g) => n + g.tabs.length, 0));
   li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .host { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .n { flex: none; color: var(--mOnSurfaceVariant); font-size: 12px; }
+  .n { flex: none; color: var(--mOnSurfaceVariant); font-size: calc(var(--font-size) - 1px); }
   .acts { display: flex; flex: none; gap: 4px; }
   button { padding: 3px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: transparent; color: inherit; font: inherit; cursor: pointer; }
   button:hover { background: var(--state-hover); }
   .danger { color: var(--mError); }
-  .note { margin: 10px 0 0; color: var(--mOnSurfaceVariant); font-size: 12px; }
+  .note { margin: 10px 0 0; color: var(--mOnSurfaceVariant); font-size: calc(var(--font-size) - 1px); }
 </style>

@@ -14,6 +14,27 @@ const HEADER = MAGIC.length + 4 + SALT + IV;
 
 export class BackupError extends Error {}
 
+/** A response body, refused as soon as it passes the backup size limit (a server can't fill memory). */
+export async function readBody(res: Response): Promise<Uint8Array> {
+  const declared = Number(res.headers.get('content-length'));
+  if (declared > MAX_BACKUP_BYTES) throw new BackupError('File is too large to be a backup');
+  const reader = res.body?.getReader();
+  if (!reader) return new Uint8Array(await res.arrayBuffer());
+  const parts: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size > MAX_BACKUP_BYTES) {
+      await reader.cancel();
+      throw new BackupError('File is too large to be a backup');
+    }
+    parts.push(value);
+  }
+  return new Uint8Array(await new Blob(parts as BlobPart[]).arrayBuffer());
+}
+
 async function pipe(bytes: Uint8Array, t: CompressionStream | DecompressionStream, cap: number) {
   const out = new Blob([bytes as BlobPart]).stream().pipeThrough(t);
   const chunks: Uint8Array[] = [];

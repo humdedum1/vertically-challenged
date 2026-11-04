@@ -7,6 +7,7 @@ import {
   SHORTCUT_ACTIONS,
   type ShortcutAction,
 } from '../../../settings/schema';
+import { BROWSER, FIREFOX } from '../../../shared/browser-urls';
 import Button from '../../components/controls/Button.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
@@ -30,7 +31,7 @@ function clashes(action: ShortcutAction): string[] {
     for (const o of others) out.push(`${formatCombo(combo)} is also bound to ${LABELS[o]}`);
     const chrome = chromeUse(combo);
     if (chrome)
-      out.push(`Chrome uses ${formatCombo(combo)} to ${chrome}; it may never reach the panel`);
+      out.push(`${BROWSER} uses ${formatCombo(combo)} to ${chrome}; it may never reach the panel`);
   }
   return out;
 }
@@ -132,7 +133,12 @@ $effect(() => {
 });
 
 function openChromeShortcuts(): void {
-  void browser.tabs.create({ url: 'chrome://extensions/shortcuts' });
+  // Firefox refuses tabs.create to about: pages but has a call for this one.
+  if (FIREFOX)
+    void (
+      browser.commands as unknown as { openShortcutSettings(): Promise<void> }
+    ).openShortcutSettings();
+  else void browser.tabs.create({ url: 'chrome://extensions/shortcuts' });
 }
 </script>
 
@@ -209,7 +215,7 @@ function openChromeShortcuts(): void {
 
     <h3>Browser shortcuts</h3>
     <p class="muted">
-      These work anywhere in Chrome and are set by Chrome itself, not here: toggle the panel, focus search, suspend the current tab, suspend other tabs.
+      These work anywhere in {BROWSER} and are set by {BROWSER} itself, not here: toggle the panel, focus search, suspend the current tab, suspend other tabs.
     </p>
     {#if commands && commands.length > 0}
       <ul class="cmds">
@@ -226,7 +232,7 @@ function openChromeShortcuts(): void {
       </ul>
     {/if}
     <div class="row">
-      <Button variant="tonal" onclick={openChromeShortcuts}>Open Chrome shortcut settings</Button>
+      <Button variant="tonal" onclick={openChromeShortcuts}>Open {BROWSER} shortcut settings</Button>
     </div>
   </div>
 </SegmentCard>
@@ -242,7 +248,7 @@ function openChromeShortcuts(): void {
   .muted {
     margin: 0;
     color: var(--mOnSurfaceVariant);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   ul {
@@ -303,7 +309,7 @@ function openChromeShortcuts(): void {
   .kbd,
   kbd {
     font: inherit;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     font-variant-numeric: tabular-nums;
   }
 
@@ -319,8 +325,8 @@ function openChromeShortcuts(): void {
   .x {
     display: grid;
     place-items: center;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     border: 0;
     border-radius: 50%;
@@ -344,7 +350,7 @@ function openChromeShortcuts(): void {
     padding: 0 10px;
     border-radius: 999px;
     font: inherit;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     cursor: pointer;
   }
 
@@ -369,13 +375,13 @@ function openChromeShortcuts(): void {
   .clash {
     flex-basis: 100%;
     color: var(--mError);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .warn {
     margin: 0;
     color: var(--mTertiary);
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
   }
 
   .warn:empty {
@@ -384,7 +390,7 @@ function openChromeShortcuts(): void {
 
   h3 {
     margin: 6px 0 0;
-    font-size: 12px;
+    font-size: calc(var(--font-size) - 1px);
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;

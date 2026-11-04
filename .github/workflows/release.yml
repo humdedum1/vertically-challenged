@@ -64,3 +64,74 @@ jobs:
           RELEASE_TAG: ${{ needs.release.outputs.tag }}
           RELEASE_VERSION: ${{ needs.release.outputs.version }}
         run: gh release upload "$RELEASE_TAG" ".output/vertically-challenged-${RELEASE_VERSION}-crx.zip" --clobber
+
+  package-firefox:
+    name: Attach Firefox ZIPs
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - run: npm ci
+      # Produces the extension zip and the sources zip AMO asks for.
+      - run: npm run zip:firefox
+      - name: Sign with AMO (unlisted) when credentials exist
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          if [ -z "$WEB_EXT_API_KEY" ]; then echo 'AMO credentials not set; skipping signing'; exit 0; fi
+          npx web-ext sign --channel unlisted -s .output/firefox-mv3 --upload-source-code "$(ls .output/*-sources.zip)" -a .output/signed
+      - name: Upload Firefox ZIPs to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          shopt -s nullglob
+          gh release upload "$RELEASE_TAG" .output/*-firefox.zip .output/*-sources.zip .output/signed/*.xpi --clobber
+
+  publish-chrome-web-store:
+    name: Upload to the Chrome Web Store
+    needs: release
+    # Stays off until the store item exists and CWS_EXTENSION_ID is set (see docs/store/LISTING.md).
+    if: needs.release.outputs.released == 'true' && vars.CWS_EXTENSION_ID != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run zip
+      - name: Upload the build
+        env:
+          EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+          PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          RELEASE_VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          npx --yes chrome-webstore-upload-cli@4.0.2 upload --source ".output/vertically-challenged-${RELEASE_VERSION}-chrome.zip"
+      - name: Submit for review
+        if: vars.CWS_AUTO_PUBLISH == 'true'
+        env:
+          EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+          PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: npx --yes chrome-webstore-upload-cli@4.0.2 publish

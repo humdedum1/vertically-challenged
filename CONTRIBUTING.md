@@ -12,7 +12,7 @@ Report the extension version, browser/OS, installation method, reproduction step
 
 1. Fork the repository if you have access, or create a branch in your clone.
 2. Use Node.js 22 or later and run `npm ci`.
-3. Run `npm run dev`, or build with `npm run build` and load `.output/chrome-mv3` through Chrome's Load unpacked.
+3. Run `npm run dev`, or build with `npm run build` and load `.output/chrome-mv3` through Chrome's Load unpacked. For Firefox, `npm run build:firefox` writes `.output/firefox-mv3` (load its `manifest.json` from `about:debugging`), and `npm run start:firefox` runs it with web-ext.
 4. Keep changes focused and follow nearby TypeScript/Svelte code and the existing UI components. Avoid adding dependencies for small changes.
 5. Add a meaningful regression test for changed behavior. Preserve incognito separation, input validation, and existing data during migrations.
 
@@ -23,17 +23,21 @@ npm run lint
 npm run check
 npm test
 npm run build
+npm run build:firefox
 npx playwright-core install chromium
 npm run test:e2e
+FIREFOX_BIN=/path/to/firefox npm run test:e2e:firefox   # Firefox 140 or newer
 ```
 
 Use `npx playwright-core install --with-deps chromium` when the operating system needs browser libraries. Test UI changes in the real panel and popup at narrow widths, with keyboard navigation and accessible labels. For performance changes, profile first and include before/after measurements; see [bench/README.md](bench/README.md).
+
+Firefox support has had far less testing than Chrome, so Firefox fixes and extra Firefox tests are especially welcome. Say which browser a change was tested in.
 
 Report exactly which checks you ran and their results. If a check could not run, state why. Never include a real browser profile in a test or commit private session data.
 
 ## Pull requests and review
 
-- Target `main` from a feature branch.
+- Target `dev` from a feature branch. Maintainers merge `dev` into `main`, which cuts the release.
 - Explain the concrete problem and final behavior, link relevant issues, and include screenshots for visible UI changes.
 - Include verification results and any known limits. Mention AI assistance when it materially affected the implementation or review.
 - Use Conventional Commits, such as `fix(sync): include ordinary tabs in workspace snapshots` or `feat(panel): add a reload control`.
@@ -44,17 +48,17 @@ GitHub Actions checks PRs with lint, type checking, tests, builds, and real-brow
 
 ## Releases
 
-The existing release workflow runs on `main` and creates Semantic Versioning releases from Conventional Commits. Release publishing and signing are maintainer responsibilities. `npm run zip` creates an unpacked-extension ZIP; signed CRX archives are a separate release artifact. Keep the signing key private and reuse it for compatible extension updates.
+The release workflow runs on `main` and creates Semantic Versioning releases from Conventional Commits. Each release gets:
 
-Every new release automatically receives `vertically-challenged-<version>-crx.zip`, containing the signed CRX. Maintainers must configure the `CRX_PRIVATE_KEY` Actions secret with the existing PEM signing key; never generate a replacement for an update. Dry runs do not sign or upload packages.
+- `vertically-challenged-<version>-crx.zip`: the signed Chrome CRX. It needs the `CRX_PRIVATE_KEY` Actions secret (the PEM signing key; never generate a replacement for an update).
+- `vertically-challenged-<version>-firefox.zip` and `-sources.zip`: the Firefox build and the source archive Mozilla asks for. When the `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` secrets exist, the release is also signed on addons.mozilla.org (unlisted) and the signed `.xpi` is attached.
+- Optionally, an upload to the Chrome Web Store: set the repository variables `CWS_EXTENSION_ID` and `CWS_PUBLISHER_ID` and the secrets `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET` and `CWS_REFRESH_TOKEN`. Set the variable `CWS_AUTO_PUBLISH` to `true` to also submit the upload for review. See [docs/store/LISTING.md](docs/store/LISTING.md).
 
-For local packaging, run `npm run pack:crx`. It uses `.output/chrome-mv3.pem` by default; set `CRX_KEY_PATH` for another location and `CHROME_BIN` if Chrome is not available as `google-chrome`. Chrome/Chromium, `zip`, and `unzip` must be installed. The signing key stays outside the package.
+Dry runs do not sign or upload anything. For local packaging, run `npm run pack:crx`. It uses `.output/chrome-mv3.pem` by default; set `CRX_KEY_PATH` for another location and `CHROME_BIN` if Chrome is not available as `google-chrome`. Chrome/Chromium, `zip`, and `unzip` must be installed. Keep the signing key outside the repository and the package, and keep a backup of it somewhere other than `.output`.
 
 ## Branch protection
 
-The intended `main` protection is: require PRs and one approval, dismiss stale approvals, require the `check` CI job with the branch up to date, resolve conversations, and disallow force pushes and deletion. Administrator bypass remains available for maintainer recovery.
-
-On 2026-10-24 GitHub rejected protection/ruleset access for this private repository with HTTP 403: “Upgrade to GitHub Pro or make this repository public to enable this feature.” No branch protection is claimed to be active. An owner must enable a suitable plan or explicitly choose to make the repository public, then apply and verify these settings. PR instructions and CI alone do not enforce branch protection.
+`main` requires a pull request and the `check` CI job, and disallows force pushes and deletion. Maintainers merge `dev` into `main` through a PR.
 
 ## License
 

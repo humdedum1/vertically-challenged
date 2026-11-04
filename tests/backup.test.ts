@@ -93,6 +93,12 @@ describe('restored custom CSS', () => {
     expect(r.css).toContain('color:red');
     expect(r.stripped).toBe(true);
     expect(stripRemoteCss('a{color:red}').stripped).toBe(false);
+    for (const css of [
+      'a{background:image-set("https://x/a" 1x)}',
+      'a{background:\\75rl(https://x/a)}',
+      'a{background:src("https://x/a")}',
+    ])
+      expect(stripRemoteCss(css)).toEqual({ css: '', stripped: true });
   });
 
   it('warns when a backup file carried remote CSS', () => {

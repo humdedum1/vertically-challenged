@@ -37,6 +37,9 @@ function onWindowKeydown(e: KeyboardEvent): void {
   if (where.surface !== 'sidebar' && e.key === 'Escape' && !e.defaultPrevented) requestClose();
 }
 
+// Window managers can't see an extension's window class; the title is what their rules can match.
+if (where.surface === 'window') document.title = 'vertically-challenged';
+
 // A popup window is a launcher: it goes away once the user is back in the browser.
 function onWindowBlur(): void {
   if (

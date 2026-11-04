@@ -26,9 +26,12 @@ $effect(() => {
   );
 });
 
-// Notifications are optional: asked for (in this click's gesture) only when switching on.
+// Asked for (in this click's gesture) only when switching on. The side panel needs a
+// notification click as its gesture; the in-page popup needs site access to inject at launch.
 async function setOpenOnLaunch(on: boolean): Promise<void> {
-  if (on && !(await browser.permissions.request({ permissions: ['notifications'] }))) return;
+  const perm =
+    mode === 'popup' ? { origins: ['https://*/*', 'http://*/*'] } : { permissions: ['notifications' as const] };
+  if (on && !(await browser.permissions.request(perm))) return;
   settings.update((s) => ({ ...s, display: { ...s.display, openOnLaunch: on } }));
 }
 </script>
@@ -62,7 +65,9 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
     {/if}
     <Toggle
       label="Open on browser launch"
-      hint="Chrome doesn’t let extensions open the panel on their own, so a notification appears at launch; click it to open the panel."
+      hint={mode === 'popup'
+        ? 'Opens the popup over the first page at launch; needs access to sites. Chrome pages (like the New Tab page) get the small window instead.'
+        : 'Chrome doesn’t let extensions open the panel on their own, so a notification appears at launch; click it to open the panel.'}
       checked={settings.value.display.openOnLaunch}
       onchange={(on) => void setOpenOnLaunch(on)}
     />

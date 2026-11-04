@@ -281,6 +281,14 @@ export function startBackground(): void {
     void placeChildTab(tab).catch((err: unknown) =>
       console.debug('[vc] child tab placement failed', err),
     );
+    // Browser-opened blank tabs (Ctrl+T, + button) go to the configured new-tab URL.
+    const id = tab.id;
+    if (id !== undefined && (tab.pendingUrl ?? tab.url) === 'chrome://newtab/')
+      void settingsNow()
+        .then(async ({ tabs }) => {
+          if (tabs.newTabUrl) await browser.tabs.update(id, { url: tabs.newTabUrl });
+        })
+        .catch((err: unknown) => console.debug('[vc] new tab redirect failed', err));
   });
   // Tab rules (Settings): kept in memory, refreshed from the settings below.
   let tabRules: TabRule[] = [];

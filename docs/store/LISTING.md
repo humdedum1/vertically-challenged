@@ -116,7 +116,8 @@ Show and manage browser tabs in a vertical list in the side panel.
 | storage | Keep settings, layouts, sessions and backup settings. |
 | tabGroups | Create, rename, recolor, collapse and move tab groups. |
 | sessions | Show and reopen recently closed tabs and windows. |
-| bookmarks, history | The Bookmarks and History panels (read, search, open; history entries can be deleted). Nothing is copied or sent anywhere. |
+| bookmarks | The Bookmarks panel: read, search and open your bookmarks. Nothing is copied or sent anywhere. |
+| history | The History panel: read, search and open your browsing history, grouped by day, and delete entries you choose. Nothing is copied or sent anywhere. |
 | alarms | Auto-suspend, scheduled sync, scheduled backups and snoozed tabs. |
 | contextMenus | Tab actions in Chrome's menus. |
 | activeTab, scripting | Show the in-page popup on the tab you invoke it on, only after you ask. |

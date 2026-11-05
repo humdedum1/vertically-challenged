@@ -78,7 +78,7 @@ Local-first, no tracking, free and open source.
 
 **Tags:** vertical tabs, sidebar, tab manager, tab groups, sessions
 
-**License:** GPL-3.0-or-later
+**License:** GPL-3.0-only (AMO has no “or later” option)
 
 **Homepage:** <https://github.com/humdedum1/vertically-challenged>
 

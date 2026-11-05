@@ -15,7 +15,7 @@
   "is_experimental": false,
   "requires_payment": false,
   "version": {
-    "license": "GPL-3.0-or-later",
+    "license": "GPL-3.0-only",
     "release_notes": {
       "en-US": "See https://github.com/humdedum1/vertically-challenged/releases"
     },

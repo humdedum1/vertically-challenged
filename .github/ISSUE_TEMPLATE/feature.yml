@@ -5,7 +5,7 @@ labels: [enhancement]
 body:
   - type: markdown
     attributes:
-      value: This is a vibecoded personal project. Focused improvements and contributions are welcome; a request does not imply a delivery date. Search existing requests first.
+      value: This is a personal project developed with AI assistance. Focused improvements and contributions are welcome; a request does not imply a delivery date. Search existing requests first.
   - type: textarea
     id: problem
     attributes:

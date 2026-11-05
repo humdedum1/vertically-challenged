@@ -1,6 +1,16 @@
 {
   "name": "vertically-challenged",
   "description": "Vertical tabs for Chrome and Firefox. Local-first, no telemetry.",
+  "keywords": [
+    "vertical-tabs",
+    "tab-manager",
+    "sidebar",
+    "side-panel",
+    "chrome-extension",
+    "firefox-addon",
+    "productivity"
+  ],
+  "author": "humdedum1",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
@@ -13,7 +23,11 @@
   "private": true,
   "version": "1.0.5",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
+    "ci": "bash .github/release/validate.sh && npm run test:e2e && npm run test:e2e:firefox",
     "dev": "wxt",
     "build": "wxt build",
     "zip": "wxt zip",

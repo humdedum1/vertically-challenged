@@ -31,7 +31,9 @@ const server = http
     // Strictest page policy: frames, styles and scripts all forbidden to the page itself.
     if (req.url === '/strict')
       res.setHeader('content-security-policy', "default-src 'none'; frame-src 'none'");
-    res.end(`<!doctype html><title>${req.url}</title><h1>page ${req.url}</h1>`);
+    res.end(
+      `<!doctype html><title>${req.url.replace(/[<>&"]/g, '')}</title><h1>page ${req.url.replace(/[<>&"]/g, '')}</h1>`,
+    );
   })
   .listen(0, '127.0.0.1');
 await new Promise((r) => server.once('listening', r));

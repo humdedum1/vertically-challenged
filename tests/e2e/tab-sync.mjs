@@ -10,7 +10,7 @@ import { check, extensionDir, finish, launch, sleep, startMirror, tabRows } from
 const srv = http.createServer((req, res) => {
   const title = new URL(req.url, 'http://x').searchParams.get('t') ?? 'Page';
   res.writeHead(200, { 'content-type': 'text/html' });
-  res.end(`<!doctype html><title>${title}</title>`);
+  res.end(`<!doctype html><title>${title.replace(/[<>&"]/g, '')}</title>`);
 });
 await new Promise((r) => srv.listen(0, '127.0.0.1', r));
 const SITE = `http://127.0.0.1:${srv.address().port}`;

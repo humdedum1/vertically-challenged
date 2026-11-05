@@ -3,7 +3,7 @@ import { check, extensionDir, finish, launch } from './harness.mjs';
 
 const server = http.createServer((req, res) => {
   res.setHeader('content-type', 'text/html');
-  res.end(`<title>${req.url}</title><a href="/child-a">Open A</a>
+  res.end(`<title>${req.url.replace(/[<>&"]/g, '')}</title><a href="/child-a">Open A</a>
     <a href="/child-b">Open B</a><a href="/grandchild">Open grandchild</a>`);
 });
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));

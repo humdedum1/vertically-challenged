@@ -230,7 +230,7 @@ const nA = N - 100;
 const create = async (windowId, from, to) => {
   for (let b = from; b < to; b += 40) {
     await ev(
-      `(async()=>{${FIXTURE_SRC}const ps=[];for(let n=${b};n<Math.min(${to},${b + 40});n++){ps.push(chrome.tabs.create({windowId:${windowId},url:fixtureFor(n).url,active:false}))}await Promise.all(ps);return 1})()`,
+      `(async()=>{${FIXTURE_SRC}const ps=[];for(let n=${Number(b)};n<Math.min(${Number(to)},${Number(b) + 40});n++){ps.push(chrome.tabs.create({windowId:${Number(windowId)},url:fixtureFor(n).url,active:false}))}await Promise.all(ps);return 1})()`,
     );
     if (b % 400 === 0) console.log('created', b, 'in', windowId);
   }
@@ -241,7 +241,7 @@ const wins = JSON.parse(
 const A = wins[0];
 await create(A, 0, nA - 1);
 const B = await ev(
-  `(async()=>{${FIXTURE_SRC}const w=await chrome.windows.create({url:fixtureFor(${nA}).url,focused:false,width:1000,height:800});return w.id})()`,
+  `(async()=>{${FIXTURE_SRC}const w=await chrome.windows.create({url:fixtureFor(${Number(nA)}).url,focused:false,width:1000,height:800});return w.id})()`,
 );
 await create(B, nA + 1, nA + 100);
 for (let i = 0; i < 120; i++) {

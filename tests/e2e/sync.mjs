@@ -12,7 +12,7 @@ import { check, extensionDir, finish, launch, sleep } from './harness.mjs';
 
 const srv = http.createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-  res.end(`<!doctype html><title>${req.url.slice(1) || 'home'}</title>`);
+  res.end(`<!doctype html><title>${req.url.slice(1).replace(/[<>&"]/g, '') || 'home'}</title>`);
 });
 await new Promise((r) => srv.listen(0, '127.0.0.1', r));
 const SITE = `http://127.0.0.1:${srv.address().port}`;

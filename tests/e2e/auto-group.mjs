@@ -2,7 +2,9 @@
 import http from 'node:http';
 import { check, extensionDir, finish, launch } from './harness.mjs';
 
-const server = http.createServer((req, res) => res.end(`<title>${req.url}</title>`));
+const server = http.createServer((req, res) =>
+  res.end(`<title>${req.url.replace(/[<>&"]/g, '')}</title>`),
+);
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const site = `http://127.0.0.1:${server.address().port}`;
 const { ctx, extId, close } = await launch(extensionDir());

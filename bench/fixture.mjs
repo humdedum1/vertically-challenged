@@ -14,6 +14,7 @@ import {
   FIXTURE_SRC,
   fixtureFor,
   jget,
+  lit,
   OUT,
   PORT,
   ROOT,
@@ -254,7 +255,7 @@ for (let i = 0; i < 120; i++) {
 // --- Groups: 28 in A, 2 in B.
 const colors = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'];
 await ev(`(async()=>{
-  const colors=${JSON.stringify(colors)};
+  const colors=${lit(colors)};
   for (const [w,count,startAt] of [[${A},28,40],[${B},2,5]]) {
     const tabs=(await chrome.tabs.query({windowId:w})).sort((a,b)=>a.index-b.index);
     let pos=startAt;

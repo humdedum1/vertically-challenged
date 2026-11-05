@@ -99,7 +99,7 @@ Data loss is the worst failure. Any change to stored or synced data shape:
 - Default to the cheapest model (Haiku). Use Sonnet only for security boundaries, migrations, or debugging that Haiku has failed at.
 - State the model choice when delegating.
 
-## Agent skills
+## Agent docs
 
 ### Issue tracker
 
@@ -112,17 +112,3 @@ Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, 
 ### Domain docs
 
 See `docs/agents/domain.md`.
-
-### Skills to reach for
-
-Check which skills fit a task before starting; several can apply at once.
-
-- `svelte5-best-practices`: any `.svelte` / `.svelte.ts` change (runes, snippets, `$bindable`).
-- `modern-css`: panel styling (sticky, `::details-content`, container queries, themes).
-- `frontend-design`: new or reshaped panel and settings UI.
-- `tdd`: bug fixes and features with testable logic.
-- `diagnosing-bugs`: broken, flaky or slow behaviour.
-- `security-audit`: permissions, backup targets (Dropbox, WebDAV, S3), sync, custom CSS, imports.
-- `semantic-versioning`: release-kit config under `.github/release/`.
-- `code-review`, `pr`: before merging to `main`.
-- `domain-modeling`: naming domain concepts (staples, pinned folders, sessions, snooze, workspaces).

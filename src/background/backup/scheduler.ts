@@ -113,7 +113,10 @@ export function davUrl(raw: string, user: string): string {
     if (!user || !u.pathname.includes('/apps/files')) return raw;
     const dir = (u.searchParams.get('dir') ?? '/').split('/').filter(Boolean);
     const root = u.pathname.slice(0, u.pathname.indexOf('/apps/files'));
-    return `${u.origin}${root}/remote.php/dav/files/${encodeURIComponent(user)}/${dir.map(encodeURIComponent).join('/')}`.replace(/\/$/, '');
+    return `${u.origin}${root}/remote.php/dav/files/${encodeURIComponent(user)}/${dir.map(encodeURIComponent).join('/')}`.replace(
+      /\/$/,
+      '',
+    );
   } catch {
     return raw;
   }

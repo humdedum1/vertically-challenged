@@ -79,7 +79,8 @@ Data loss is the worst failure. Any change to stored or synced data shape:
 ## Commits and PRs
 
 - Use Conventional Commits with scopes, e.g. `fix(sidepanel): ...`, `ci(release): ...`.
-- PRs target `dev`.
+- PRs target `dev`, the staging branch. Maintainers merge `dev` into `main`, which cuts releases. `main` is protected.
+- Never delete `dev` or its remote; a ruleset blocks deletion, so don't work around it.
 - Do not commit or push unless the user asks.
 
 ## Release boundary

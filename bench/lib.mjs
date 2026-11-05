@@ -15,6 +15,12 @@ export const SRV = 18099;
 
 fs.mkdirSync(OUT, { recursive: true });
 
+/** JSON literal that is also safe to splice into evaluated code (no `<`, `>`, `/`, U+2028/9). */
+export const lit = (v) =>
+  JSON.stringify(v).replace(
+    /[<>/\u2028\u2029]/g,
+    (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`,
+  );
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const median = (a) => {
   const s = [...a].sort((x, y) => x - y);
@@ -170,7 +176,7 @@ import { fixtureFor, SITES, siteFor, WORDS } from './fixture-data.mjs';
 
 export { fixtureFor, SITES, siteFor, WORDS };
 /** Source text defining SITES, WORDS, siteFor and fixtureFor inside a page. */
-export const FIXTURE_SRC = `const SITES=${JSON.stringify(SITES)};const WORDS=${JSON.stringify(WORDS)};${siteFor.toString()};${fixtureFor.toString()};`;
+export const FIXTURE_SRC = `const SITES=${lit(SITES)};const WORDS=${lit(WORDS)};${siteFor.toString()};${fixtureFor.toString()};`;
 
 /**
  * A Playwright-driven headless Chromium with the given builds loaded side by side, for

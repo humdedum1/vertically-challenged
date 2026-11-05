@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   browserCDP,
+  lit,
   median,
   OUT,
   pct,
@@ -351,10 +352,10 @@ PHASES.events = async (ctx) => {
     const title = `ZZTITLE-${i}-${Date.now()}`;
     await cdp.evalIn(
       panel.sess,
-      `(() => { const P = window.__p; P.watch = { found: null }; const row = document.getElementById('vc-row-t${Number(id)}'); P.mo && P.mo.disconnect(); P.mo = new MutationObserver(() => { if (P.watch.found === null && row.textContent.includes(${JSON.stringify(title)})) { P.watch.found = performance.now(); P.watch.foundEpoch = performance.timeOrigin + P.watch.found; requestAnimationFrame(() => { P.watch.raf = performance.timeOrigin + performance.now(); }); } }); P.mo.observe(document.querySelector('[role=tree]'), { subtree: true, childList: true, characterData: true, attributes: true }); P.msgs.length = 0; return 1 })()`,
+      `(() => { const P = window.__p; P.watch = { found: null }; const row = document.getElementById('vc-row-t${Number(id)}'); P.mo && P.mo.disconnect(); P.mo = new MutationObserver(() => { if (P.watch.found === null && row.textContent.includes(${lit(title)})) { P.watch.found = performance.now(); P.watch.foundEpoch = performance.timeOrigin + P.watch.found; requestAnimationFrame(() => { P.watch.raf = performance.timeOrigin + performance.now(); }); } }); P.mo.observe(document.querySelector('[role=tree]'), { subtree: true, childList: true, characterData: true, attributes: true }); P.msgs.length = 0; return 1 })()`,
     );
     const t0 = Date.now();
-    await cdp.evalIn(s, `document.title=${JSON.stringify(title)}`);
+    await cdp.evalIn(s, `document.title=${lit(title)}`);
     const t1 = Date.now();
     await sleep(400);
     const r = JSON.parse(

@@ -106,6 +106,19 @@ export function originPattern(raw: string): string | null {
   return u ? `${new URL(u).protocol}//${new URL(u).host}/*` : null;
 }
 
+/** A Nextcloud web-UI link (/apps/files/…?dir=/X) isn't WebDAV; rewrite it to the DAV folder. */
+export function davUrl(raw: string, user: string): string {
+  try {
+    const u = new URL(raw);
+    if (!user || !u.pathname.includes('/apps/files')) return raw;
+    const dir = (u.searchParams.get('dir') ?? '/').split('/').filter(Boolean);
+    const root = u.pathname.slice(0, u.pathname.indexOf('/apps/files'));
+    return `${u.origin}${root}/remote.php/dav/files/${encodeURIComponent(user)}/${dir.map(encodeURIComponent).join('/')}`.replace(/\/$/, '');
+  } catch {
+    return raw;
+  }
+}
+
 export function parseConfig(raw: unknown): BackupConfig {
   const r = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
   const interval: Interval = r.interval === 'daily' || r.interval === 'weekly' ? r.interval : 'off';
@@ -119,9 +132,10 @@ export function parseConfig(raw: unknown): BackupConfig {
     target:
       r.target === 'webdav' || r.target === 's3' || r.target === 'dropbox' ? r.target : 'downloads',
     webdav: {
-      url: url(w.url),
+      url: davUrl(url(w.url), text(w.user)),
       user: text(w.user),
-      password: typeof w.password === 'string' ? w.password : '',
+      // Trimmed: a pasted app password with a stray space/newline gets a 401.
+      password: typeof w.password === 'string' ? w.password.trim() : '',
     },
     s3: {
       endpoint: url(c.endpoint),

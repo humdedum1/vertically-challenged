@@ -315,3 +315,21 @@ describe('upload verification', () => {
     expect(s.hash).toBeUndefined();
   });
 });
+
+describe('davUrl', () => {
+  it('rewrites a Nextcloud web-UI folder link to its WebDAV URL', () => {
+    expect(
+      parseConfig({
+        target: 'webdav',
+        webdav: {
+          url: 'https://nc.example.com/apps/files/files/171?dir=/My%20Backups',
+          user: 'me',
+          password: ' pw\n',
+        },
+      }).webdav,
+    ).toMatchObject({
+      url: 'https://nc.example.com/remote.php/dav/files/me/My%20Backups',
+      password: 'pw',
+    });
+  });
+});

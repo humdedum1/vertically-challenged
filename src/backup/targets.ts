@@ -39,7 +39,9 @@ const unxml = (s: string): string =>
     .replace(/&apos;/g, "'")
     .replace(/&amp;/g, '&');
 
-export function webdavTarget(c: WebDavConfig, f: Fetch = fetch): BackupTarget {
+export function webdavTarget(c: WebDavConfig, fetcher: Fetch = fetch): BackupTarget {
+  // No cookies: Nextcloud rejects (401, CSRF) a Basic-auth call that also carries a logged-in session.
+  const f: Fetch = (u, init) => fetcher(u, { ...init, credentials: 'omit' });
   const base = c.url.replace(/\/+$/, '');
   const cred = new TextEncoder().encode(`${c.user}:${c.password}`);
   const auth = { Authorization: `Basic ${btoa(String.fromCharCode(...cred))}` };

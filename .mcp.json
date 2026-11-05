@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "xerj": {
+      "type": "stdio",
+      "command": "xerj",
+      "args": ["mcp"],
+      "env": {
+        "XERJ_URL": "http://127.0.0.1:9200"
+      }
+    },
+    "svelte": {
+      "command": "npx",
+      "args": ["-y", "@sveltejs/mcp"]
+    }
+  }
+}

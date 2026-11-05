@@ -12,11 +12,11 @@ web-ext.config.ts
 .superpowers/
 bench/.out/
 
-# Local Claude Code skills and settings, never published
-.claude/
+# Local Claude Code skills and settings, never published (shared project settings stay tracked)
+.claude/*
+!.claude/settings.json
 
 # Local working notes and scratch output, kept off GitHub
-AGENTS.md
 docs/agents/
 docs/superpowers/
 docs/m6-profile.md

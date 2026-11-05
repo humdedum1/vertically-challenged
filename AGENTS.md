@@ -99,16 +99,6 @@ Data loss is the worst failure. Any change to stored or synced data shape:
 - Default to the cheapest model (Haiku). Use Sonnet only for security boundaries, migrations, or debugging that Haiku has failed at.
 - State the model choice when delegating.
 
-## Agent docs
+## Issues and labels
 
-### Issue tracker
-
-Issues live in GitHub Issues on humdedum1/vertically-challenged (via `gh`). See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Default vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-See `docs/agents/domain.md`.
+Issues live in GitHub Issues on humdedum1/vertically-challenged (via `gh`). Label vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. File issues only into this repo, never into an upstream.

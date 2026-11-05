@@ -17,6 +17,7 @@ bench/.out/
 !.claude/settings.json
 
 # Local working notes and scratch output, kept off GitHub
+docs/agents/
 docs/superpowers/
 docs/m6-profile.md
 docs/release-history.md

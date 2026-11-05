@@ -1,0 +1,13 @@
+# Code owners are requested as reviewers automatically on pull requests.
+# The last matching pattern wins, so the specific lines below take precedence.
+#
+# Permission, manifest, CI and stored-data format changes always request review:
+# wxt.config.ts (manifest and permissions), .github/ (workflows and release
+# automation), src/settings/ and src/backup/ (settings and backup data shape).
+
+* @humdedum1
+
+/wxt.config.ts @humdedum1
+/.github/ @humdedum1
+/src/settings/ @humdedum1
+/src/backup/ @humdedum1

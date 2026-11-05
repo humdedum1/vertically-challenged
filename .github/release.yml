@@ -1,0 +1,22 @@
+# GitHub auto-generated release notes: categories by PR label.
+# Used when a release is created from the GitHub UI or with `gh release create --generate-notes`.
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+  categories:
+    - title: Bug fixes
+      labels:
+        - bug
+    - title: Features
+      labels:
+        - enhancement
+    - title: Documentation
+      labels:
+        - documentation
+    - title: Dependencies
+      labels:
+        - dependencies
+    - title: Other changes
+      labels:
+        - "*"

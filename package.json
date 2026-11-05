@@ -1,7 +1,7 @@
 {
   "name": "vertically-challenged",
   "description": "Vertical tabs for Chrome and Firefox. Local-first, no telemetry.",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/humdedum1/vertically-challenged.git"

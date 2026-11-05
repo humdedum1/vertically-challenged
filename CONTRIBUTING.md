@@ -64,4 +64,4 @@ When you merge a PR on GitHub, use a commit email you're happy to publish. GitHu
 
 ## License
 
-By contributing, you agree that your contribution is available under this project's [MIT license](LICENSE). Preserve [third-party notices](THIRD_PARTY_NOTICES.md).
+By contributing, you agree that your contribution is available under this project's [GPLv3 license](LICENSE). Preserve [third-party notices](THIRD_PARTY_NOTICES.md).

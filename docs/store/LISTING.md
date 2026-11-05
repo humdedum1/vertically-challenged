@@ -90,7 +90,7 @@ panel (or an in-page popup, or its own window).
 - Themes, density and layout you control, including custom CSS.
 - Full backups with optional encryption, saved to Downloads, Nextcloud/WebDAV, S3-compatible
   storage or Dropbox, on a schedule you choose. Restore from the server in one click.
-- Free and MIT licensed. No account, no analytics, no ads.
+- Free and open source (GPLv3). No account, no analytics, no ads.
 
 This is a young, AI-assisted project with a small test sample. Keep backups of anything you
 cannot afford to lose, and please report problems on GitHub.

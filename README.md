@@ -12,7 +12,7 @@ I made this because I loved Sidebery and Zen Browser and couldn't get anything l
 
 [![CI](https://github.com/humdedum1/vertically-challenged/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/humdedum1/vertically-challenged/actions/workflows/release.yml)
 [![Release](https://img.shields.io/github/v/release/humdedum1/vertically-challenged?label=release&color=0071e3&labelColor=1d1d1f)](https://github.com/humdedum1/vertically-challenged/releases)
-[![License: MIT](https://img.shields.io/badge/license-MIT-0071e3?labelColor=1d1d1f)](LICENSE)
+[![License: GPLv3](https://img.shields.io/badge/license-GPLv3-0071e3?labelColor=1d1d1f)](LICENSE)
 ![Chrome 116+](https://img.shields.io/badge/Chrome-116%2B-0071e3?logo=googlechrome&logoColor=white&labelColor=1d1d1f)
 ![Firefox 140+](https://img.shields.io/badge/Firefox-140%2B-0071e3?logo=firefoxbrowser&logoColor=white&labelColor=1d1d1f)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/humdedum1)
@@ -40,7 +40,7 @@ I made this because I loved Sidebery and Zen Browser and couldn't get anything l
   </tr>
   <tr>
     <td align="center"><b>No host permissions</b><br><sub>Nothing asked for at install</sub></td>
-    <td align="center"><b>Free, MIT</b><br><sub>And it stays free</sub></td>
+    <td align="center"><b>Free, GPLv3</b><br><sub>And it stays free</sub></td>
   </tr>
 </table>
 <!-- TODO: add Chrome Web Store version/users badges once the store listing exists. -->
@@ -263,8 +263,8 @@ Report vulnerabilities as described in [SECURITY.md](SECURITY.md), and keep expl
 
 ## Support the project
 
-It's free under the [MIT License](LICENSE), and it will stay free for the foreseeable future. If it saves you time, you can chip in on [Ko-fi](https://ko-fi.com/humdedum1) or [PayPal](https://paypal.me/oddboxx). Donations are optional and unlock nothing. Bug reports, testing on your setup, doc fixes and code review help just as much.
+It's free under the [GNU GPLv3](LICENSE), and it will stay free for the foreseeable future. If it saves you time, you can chip in on [Ko-fi](https://ko-fi.com/humdedum1) or [PayPal](https://paypal.me/oddboxx). Donations are optional and unlock nothing. Bug reports, testing on your setup, doc fixes and code review help just as much.
 
 ## License
 
-[MIT](LICENSE). Third-party palettes keep their own notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[GPL-3.0-or-later](LICENSE). Third-party palettes keep their own notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

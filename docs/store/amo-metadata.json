@@ -6,7 +6,7 @@
     "en-US": "Vertical tabs in the sidebar: search, pin, group, snooze and back up your tabs. Local-first, no tracking, free and open source."
   },
   "description": {
-    "en-US": "Vertically Challenged shows all your tabs in a fast, searchable vertical list in Firefox's sidebar (or its own window).\n\n<ul>\n<li>Every tab in every window, with window names. Private windows stay separate.</li>\n<li>Fuzzy search over tabs, bookmarks, history and saved sessions. Type &gt; to run commands from the keyboard.</li>\n<li>Staples (a grid of the pages you use all day), pinned folders, child tabs and Firefox's own tab groups.</li>\n<li>Save sessions and window setups, restore them later, or snooze a tab until tomorrow.</li>\n<li>Suspend idle tabs to save memory.</li>\n<li>Themes, density and layout you control, including custom CSS.</li>\n<li>Full backups with optional encryption, saved to Downloads, Nextcloud/WebDAV, S3-compatible storage or Dropbox, on a schedule you choose.</li>\n<li>Free and MIT licensed. No account, no analytics, no ads.</li>\n</ul>\n\nFirefox support is newer and has had much less testing than the Chrome version, so there will be rough edges. Keep backups of anything you cannot afford to lose, and please report problems or send fixes on GitHub: https://github.com/humdedum1/vertically-challenged"
+    "en-US": "Vertically Challenged shows all your tabs in a fast, searchable vertical list in Firefox's sidebar (or its own window).\n\n<ul>\n<li>Every tab in every window, with window names. Private windows stay separate.</li>\n<li>Fuzzy search over tabs, bookmarks, history and saved sessions. Type &gt; to run commands from the keyboard.</li>\n<li>Staples (a grid of the pages you use all day), pinned folders, child tabs and Firefox's own tab groups.</li>\n<li>Save sessions and window setups, restore them later, or snooze a tab until tomorrow.</li>\n<li>Suspend idle tabs to save memory.</li>\n<li>Themes, density and layout you control, including custom CSS.</li>\n<li>Full backups with optional encryption, saved to Downloads, Nextcloud/WebDAV, S3-compatible storage or Dropbox, on a schedule you choose.</li>\n<li>Free and open source (GPLv3). No account, no analytics, no ads.</li>\n</ul>\n\nFirefox support is newer and has had much less testing than the Chrome version, so there will be rough edges. Keep backups of anything you cannot afford to lose, and please report problems or send fixes on GitHub: https://github.com/humdedum1/vertically-challenged"
   },
   "categories": { "firefox": ["tabs"] },
   "tags": ["vertical tabs", "sidebar", "tab manager", "tab groups", "sessions"],
@@ -15,7 +15,7 @@
   "is_experimental": false,
   "requires_payment": false,
   "version": {
-    "license": "MIT",
+    "license": "GPL-3.0-or-later",
     "release_notes": {
       "en-US": "See https://github.com/humdedum1/vertically-challenged/releases"
     },

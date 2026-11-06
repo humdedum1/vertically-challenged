@@ -2,14 +2,19 @@
 //   node tests/e2e/shots.mjs [extension dir]
 import { extensionDir, launch, sleep } from './harness.mjs';
 
-const SITES = [
-  'https://en.wikipedia.org/wiki/Tab_(interface)',
-  'https://github.com/',
-  'https://developer.mozilla.org/en-US/',
-  'https://news.ycombinator.com/',
-  'https://www.python.org/',
-  'https://svelte.dev/',
+const SITES = ['https://en.wikipedia.org/wiki/Tab_(interface)'];
+// Opened from the Wikipedia tab, so it shows as a child tab.
+const CHILD = 'https://svelte.dev/';
+// Closed after the warm-up, so Recently closed shows a page that is not also open.
+const CLOSED = 'https://developer.mozilla.org/en-US/docs/Web/CSS';
+// Pinned into the Staples grid, and into a "Reading" pinned folder.
+const STAPLES = [
+  'https://www.youtube.com/',
+  'https://www.figma.com/',
+  'https://www.notion.com/',
+  'https://open.spotify.com/',
 ];
+const FOLDER = ['https://web.dev/', 'https://developer.chrome.com/'];
 const { ctx, extId, close } = await launch(extensionDir(), {
   width: 360,
   height: 760,
@@ -19,7 +24,7 @@ const { ctx, extId, close } = await launch(extensionDir(), {
 try {
   // Background tabs often never store a favicon, so load each site in the foreground first.
   const warm = ctx.pages()[0];
-  for (const url of SITES) {
+  for (const url of [...STAPLES, ...FOLDER, ...SITES, CHILD, CLOSED]) {
     await warm.goto(url, { waitUntil: 'load', timeout: 20000 }).catch(() => {});
     await sleep(1500);
   }
@@ -29,13 +34,48 @@ try {
   const opened = ctx.waitForEvent('page', (p) => p.url().includes('sidepanel.html'));
   await boot.evaluate(
     (urls) => chrome.windows.create({ url: urls }),
-    [`chrome-extension://${extId}/sidepanel.html`, ...SITES],
+    [`chrome-extension://${extId}/sidepanel.html`, ...SITES, ...STAPLES, ...FOLDER],
   );
   const page = await opened;
   await warm.close(); // on a real site, so Recently closed shows it rather than about:blank
   await boot.close();
   await page.bringToFront();
   await sleep(5000);
+  // Tabs open in windows.create order: the panel, SITES, STAPLES, then FOLDER.
+  await page.evaluate(
+    async ([nSites, nStaples, child]) => {
+      const win = await chrome.windows.getCurrent();
+      const ids = (await chrome.tabs.query({ windowId: win.id })).map((t) => t.id);
+      const staples = ids.slice(1 + nSites, 1 + nSites + nStaples);
+      const folder = ids.slice(1 + nSites + nStaples);
+      let layout;
+      const port = chrome.runtime.connect({ name: 'vc-panel' });
+      port.onMessage.addListener((m) => {
+        if (m.type === 'layout') layout = m.layout;
+      });
+      port.postMessage({ type: 'subscribe', windowId: win.id });
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      await wait(300);
+      const send = (msg) => port.postMessage({ windowId: win.id, ...msg });
+      send({ type: 'pinTabs', tabIds: staples, dest: { zone: 'essentials', index: 0 } });
+      send({ type: 'pinTabs', tabIds: folder, dest: { zone: 'pinned', folderId: null, index: 0 } });
+      await wait(1000);
+      const itemIds = layout.pinned.filter((n) => folder.includes(n.tabId)).map((n) => n.id);
+      send({
+        type: 'folderCreate',
+        name: 'Reading',
+        dest: { zone: 'pinned', folderId: null, index: 0 },
+        itemIds,
+      });
+      await wait(500);
+      const made = layout.pinned.find((n) => n.kind === 'folder');
+      send({ type: 'folderUpdate', folderId: made.id, icon: 'book' });
+      await wait(300);
+      await chrome.tabs.create({ url: child, openerTabId: ids[1], active: false });
+      await wait(500);
+    },
+    [SITES.length, STAPLES.length, CHILD],
+  );
   await page.reload();
   await sleep(2000);
   await page.getByRole('button', { name: 'Got it', exact: true }).click();

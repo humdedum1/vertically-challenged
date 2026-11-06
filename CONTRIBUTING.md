@@ -1,6 +1,10 @@
 # Contributing
 
-Vertically Challenged is a vibecoded, AI-assisted personal project. Contributions from humans and AI-assisted workflows are welcome. You are responsible for understanding your changes and verifying them; generated code and a passing test suite are not substitutes for review.
+Vertically Challenged is a personal, open-source project. Contributions are welcome from anyone, including people who use AI tools in their workflow.
+
+This project is developed with AI assistance. Humans review and own every change; contributors remain responsible for what they submit. You are responsible for understanding your changes and verifying them; generated code and a passing test suite are not substitutes for review.
+
+Please also read the [Code of Conduct](CODE_OF_CONDUCT.md) and [Support](SUPPORT.md) guide.
 
 ## Before you start
 
@@ -10,13 +14,34 @@ Report the extension version, browser/OS, installation method, reproduction step
 
 ## Local development
 
-1. Fork the repository if you have access, or create a branch in your clone.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:23da45be114b0a348d050ee0151805955b82267fe276b1a06359c465e001c17d -->
+
+1. Fork the repository on GitHub and clone your fork. Ensure your fork includes the `dev` branch, then run `git fetch origin dev` before creating a feature branch with `git switch -c fix/short-description origin/dev`. If your fork lacks `dev`, add the original repository as an upstream remote with `git remote add upstream https://github.com/humdedum1/vertically-challenged.git`, then run `git fetch upstream dev` and `git switch -c fix/short-description upstream/dev`.
+
+<!-- /coderabbit-ai-generated:v1 -->
 2. Use Node.js 22 or later and run `npm ci`.
 3. Run `npm run dev`, or build with `npm run build` and load `.output/chrome-mv3` through Chrome's Load unpacked. For Firefox, `npm run build:firefox` writes `.output/firefox-mv3` (load its `manifest.json` from `about:debugging`), and `npm run start:firefox` runs it with web-ext.
 4. Keep changes focused and follow nearby TypeScript/Svelte code and the existing UI components. Avoid adding dependencies for small changes.
 5. Add a meaningful regression test for changed behavior. Preserve incognito separation, input validation, and existing data during migrations.
 
 ## Checks before a PR
+
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:81f6dabed85ded4978a254eadabf3a67d31df70507a2d0ccfd6d69b660d57bdf -->
+
+Install Chromium before running the local CI gate. The gate runs the validation script, the Chromium end-to-end tests, and the Firefox 140 smoke test:
+
+```sh
+npx playwright-core install chromium
+FIREFOX_BIN=/path/to/firefox npm run ci
+```
+
+<!-- /coderabbit-ai-generated:v1 -->
+
+`FIREFOX_BIN` must point to Firefox 140 or newer. To run the steps one at a time:
 
 ```sh
 npm run lint
@@ -26,10 +51,12 @@ npm run build
 npm run build:firefox
 npx playwright-core install chromium
 npm run test:e2e
-FIREFOX_BIN=/path/to/firefox npm run test:e2e:firefox   # Firefox 140 or newer
+FIREFOX_BIN=/path/to/firefox npm run test:e2e:firefox
 ```
 
-Use `npx playwright-core install --with-deps chromium` when the operating system needs browser libraries. Test UI changes in the real panel and popup at narrow widths, with keyboard navigation and accessible labels. For performance changes, profile first and include before/after measurements; see [bench/README.md](bench/README.md).
+Use `npx playwright-core install --with-deps chromium` when the operating system needs browser libraries. To run the pull-request workflow locally, you can use [`act`](https://github.com/nektos/act) (it needs Docker): `act pull_request -W .github/workflows/checks.yml`. This is optional; GitHub Actions remains the reference.
+
+Test UI changes in the real panel and popup at narrow widths, with keyboard navigation and accessible labels. For performance changes, profile first and include before/after measurements; see [bench/README.md](bench/README.md).
 
 Firefox support has had far less testing than Chrome, so Firefox fixes and extra Firefox tests are especially welcome. Say which browser a change was tested in.
 
@@ -37,7 +64,7 @@ Report exactly which checks you ran and their results. If a check could not run,
 
 ## Pull requests and review
 
-- Target `dev` from a feature branch. Maintainers merge `dev` into `main`, which cuts the release.
+- Open pull requests against `dev` from your feature branch. Maintainers merge `dev` into `main`, which cuts the release.
 - Explain the concrete problem and final behavior, link relevant issues, and include screenshots for visible UI changes.
 - Include verification results and any known limits. Mention AI assistance when it materially affected the implementation or review.
 - Use Conventional Commits, such as `fix(sync): include ordinary tabs in workspace snapshots` or `feat(panel): add a reload control`.

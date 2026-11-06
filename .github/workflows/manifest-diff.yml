@@ -1,0 +1,67 @@
+name: Manifest diff
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths: [wxt.config.ts]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manifest-diff-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # forks get a read-only token regardless; the comment step handles that
+    steps:
+      # wxt.config.ts builds the manifest with browser-conditional code, so the built
+      # manifests are the only reliable thing to diff (a regex over the source would miss spreads).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: head
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            head/package-lock.json
+            base/package-lock.json
+      - name: Build base and head
+        run: |
+          for d in base head; do
+            (cd "$d" && npm ci --ignore-scripts && npx wxt prepare && npx wxt build && npx wxt build -b firefox --mv3)
+          done
+      - name: Diff manifests
+        id: diff
+        shell: bash
+        env:
+          BODY_FILE: ${{ runner.temp }}/manifest-diff.md
+        run: |
+          set -o pipefail
+          # The job holds no repository secrets (only the GITHUB_TOKEN, read-only for forks), so running the PR copy of the script is acceptable.
+          node head/.github/scripts/manifest-diff.mjs base/.output head/.output | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Comment on PR
+        if: steps.diff.outputs.changed == 'true' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          BODY_FILE: ${{ runner.temp }}/manifest-diff.md
+        with:
+          script: |
+            const body = '<!-- manifest-diff -->\n' + require('fs').readFileSync(process.env.BODY_FILE, 'utf8');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const all = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const prev = all.find((c) => c.body.startsWith('<!-- manifest-diff -->'));
+            if (prev) await github.rest.issues.updateComment({ owner, repo, comment_id: prev.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });

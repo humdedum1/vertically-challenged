@@ -96,13 +96,16 @@ jobs:
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          node .github/release/semver-analyze.mjs --to "$HEAD_SHA" --json > "$RUNNER_TEMP/analysis.json" || true
+          # Exit 1 = invalid commits in history (the JSON is still complete); 2+ = analyzer failure.
+          rc=0
+          node .github/release/semver-analyze.mjs --to "$HEAD_SHA" --json > "$RUNNER_TEMP/analysis.json" || rc=$?
+          if [ "$rc" -gt 1 ]; then echo "semver-analyze failed (exit $rc)" >&2; exit "$rc"; fi
           impact="$(node -e 'try{process.stdout.write(require(process.argv[1]).commitImpact||"none")}catch{process.stdout.write("none")}' "$RUNNER_TEMP/analysis.json")"
           echo "impact=${impact}" >> "$GITHUB_OUTPUT"
           {
             echo '## Release impact'
             echo '```'
-            node .github/release/semver-analyze.mjs --to "$HEAD_SHA" || true
+            node .github/release/semver-analyze.mjs --to "$HEAD_SHA" || [ $? -eq 1 ]
             echo '```'
             echo 'Commit-derived proposal. Review hints mark diffs (deleted files, runtime requirements, migrations, API contracts) to check against the commit types.'
           } >> "$GITHUB_STEP_SUMMARY"

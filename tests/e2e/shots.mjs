@@ -4,9 +4,11 @@ import { extensionDir, launch, sleep } from './harness.mjs';
 
 const SITES = [
   'https://en.wikipedia.org/wiki/Tab_(interface)',
-  'https://developer.mozilla.org/en-US/',
-  'https://svelte.dev/',
 ];
+// Opened from the Wikipedia tab, so it shows as a child tab.
+const CHILD = 'https://svelte.dev/';
+// Closed after the warm-up, so Recently closed shows a page that is not also open.
+const CLOSED = 'https://developer.mozilla.org/en-US/docs/Web/CSS';
 // Pinned into the Staples grid, and into a "Reading" pinned folder.
 const STAPLES = [
   'https://www.youtube.com/',
@@ -24,8 +26,7 @@ const { ctx, extId, close } = await launch(extensionDir(), {
 try {
   // Background tabs often never store a favicon, so load each site in the foreground first.
   const warm = ctx.pages()[0];
-  // SITES last, so the closed warm-up tab is a real site in Recently closed.
-  for (const url of [...STAPLES, ...FOLDER, ...SITES]) {
+    for (const url of [...STAPLES, ...FOLDER, ...SITES, CHILD, CLOSED]) {
     await warm.goto(url, { waitUntil: 'load', timeout: 20000 }).catch(() => {});
     await sleep(1500);
   }
@@ -44,7 +45,7 @@ try {
   await sleep(5000);
   // Tabs open in windows.create order: the panel, SITES, STAPLES, then FOLDER.
   await page.evaluate(
-    async ([nSites, nStaples]) => {
+    async ([nSites, nStaples, child]) => {
       const win = await chrome.windows.getCurrent();
       const ids = (await chrome.tabs.query({ windowId: win.id })).map((t) => t.id);
       const staples = ids.slice(1 + nSites, 1 + nSites + nStaples);
@@ -72,8 +73,10 @@ try {
       const made = layout.pinned.find((n) => n.kind === 'folder');
       send({ type: 'folderUpdate', folderId: made.id, icon: 'book' });
       await wait(300);
+      await chrome.tabs.create({ url: child, openerTabId: ids[1], active: false });
+      await wait(500);
     },
-    [SITES.length, STAPLES.length],
+    [SITES.length, STAPLES.length, CHILD],
   );
   await page.reload();
   await sleep(2000);

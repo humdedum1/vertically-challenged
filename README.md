@@ -5,33 +5,44 @@
 <h1 align="center">Vertically Challenged</h1>
 
 <p align="center">
-  <strong>Vertical tabs for Chrome and Firefox: every tab in every window, in one searchable, local-first list.</strong>
+  <strong>Vertical tabs for Chrome and Firefox</strong><br>
+  Every tab in every window, in one searchable, local-first list.
 </p>
 
 <p align="center">
-  <a href="https://chromewebstore.google.com/detail/vertically-challenged/bekjjhfjknegeaaaieadcgakkipcgfjm"><img src="https://img.shields.io/badge/Chrome_Web_Store-install-0071e3?logo=googlechrome&logoColor=white&labelColor=1d1d1f" alt="Install from the Chrome Web Store"></a>
-  <a href="https://github.com/humdedum1/vertically-challenged/releases"><img src="https://img.shields.io/badge/Firefox-signed_.xpi-0071e3?logo=firefoxbrowser&logoColor=white&labelColor=1d1d1f" alt="Signed Firefox add-on on GitHub Releases"></a>
+  <a href="https://chromewebstore.google.com/detail/vertically-challenged/bekjjhfjknegeaaaieadcgakkipcgfjm"><img src="https://img.shields.io/badge/Chrome_Web_Store-Install-0071e3?style=for-the-badge&logo=googlechrome&logoColor=white&labelColor=1d1d1f" alt="Install from the Chrome Web Store"></a>
+  <a href="https://github.com/humdedum1/vertically-challenged/releases"><img src="https://img.shields.io/badge/Firefox-Signed_.xpi-0071e3?style=for-the-badge&logo=firefoxbrowser&logoColor=white&labelColor=1d1d1f" alt="Signed Firefox add-on on GitHub Releases"></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/humdedum1/vertically-challenged/releases"><img src="https://img.shields.io/github/v/release/humdedum1/vertically-challenged?label=release&color=0071e3&labelColor=1d1d1f" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-0071e3?labelColor=1d1d1f" alt="License: GPLv3"></a>
+  <img src="https://img.shields.io/badge/telemetry-none-0071e3?labelColor=1d1d1f" alt="Telemetry: none">
+  <img src="https://img.shields.io/badge/backend-none-0071e3?labelColor=1d1d1f" alt="Backend: none">
 </p>
 
 <p align="center">
-  <a href="#install">Install</a> ·
-  <a href="#features">Features</a> ·
-  <a href="#browser-support">Browser support</a> ·
-  <a href="#sync-and-its-limits">Sync</a> ·
-  <a href="#privacy-and-permissions">Privacy</a> ·
-  <a href="#development">Development</a>
+  <a href="#-install"><img src="https://img.shields.io/badge/Install-1d1d1f?style=flat-square" alt="Install"></a>
+  <a href="#-features"><img src="https://img.shields.io/badge/Features-1d1d1f?style=flat-square" alt="Features"></a>
+  <a href="#-browser-support"><img src="https://img.shields.io/badge/Browsers-1d1d1f?style=flat-square" alt="Browsers"></a>
+  <a href="#-keyboard-shortcuts"><img src="https://img.shields.io/badge/Shortcuts-1d1d1f?style=flat-square" alt="Shortcuts"></a>
+  <a href="#-sync-and-its-limits"><img src="https://img.shields.io/badge/Sync-1d1d1f?style=flat-square" alt="Sync"></a>
+  <a href="#-privacy-and-permissions"><img src="https://img.shields.io/badge/Privacy-1d1d1f?style=flat-square" alt="Privacy"></a>
+  <a href="#-development"><img src="https://img.shields.io/badge/Development-1d1d1f?style=flat-square" alt="Development"></a>
 </p>
 
-<p align="center">
-  <img src="docs/store/store-1-tabs.png" alt="The tab list in the Classic, Dense and Glass styles, with search, child tabs and recently closed called out" width="49%">
-  <img src="docs/store/store-2-search.png" alt="Search and the command palette" width="49%">
-</p>
-<p align="center">
-  <img src="docs/store/store-3-history.png" alt="The History panel" width="49%">
-  <img src="docs/store/store-4-settings.png" alt="Settings" width="49%">
-</p>
+<p align="center"><img src="docs/divider.svg" alt="" width="100%"></p>
+
+<table>
+  <tr>
+    <td width="50%" align="center"><strong>🗂️ One list, three styles</strong><br><br><img src="docs/store/store-1-tabs.png" alt="The tab list in the Classic, Dense and Glass styles, with search, child tabs and recently closed called out"></td>
+    <td width="50%" align="center"><strong>🔎 Search everything</strong><br><br><img src="docs/store/store-2-search.png" alt="Search and the command palette"></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><strong>🕘 History by day</strong><br><br><img src="docs/store/store-3-history.png" alt="The History panel"></td>
+    <td width="50%" align="center"><strong>🎛️ Settings for all of it</strong><br><br><img src="docs/store/store-4-settings.png" alt="Settings"></td>
+  </tr>
+</table>
 
 > [!WARNING]
 > **Young, AI-assisted repository.** Mostly written with AI coding tools. Tested on few machines and profiles. Expect rough edges.
@@ -40,18 +51,35 @@
 >
 > **Keep backups** of anything you can't lose. [Report what breaks](https://github.com/humdedum1/vertically-challenged/issues/new/choose).
 
-## Why it exists
+## 💡 Why it exists
 
-I made this because I loved Sidebery and Zen Browser and couldn't get anything like them in Chromium. I kept adding the little things I wanted, and it slowly grew into this. Now there's a Firefox release too.
+> I made this because I loved Sidebery and Zen Browser and couldn't get anything like them in Chromium. I kept adding the little things I wanted, and it slowly grew into this. Now there's a Firefox release too.
 
-## Install
+## 🚀 Install
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### Chrome 116+
 
 - **Chrome Web Store:** [install from the store](https://chromewebstore.google.com/detail/vertically-challenged/bekjjhfjknegeaaaieadcgakkipcgfjm).
-- **addons.mozilla.org:** [listing](https://addons.mozilla.org/firefox/addon/vertically-challenged/) isn't public until Mozilla's review finishes.
-- **Firefox release:** open the signed `.xpi` from [Releases](https://github.com/humdedum1/vertically-challenged/releases).
 - **Chrome release:** extract the signed `.crx` from `vertically-challenged-<version>-crx.zip`. Chrome often blocks it outside the Web Store. Fall back to an unpacked build.
 
-### Build from source
+</td>
+<td width="50%" valign="top">
+
+### Firefox 140+
+
+- **Firefox release:** open the signed `.xpi` from [Releases](https://github.com/humdedum1/vertically-challenged/releases).
+- **addons.mozilla.org:** [listing](https://addons.mozilla.org/firefox/addon/vertically-challenged/) isn't public until Mozilla's review finishes.
+
+</td>
+</tr>
+</table>
+
+<details>
+<summary><strong>Build from source</strong></summary>
 
 Requires Node.js 22+ and npm.
 
@@ -67,53 +95,93 @@ npm run build:firefox    # Firefox: .output/firefox-mv3
 - **Load in Firefox:** `about:debugging` → This Firefox → Load Temporary Add-on → `.output/firefox-mv3/manifest.json`. Removed when Firefox closes.
 - **Open the panel:** toolbar icon or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>.
 
-## Features
+</details>
 
-### Organize
+## ✨ Features
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🗂️ Organize
+
 - **One list** for every window, with window names.
 - **Staples grid** of daily pages with fixed home URLs.
 - **Nested pinned folders** with custom icons, draggable between sections and windows.
 - **Child tabs** nested under their opener.
 - **Native tab groups:** create, rename, recolor, collapse, move.
 
-### Find and select
+</td>
+<td width="50%" valign="top">
+
+### 🔎 Find and select
+
 - **Fuzzy search** over tabs, bookmarks, history, saved sessions and snoozed tabs.
 - **Command palette:** type `>`.
 - **Multi-select** ranges or single tabs for bulk actions.
 - **Dedicated panels** for bookmarks, history and recently closed.
 
-### Declutter
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🧹 Declutter
+
 - **Clear** closes ordinary tabs. Keeps Staples and pins.
 - **Suspend tabs** by hand or after inactivity, with exclusions.
 - **Snooze and park** tabs. Snoozed tabs return on time, even after a restart.
 - **Tidy up** tabs untouched for 7, 30 or 90 days, grouped by site.
 
-### Customize
+</td>
+<td width="50%" valign="top">
+
+### 🎨 Customize
+
 - **Three styles:** Classic, Dense and Glass.
 - **Themes and CSS:** built-in or custom themes, accent colors, custom CSS, import and export.
 - **Layout controls:** density, fonts, row layout, panel order, visible sections, tab actions.
 - **Rebindable input:** in-panel shortcuts, browser commands, context-menu actions.
 
-### Save and restore
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 💾 Save and restore
+
 - **Window setups** store names, Staples, pins and folders.
 - **Saved sessions** restore tabs, groups and pinned layout. Export as Markdown or bookmarks.
 - **Other devices:** browse, open or keep workspaces from your other computers.
 - **Full backups:** scheduled, optionally encrypted, to Downloads, WebDAV, S3-compatible storage or Dropbox.
 - **Restore safety:** restore from the server, undo a restore, get a toolbar warning if backups stop.
 
-## Browser support
+</td>
+<td width="50%" valign="top">
+
+### 🔒 Private by default
+
+- **No analytics** and no project server.
+- **No host permissions** requested at install.
+- **Incognito stays separate** from normal windows and sync.
+
+</td>
+</tr>
+</table>
+
+## 🌐 Browser support
 
 | | Chrome 116+ | Firefox 140+ |
 | --- | --- | --- |
 | Surface | Side panel, in-page popup, window | Sidebar, window |
-| Browser's synced tabs from other devices | Yes | No API. Extension workspaces and sessions still sync. |
+| Browser's synced tabs from other devices | ✅ | ❌ No API. Extension workspaces and sessions still sync. |
 | Favicons | Browser cache | Each site's own server |
 | Remote images in custom CSS | Blocked | Blocked, stylesheet left unapplied |
 
 - **Closing by shortcut:** closing the Chrome side panel with the shortcut needs Chrome 141+.
 - **Popup setting on Firefox:** arriving through a backup, it opens the window instead.
 
-## Keyboard shortcuts
+## ⌨️ Keyboard shortcuts
 
 | Command | Default |
 | --- | --- |
@@ -127,7 +195,7 @@ npm run build:firefox    # Firefox: .output/firefox-mv3
 - **In-panel shortcuts:** rebind in Settings.
 - **Browser commands:** `chrome://extensions/shortcuts` in Chrome, Settings → Shortcuts in Firefox.
 
-## Sync and its limits
+## 🔄 Sync and its limits
 
 - **Transport:** Chrome Sync or Firefox Sync. The two browsers share nothing.
 - **Setup:** same account, extension sync on, extension installed on each computer.
@@ -148,7 +216,7 @@ npm run build:firefox    # Firefox: .output/firefox-mv3
 
 </details>
 
-## Privacy and permissions
+## 🔒 Privacy and permissions
 
 - **No analytics.** No server run by the project.
 - **Sync caveat:** shared tab URLs, titles, workspaces and settings travel through Chrome Sync or Firefox Sync.
@@ -180,7 +248,10 @@ npm run build:firefox    # Firefox: .output/firefox-mv3
 
 </details>
 
-## Development
+## 🛠️ Development
+
+<details>
+<summary><strong>Commands, tests and tooling</strong></summary>
 
 Stack: TypeScript, Svelte 5, WXT, Vitest, Playwright, Selenium, Biome.
 
@@ -210,7 +281,9 @@ npm run test:e2e
 - **Screenshots:** `node tests/e2e/shots.mjs`, then `node scripts/store-assets.mjs` for the store images.
 - **Profiling:** [bench/README.md](bench/README.md).
 
-## Contributing and security
+</details>
+
+## 🤝 Contributing and security
 
 - **Pull requests:** feature branch, focused change, checks listed. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - **AI-assisted PRs** are welcome once reviewed and tested by you.
@@ -218,10 +291,12 @@ npm run test:e2e
 - **Versions:** SemVer, Conventional Commits, automatic releases from `main`.
 - **Vulnerabilities:** follow [SECURITY.md](SECURITY.md).
 
-## Support
+<p align="center"><img src="docs/divider.svg" alt="" width="100%"></p>
 
-Optional. Unlocks nothing. [Ko-fi](https://ko-fi.com/humdedum1) · [PayPal](https://paypal.me/oddboxx)
+<p align="center">
+  <a href="https://ko-fi.com/humdedum1"><img src="https://img.shields.io/badge/Ko--fi-support-0071e3?style=flat-square&logo=kofi&logoColor=white&labelColor=1d1d1f" alt="Support on Ko-fi"></a>
+  <a href="https://paypal.me/oddboxx"><img src="https://img.shields.io/badge/PayPal-support-0071e3?style=flat-square&logo=paypal&logoColor=white&labelColor=1d1d1f" alt="Support on PayPal"></a>
+  <br><sub>Optional. Unlocks nothing.</sub>
+</p>
 
-## License
-
-[GPL-3.0-or-later](LICENSE). Third-party palettes: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+<p align="center"><sub><a href="LICENSE">GPL-3.0-or-later</a> · Third-party palettes: <a href="THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a></sub></p>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDisplay, type DisplayApi } from '../src/background/display';
-import { parseSurface } from '../src/shared/surface';
+import { parseSurface, popupQuery, popupTokenOk } from '../src/shared/surface';
 
 function fakeApi(opts: { injectFails?: boolean; noClose?: boolean; noOverlay?: boolean } = {}) {
   const calls: string[] = [];
@@ -167,5 +167,15 @@ describe('parseSurface', () => {
       windowId: null,
     });
     expect(parseSurface('?surface=frame')).toEqual({ surface: 'sidebar', windowId: null });
+  });
+});
+
+describe('popupTokenOk', () => {
+  it('accepts only the stored token', () => {
+    expect(popupTokenOk(popupQuery('abc'), 'abc')).toBe(true);
+    expect(popupTokenOk(popupQuery('abc'), 'xyz')).toBe(false);
+    expect(popupTokenOk('?surface=popup', 'abc')).toBe(false);
+    expect(popupTokenOk('?surface=popup&t=', '')).toBe(false);
+    expect(popupTokenOk(popupQuery('abc'), undefined)).toBe(false);
   });
 });

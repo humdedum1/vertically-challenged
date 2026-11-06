@@ -22,6 +22,7 @@ import {
   type SessionSettings,
   type Settings,
   SHORTCUT_ACTIONS,
+  SKINS,
   type SuspendSettings,
   SYNC_INTERVALS,
   type SyncSettings,
@@ -60,6 +61,8 @@ const MIGRATIONS: readonly ((s: Raw) => Raw)[] = [
   // v8 → v9: optional new-tab URL; empty preserves the browser default.
   (s) => s,
   // v9 → v10: `suspend.archiveDays` (off) and the commandPalette shortcut; default-filled.
+  (s) => s,
+  // v10 → v11: `appearance.skin` (classic); default-filled.
   (s) => s,
 ];
 
@@ -176,6 +179,7 @@ function sanitize(raw: Raw): Settings {
         : d.appearance.themeId,
     mode: oneOf(a.mode, ['system', 'light', 'dark'] as const, d.appearance.mode),
     density: oneOf(a.density, ['compact', 'comfortable'] as const, d.appearance.density),
+    skin: oneOf(a.skin, SKINS, d.appearance.skin),
     radius: clampInt(a.radius, LIMITS.radius, d.appearance.radius),
     fontFamily:
       typeof a.fontFamily === 'string' && SAFE_FONT.test(a.fontFamily)

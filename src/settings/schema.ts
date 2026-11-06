@@ -1,10 +1,13 @@
 import { DEFAULT_THEME_ID } from '../themes/builtin';
 
 /** Bump when the stored shape changes, and add a step to MIGRATIONS in migrate.ts. */
-export const SETTINGS_VERSION = 10;
+export const SETTINGS_VERSION = 11;
 
 export type ColorMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'comfortable';
+/** classic is the original look; the others are CSS skins (sidepanel/styles/skin-*.css). */
+export const SKINS = ['classic', 'dense', 'glass'] as const;
+export type SkinName = (typeof SKINS)[number];
 export type RowLayout = 'single' | 'double';
 export type ActionVisibility = 'hover' | 'always';
 /** system follows the OS "reduce motion" preference. */
@@ -42,6 +45,7 @@ export interface Appearance {
   themeId: string;
   mode: ColorMode;
   density: Density;
+  skin: SkinName;
   /** Card corner radius in px; rows and controls derive theirs from it. */
   radius: number;
   fontFamily: string;
@@ -203,7 +207,8 @@ export const DEFAULT_SETTINGS: Settings = {
   appearance: {
     themeId: DEFAULT_THEME_ID,
     mode: 'system',
-    density: 'compact',
+    density: 'comfortable',
+    skin: 'classic',
     radius: 14,
     fontFamily: DEFAULT_FONT,
     fontSize: 13,

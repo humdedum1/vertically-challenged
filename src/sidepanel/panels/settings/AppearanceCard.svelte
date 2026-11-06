@@ -7,6 +7,8 @@ import {
   FONT_PRESETS,
   LIMITS,
   type RowLayout,
+  SKINS,
+  type SkinName,
 } from '../../../settings/schema';
 import { BUILTIN_THEMES } from '../../../themes/builtin';
 import { contrastRatio } from '../../../themes/contrast';
@@ -35,6 +37,10 @@ const DENSITIES: { value: Density; label: string }[] = [
   { value: 'compact', label: 'Compact' },
   { value: 'comfortable', label: 'Comfortable' },
 ];
+const STYLES: { value: SkinName; label: string }[] = SKINS.map((value) => ({
+  value,
+  label: value.charAt(0).toUpperCase() + value.slice(1),
+}));
 const LAYOUTS: { value: RowLayout; label: string }[] = [
   { value: 'single', label: 'Single line' },
   { value: 'double', label: 'Title + URL' },
@@ -135,6 +141,11 @@ const accentRatio = $derived(a.accent ? contrastRatio(a.accent, palette.mSurface
 
     <Field label="Density">
       <SegmentedControl label="Density" options={DENSITIES} value={a.density} onchange={(density) => patch({ density })} />
+    </Field>
+
+    <Field label="Style">
+      <SegmentedControl label="Style" options={STYLES} value={a.skin} onchange={(skin) => patch({ skin })} />
+      <p class="hint">Classic is the original look; Dense and Glass restyle rows and cards.</p>
     </Field>
 
     <Field label="Row layout">

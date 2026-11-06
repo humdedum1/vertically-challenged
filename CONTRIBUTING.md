@@ -32,16 +32,15 @@ Report the extension version, browser/OS, installation method, reproduction step
 
 <!-- coderabbit-ai-generated-section:v1:81f6dabed85ded4978a254eadabf3a67d31df70507a2d0ccfd6d69b660d57bdf -->
 
-Install Chromium before running the local CI gate. The gate runs the validation script, the Chromium end-to-end tests, and the Firefox 140 smoke test:
+There is no hosted CI for pull requests: checks run locally through [`just`](https://github.com/casey/just). Install Chromium, then run both gates. `just ci` runs the validation script; `just qa` runs the Chromium end-to-end tests and the Firefox 140 smoke test:
 
 ```sh
 npx playwright-core install chromium
-FIREFOX_BIN=/path/to/firefox npm run ci
+just ci
+just qa
 ```
 
-<!-- /coderabbit-ai-generated:v1 -->
-
-`FIREFOX_BIN` must point to Firefox 140 or newer. To run the steps one at a time:
+`just qa` downloads Firefox 140 unless `FIREFOX_BIN` points to Firefox 140 or newer. To run the steps one at a time:
 
 ```sh
 npm run lint
@@ -54,7 +53,7 @@ npm run test:e2e
 FIREFOX_BIN=/path/to/firefox npm run test:e2e:firefox
 ```
 
-Use `npx playwright-core install --with-deps chromium` when the operating system needs browser libraries. To run the pull-request workflow locally, you can use [`act`](https://github.com/nektos/act) (it needs Docker): `act pull_request -W .github/workflows/checks.yml`. This is optional; GitHub Actions remains the reference.
+Use `npx playwright-core install --with-deps chromium` when the operating system needs browser libraries.
 
 Test UI changes in the real panel and popup at narrow widths, with keyboard navigation and accessible labels. For performance changes, profile first and include before/after measurements; see [bench/README.md](bench/README.md).
 
@@ -71,7 +70,7 @@ Report exactly which checks you ran and their results. If a check could not run,
 - State release impact: NONE for internal/docs-only work, PATCH for compatible fixes, MINOR for compatible features, MAJOR for breaking changes. Judge the actual behavior, not just the prefix.
 - Do not manually bump package versions, create tags, publish releases, change repository settings, or include private signing keys in an ordinary PR.
 
-GitHub Actions checks PRs with lint, type checking, tests, builds, and real-browser flows. Maintainers may ask for smaller changes or additional evidence. Dependency updates require review and are not automatically merged.
+Maintainers may ask for smaller changes or additional evidence. Dependency updates require review and are not automatically merged.
 
 ## Releases
 

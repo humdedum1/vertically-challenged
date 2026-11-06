@@ -19,7 +19,21 @@ export const POPUP_CLOSE = 'vc-popup-close';
 
 export const PANEL_PAGE = '/sidepanel.html';
 
-export const popupQuery = (): string => '?surface=popup';
+/** storage.local key holding the token of the latest in-page popup; pages can't read storage. */
+export const POPUP_TOKEN_KEY = 'popupToken';
+
+export const popupQuery = (token: string): string =>
+  `?surface=popup&t=${encodeURIComponent(token)}`;
+
+/**
+ * Whether a popup page was opened by our overlay script: its URL carries the token the script
+ * stored. A site that frames sidepanel.html itself (to trick clicks) can't know the token.
+ */
+export function popupTokenOk(search: string, stored: unknown): boolean {
+  return (
+    typeof stored === 'string' && stored !== '' && new URLSearchParams(search).get('t') === stored
+  );
+}
 export const windowQuery = (windowId: number): string => `?surface=window&windowId=${windowId}`;
 
 export function parseSurface(search: string): SurfaceInfo {

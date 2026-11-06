@@ -1,103 +1,131 @@
-// Builds the Chrome Web Store images from the README screenshots (docs/store/readme-*.png):
-// 1280x800 screenshots with a caption beside the panel, and the 440x280 small promo tile.
+// Builds the Chrome Web Store images from the style screenshots (docs/store/style-*.png):
+// 1280x800 images showing each view in all three styles, and the 440x280 small promo tile.
 //   node scripts/store-assets.mjs        (needs ImageMagick 7 as `magick`)
 import { execFileSync } from 'node:child_process';
 
 const OUT = 'docs/store';
+const SKINS = ['Classic', 'Dense', 'Glass'];
 const SHOTS = [
   {
     file: 'store-1-tabs',
-    src: 'readme-tabs-light',
+    view: 'tabs',
     light: true,
-    title: 'Every tab,\none fast list',
-    sub: 'All windows in a vertical list, with child tabs, groups and search.',
+    title: 'Every tab, one fast list',
+    sub: 'All windows in a vertical list, with child tabs, groups and search. In three styles.',
   },
   {
     file: 'store-2-search',
-    src: 'readme-search-dark',
+    view: 'search',
     light: false,
-    title: 'Find it before\nyou finish typing',
+    title: 'Find it before you finish typing',
     sub: 'Fuzzy search over tabs, bookmarks, history and sessions. Type > for commands.',
   },
   {
-    file: 'store-3-commands',
-    src: 'readme-commands-light',
+    file: 'store-3-history',
+    view: 'history',
     light: true,
-    title: 'Keep your hands\non the keyboard',
-    sub: 'Type > to reload, pin, group or snooze without touching the mouse.',
-  },
-  {
-    file: 'store-4-history',
-    src: 'readme-history-dark',
-    light: false,
-    title: 'Your history,\nby day',
+    title: 'Your history, by day',
     sub: 'Search and reopen anything you visited, without leaving the panel.',
   },
   {
-    file: 'store-5-settings',
-    src: 'readme-settings-light',
-    light: true,
-    title: 'Make it\nyour own',
-    sub: 'Themes, layout, shortcuts, sync and encrypted backups.',
+    file: 'store-4-settings',
+    view: 'settings',
+    light: false,
+    title: 'Make it your own',
+    sub: 'Pick a style, then tune themes, layout, shortcuts, sync and encrypted backups.',
   },
 ];
 const run = (args) => execFileSync('magick', args, { stdio: 'inherit' });
 
+const PANEL_W = 320;
+const PANEL_H = Math.round((PANEL_W * 640) / 360);
+const GAP = 40;
+const PANEL_Y = 192;
+const LEFT = (1280 - 3 * PANEL_W - 2 * GAP) / 2;
+
 for (const s of SHOTS) {
-  const [bg1, bg2, ink, soft] = s.light
-    ? ['#f4f6fb', '#dde4f0', '#15171c', '#4a5160']
-    : ['#1a1d24', '#0d0e12', '#f3f5f9', '#a9b0bf'];
+  const [bg1, bg2, ink, soft, accent] = s.light
+    ? ['#f4f6fb', '#dde4f0', '#15171c', '#4a5160', '#0071e3']
+    : ['#1a1d24', '#0d0e12', '#f3f5f9', '#a9b0bf', '#7cb7ff'];
+  const panels = SKINS.flatMap((skin, i) => {
+    const x = LEFT + i * (PANEL_W + GAP);
+    return [
+      // A rounded panel with a soft shadow.
+      '(',
+      `${OUT}/style-${s.view}-${skin.toLowerCase()}.png`,
+      '-resize',
+      `${PANEL_W}x${PANEL_H}!`,
+      '-alpha',
+      'set',
+      '(',
+      '-size',
+      `${PANEL_W}x${PANEL_H}`,
+      'xc:none',
+      '-fill',
+      'white',
+      '-draw',
+      `roundrectangle 0,0 ${PANEL_W - 1},${PANEL_H - 1} 14,14`,
+      ')',
+      '-compose',
+      'DstIn',
+      '-composite',
+      '-compose',
+      'Over',
+      '(',
+      '+clone',
+      '-background',
+      'black',
+      '-shadow',
+      '40x14+0+8',
+      ')',
+      '+swap',
+      '-background',
+      'none',
+      '-layers',
+      'merge',
+      '+repage',
+      ')',
+      '-gravity',
+      'northwest',
+      '-geometry',
+      `+${x - 28}+${PANEL_Y - 28}`,
+      '-composite',
+      '-font',
+      'Noto-Sans-Bold',
+      '-pointsize',
+      '20',
+      '-fill',
+      accent,
+      '-annotate',
+      `+${x + 2}+${PANEL_Y - 38}`,
+      skin,
+    ];
+  });
   run([
     '-size',
     '1280x800',
     `gradient:${bg1}-${bg2}`,
-    '(',
-    `${OUT}/${s.src}.png`,
-    '-resize',
-    'x720',
-    '-bordercolor',
-    'none',
-    '-border',
-    '0',
-    '(',
-    '+clone',
-    '-background',
-    'black',
-    '-shadow',
-    '45x18+0+10',
-    ')',
-    '+swap',
-    '-background',
-    'none',
-    '-layers',
-    'merge',
-    '+repage',
-    ')',
-    '-gravity',
-    'east',
-    '-geometry',
-    '+120+0',
-    '-composite',
     '-gravity',
     'northwest',
     '-font',
     'Noto-Sans-Bold',
     '-pointsize',
-    '58',
+    '46',
     '-fill',
     ink,
     '-annotate',
-    '+110+230',
+    `+${LEFT}+30`,
     s.title,
     '-font',
     'Noto-Sans-Regular',
     '-pointsize',
-    '28',
+    '22',
     '-fill',
     soft,
     '-annotate',
-    '+110+440',
-    s.sub.replace(/(.{34,}?) /g, '$1\n'),
+    `+${LEFT}+98`,
+    s.sub,
+    ...panels,
     `${OUT}/${s.file}.png`,
   ]);
 }

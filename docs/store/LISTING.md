@@ -6,7 +6,7 @@
 
 **Everything the store form asks for, and the steps to a published listing.**
 
-The images in this folder are built by `node scripts/store-assets.mjs` from the README screenshots.
+The images in this folder are built by `node scripts/store-assets.mjs` from the screenshots `tests/e2e/shots.mjs` takes.
 
 [![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-submit-0071e3?logo=googlechrome&logoColor=white&labelColor=1d1d1f)](https://chrome.google.com/webstore/devconsole)
 [![Firefox](https://img.shields.io/badge/Firefox-AMO.md-0071e3?logo=firefoxbrowser&logoColor=white&labelColor=1d1d1f)](AMO.md)
@@ -46,7 +46,7 @@ After approval, copy the extension ID and set up [automatic uploads](#automatic-
 
 | Use | File | Size |
 | --- | --- | --- |
-| Screenshots | `store-1-tabs.png`, `store-2-search.png`, `store-3-commands.png`, `store-4-history.png`, `store-5-settings.png` | 1280x800 |
+| Screenshots | `store-1-tabs.png`, `store-2-search.png`, `store-3-history.png`, `store-4-settings.png` | 1280x800 |
 | Small promo tile | `store-promo-small.png` | 440x280 |
 | Icon | `public/icon/128.png` | 128x128 |
 

@@ -102,4 +102,4 @@ Data loss is the worst failure. Any change to stored or synced data shape:
 
 ## Issues and labels
 
-Issues live in GitHub Issues on humdedum1/vertically-challenged (via `gh`). Label vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. File issues only into this repo, never into an upstream.
+Issues live in GitHub Issues on humdedum1/vertically-challenged (via `gh`). Label vocabulary: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. Issue templates and release notes (`.github/release.yml`) also use the type labels bug, enhancement, documentation, dependencies and skip-changelog. File issues only into this repo, never into an upstream.

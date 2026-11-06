@@ -120,6 +120,8 @@ const errors = $derived(toasts.filter((t) => t.level === 'error'));
 
   .act {
     flex: none;
+    width: auto;
+    height: auto;
     padding: 4px 10px;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-control);

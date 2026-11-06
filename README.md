@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/store/store-promo-small.png" alt="Vertically Challenged: vertical tabs in three styles" width="440">
+  <img src="docs/store/readme-promo.png" alt="Vertically Challenged: vertical tabs in three styles" width="660">
 </p>
 
 <h1 align="center">Vertically Challenged</h1>

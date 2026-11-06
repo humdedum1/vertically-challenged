@@ -20,35 +20,38 @@ const SHOTS = [
     title: 'Every tab, one fast list',
     sub: 'All your windows in one vertical list, in the style you like.',
     callouts: [
-      { at: 0.25, head: 'Search or command', text: 'Type to filter, or > for commands' },
-      { at: 0.32, head: 'Active tab', text: 'Always easy to spot' },
-      { at: 0.638, head: 'Child tabs', text: 'Nest related pages and fold them away' },
+      { at: 0.252, head: 'Search or command', text: 'Type to filter, or > for commands' },
+      { at: 0.329, head: 'Staples', text: 'Your everyday sites, one click away' },
+      { at: 0.413, head: 'Pinned folders', text: 'Keep pinned tabs sorted and tidy' },
+      { at: 0.625, head: 'Active tab', text: 'Always easy to spot' },
       { at: 0.9, head: 'Recently closed', text: 'Bring back a tab in one click' },
     ],
-    facts: ['Every window', 'Tab groups', 'Pinned folders', 'Staples', 'Snooze', 'Suspend'],
+    facts: ['Every window', 'Tab groups', 'Snooze', 'Suspend', 'Sync'],
   },
   {
     file: 'store-2-search',
     view: 'search',
+    zoom: 'Classic',
     light: false,
     title: 'Find it before you finish typing',
     sub: 'One box for everything you have open, saved or visited.',
     callouts: [
       { at: 0.25, head: 'One search box', text: 'Type > to run commands instead' },
       { at: 0.31, head: 'Instant matches', text: 'Hits are highlighted as you type' },
-      { at: 0.417, head: 'Fuzzy matching', text: 'Partial words still match' },
+      { at: 0.476, head: 'Fuzzy matching', text: 'Partial words still match' },
     ],
     facts: ['Tabs', 'Bookmarks', 'History', 'Saved sessions', '> Commands'],
   },
   {
     file: 'store-3-history',
     view: 'history',
+    zoom: 'Classic',
     light: true,
     title: 'Your history, by day',
     sub: 'Search and reopen anything you visited, without leaving the panel.',
     callouts: [
       { at: 0.24, head: 'Search history', text: 'Find a page by title or address' },
-      { at: 0.306, head: 'Grouped by day', text: 'Scan back through your week' },
+      { at: 0.306, head: 'Grouped by day', text: 'Newest first, with the time of each visit' },
       { at: 0.41, head: 'Reopen in a click', text: 'Every entry is one click away' },
     ],
     facts: ['No new tab needed', 'Delete entries you choose', 'Nothing is copied or uploaded'],
@@ -78,6 +81,10 @@ const PANEL_Y = 172;
 const GAP = 20;
 const LEGEND_R = 296;
 const LEGEND_GAP = 76;
+// `zoom` slides show one style, larger and cropped to the top of the panel.
+const ZOOM_W = 520;
+const ZOOM_H = 528;
+const ZOOM_X = 420;
 
 function slide(s) {
   const c = s.light
@@ -96,9 +103,11 @@ function slide(s) {
         chip: '#ffffff14',
       };
   // Sit each label level with its target, pushed down just enough not to overlap the last one.
+  const panelH = s.zoom ? (ZOOM_W * 1280) / 720 : PANEL_H;
+  const panelX = s.zoom ? ZOOM_X : PANEL_X;
   const ys = [];
   for (const k of s.callouts) {
-    const y = PANEL_Y + k.at * PANEL_H;
+    const y = PANEL_Y + k.at * panelH;
     ys.push(ys.length ? Math.max(y, ys[ys.length - 1] + LEGEND_GAP) : y);
   }
   const legendY = (i) => ys[i];
@@ -110,14 +119,16 @@ function slide(s) {
     .join('');
   const lines = s.callouts
     .map((k, i) => {
-      const y = PANEL_Y + k.at * PANEL_H;
-      return `<path d="M${LEGEND_R} ${legendY(i)}H${LEGEND_R + 8}L${PANEL_X - 8} ${y}H${PANEL_X + 4}"/><circle cx="${PANEL_X + 4}" cy="${y}" r="5"/>`;
+      const y = PANEL_Y + k.at * panelH;
+      return `<path d="M${LEGEND_R} ${legendY(i)}H${LEGEND_R + 8}L${panelX - 8} ${y}H${panelX + 4}"/><circle cx="${panelX + 4}" cy="${y}" r="5"/>`;
     })
     .join('');
-  const panels = SKINS.map(
-    (skin, i) =>
-      `<figure style="left:${PANEL_X + i * (PANEL_W + GAP)}px"><figcaption>${skin}</figcaption><img src="${shot(s.view, skin)}"></figure>`,
-  ).join('');
+  const panels = s.zoom
+    ? `<figure class="zoom" style="left:${ZOOM_X}px"><figcaption>${s.zoom}</figcaption><img src="${shot(s.view, s.zoom)}"></figure>`
+    : SKINS.map(
+        (skin, i) =>
+          `<figure style="left:${PANEL_X + i * (PANEL_W + GAP)}px"><figcaption>${skin}</figcaption><img src="${shot(s.view, skin)}"></figure>`,
+      ).join('');
   return `<style>${BASE}
   body{width:1280px;height:800px;position:relative;background:linear-gradient(${c.bg});color:${c.ink}}
   h1{position:absolute;left:56px;top:22px;font-size:46px;font-weight:800;letter-spacing:-.5px}
@@ -125,6 +136,9 @@ function slide(s) {
   figure{position:absolute;top:${PANEL_Y}px;width:${PANEL_W}px}
   figcaption{position:absolute;top:-30px;left:2px;font-size:17px;font-weight:700;color:${c.accent}}
   img{display:block;width:${PANEL_W}px;height:${PANEL_H}px;border-radius:14px;box-shadow:0 10px 28px #0006}
+  .zoom{width:${ZOOM_W}px;height:${ZOOM_H}px;overflow:hidden;border-radius:14px 14px 0 0;box-shadow:0 10px 28px #0006;-webkit-mask:linear-gradient(#000 85%,#0000)}
+  .zoom figcaption{display:none}
+  .zoom img{width:${ZOOM_W}px;height:auto;border-radius:0;box-shadow:none}
   .k{position:absolute;left:56px;width:${LEGEND_R - 64}px;transform:translateY(-50%)}
   .k b{display:flex;align-items:center;gap:8px;font-size:16px}
   .k i{flex:none;width:22px;height:22px;border-radius:50%;background:${c.accent};color:${s.light ? '#fff' : '#0d0e12'};font:700 13px/22px 'Noto Sans';text-align:center}
@@ -138,25 +152,27 @@ function slide(s) {
   <ul>${s.facts.map((f) => `<li>${f}</li>`).join('')}</ul>`;
 }
 
+// One large crop of the Staples and pinned folder: Chrome's guidance is to avoid small text here.
 const promo = () => `<style>${BASE}
   body{width:440px;height:280px;position:relative;background:linear-gradient(#1a1d24,#0d0e12);color:#f3f5f9}
-  .logo{position:absolute;left:24px;top:32px;width:60px;height:60px}
-  h1{position:absolute;left:24px;top:102px;font-size:27px;line-height:1.15;font-weight:800}
-  p{position:absolute;left:24px;top:174px;width:150px;font-size:15px;line-height:1.3;color:#a9b0bf}
-  img.s{position:absolute;width:104px;height:185px;border-radius:8px;box-shadow:0 6px 18px #000a}
+  .logo{position:absolute;left:24px;top:36px;width:56px;height:56px}
+  h1{position:absolute;left:24px;top:104px;font-size:27px;line-height:1.15;font-weight:800}
+  p{position:absolute;left:24px;top:178px;width:170px;font-size:16px;line-height:1.3;color:#a9b0bf}
+  .crop{position:absolute;left:196px;top:24px;width:226px;height:256px;overflow:hidden;border-radius:12px 12px 0 0;box-shadow:0 6px 18px #000a}
+  .crop img{display:block;width:250px;margin:-108px 0 0 -12px}
   </style><img class="logo" src="${png('public/icon/128.png')}"><h1>Vertically<br>Challenged</h1>
-  <p>Vertical tabs<br>in three styles</p>
-  <img class="s" src="${shot('tabs', 'Classic')}" style="left:214px;top:30px">
-  <img class="s" src="${shot('tabs', 'Dense')}" style="left:268px;top:48px">
-  <img class="s" src="${shot('tabs', 'Glass')}" style="left:322px;top:66px">`;
+  <p>Vertical tabs, Staples and pinned folders</p>
+  <div class="crop"><img src="${shot('tabs', 'Glass')}"></div>`;
 
 const browser = await chromium.launch();
-const render = async (html, width, height, file) => {
-  const page = await browser.newPage({ viewport: { width, height } });
+const render = async (html, width, height, file, deviceScaleFactor = 1) => {
+  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor });
   await page.setContent(`<!doctype html><meta charset="utf-8">${html}`, { waitUntil: 'load' });
   await page.screenshot({ path: `${OUT}/${file}.png` });
   await page.close();
 };
 for (const s of SHOTS) await render(slide(s), 1280, 800, s.file);
 await render(promo(), 440, 280, 'store-promo-small');
+// The README shows the tile larger; 2x keeps it sharp there.
+await render(promo(), 440, 280, 'readme-promo', 2);
 await browser.close();

@@ -62,15 +62,19 @@ $effect(() => {
     if (el && !el.contains(e.target as Node)) onclose();
   };
   const close = () => onclose();
+  // Wheel inside the menu scrolls a long menu; only wheel outside closes it.
+  const wheel = (e: WheelEvent) => {
+    if (el && !el.contains(e.target as Node)) onclose();
+  };
   window.addEventListener('pointerdown', down, true);
   window.addEventListener('blur', close);
   window.addEventListener('resize', close);
-  window.addEventListener('wheel', close, { passive: true });
+  window.addEventListener('wheel', wheel, { passive: true });
   return () => {
     window.removeEventListener('pointerdown', down, true);
     window.removeEventListener('blur', close);
     window.removeEventListener('resize', close);
-    window.removeEventListener('wheel', close);
+    window.removeEventListener('wheel', wheel);
   };
 });
 

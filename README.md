@@ -181,7 +181,7 @@ npm run build:firefox    # Firefox: .output/firefox-mv3
 - **Closing by shortcut:** closing the Chrome side panel with the shortcut needs Chrome 141+.
 - **Popup setting on Firefox:** arriving through a backup, it opens the window instead.
 
-## ⌨️ Keyboard shortcuts
+## ⌨ Keyboard shortcuts
 
 | Command | Default |
 | --- | --- |
@@ -248,7 +248,7 @@ npm run build:firefox    # Firefox: .output/firefox-mv3
 
 </details>
 
-## 🛠️ Development
+## 🧰 Development
 
 <details>
 <summary><strong>Commands, tests and tooling</strong></summary>

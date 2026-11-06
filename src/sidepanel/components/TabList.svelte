@@ -36,6 +36,7 @@ import {
 import { flattenItems, type PinItem, type PinNode, type WindowLayout } from '../../shared/layout';
 import type { PanelMessage } from '../../shared/protocol';
 import type { GroupInfo, TabInfo } from '../../shared/types';
+import { activePathDepths } from '../model/active-path';
 import { buildChildRows } from '../model/child-tabs';
 import { type Command, matchCommands, menuCommands } from '../model/commands';
 import { canBeEssential, type DragContext, dragName, dragOf } from '../model/drag-source';
@@ -285,6 +286,33 @@ const focusedIndex = $derived.by(() => {
   return i ?? Math.max(0, Math.min(lastIndex, view.length - 1));
 });
 const focusedRow = $derived(view[focusedIndex]);
+// Indent guides on the active tab's ancestor path (the focused row when no tab is active).
+const activeIndex = $derived(view.findIndex((r) => r.kind === 'tab' && r.tab.active));
+const guidePaths = $derived(activePathDepths(view, activeIndex >= 0 ? activeIndex : focusedIndex));
+
+// Tabs that appeared after the first load, for a short entry animation. Recycled rows
+// remount on scroll, so the animation keys off this set rather than the mount itself.
+let knownTabIds = new Set<number>();
+let primed = false;
+let freshTabIds = $state.raw<ReadonlySet<number>>(new Set());
+$effect(() => {
+  const ids = tabState.tabs.map((t) => t.id);
+  if (!primed) {
+    if (ids.length === 0) return;
+    primed = true;
+    knownTabIds = new Set(ids);
+    return;
+  }
+  const added = ids.filter((id) => !knownTabIds.has(id));
+  knownTabIds = new Set(ids);
+  if (added.length === 0) return;
+  freshTabIds = new Set([...untrack(() => freshTabIds), ...added]);
+  setTimeout(() => {
+    const next = new Set(untrack(() => freshTabIds));
+    for (const id of added) next.delete(id);
+    freshTabIds = next;
+  }, 150);
+});
 
 const tree = (): HTMLElement | undefined => list?.scroller();
 
@@ -1629,6 +1657,8 @@ $effect(() => {
                 level={r.level}
                 {grouped}
                 childDepth={r.childDepth}
+                guideDepths={guidePaths[i]}
+                fresh={freshTabIds.has(r.tab.id)}
                 hasChildren={r.hasChildren}
                 collapsed={r.collapsed}
                 ontoggle={() => {

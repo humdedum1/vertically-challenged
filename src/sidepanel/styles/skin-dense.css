@@ -1,0 +1,263 @@
+/* Dense, utilitarian skin (Sidebery / terminal feel). CSS only: every rule is scoped under
+   html[data-skin="dense"], so removing the attribute in appearance.ts turns the skin off.
+   Radius tokens are set inline by applyAppearance, so the skin leaves them alone and the
+   user's corner-radius setting still applies to rows. Row rules sit under #app so they
+   outrank the hashed scoped styles in TabRow.svelte. */
+
+html[data-skin="dense"] {
+  --dur: 90ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Spacing follows the density setting, tightened. */
+html[data-skin="dense"][data-density="compact"] {
+  --gap: 4px;
+  --pad-card: 6px;
+  --pad-panel: 6px;
+}
+
+html[data-skin="dense"][data-density="comfortable"] {
+  --gap: 6px;
+  --pad-card: 8px;
+  --pad-panel: 8px;
+}
+
+/* Settings panel: flat cards, hairline separators, shorter controls. */
+html[data-skin="dense"] .cards .card,
+html[data-skin="dense"] .sticky > .card {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-skin="dense"] .cards .category-content > .card + .card {
+  border-top: 1px solid var(--border);
+  padding-top: var(--gap);
+}
+
+html[data-skin="dense"] .cards summary {
+  padding: 6px var(--pad-card);
+  border-radius: 0;
+}
+
+html[data-skin="dense"] .settings .field {
+  gap: 2px;
+}
+
+html[data-skin="dense"] .settings .group {
+  padding: 1px;
+  border-radius: 4px;
+}
+
+html[data-skin="dense"] .settings .group button {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 3px;
+}
+
+html[data-skin="dense"] .settings select {
+  height: 24px;
+  border-radius: 4px;
+}
+
+html[data-skin="dense"] .settings input[type="range"] {
+  height: 18px;
+}
+
+html[data-skin="dense"] .settings input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+}
+
+html[data-skin="dense"] .settings input[type="range"]::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+}
+
+html[data-skin="dense"] .sticky .mock {
+  padding: 0 2px 2px;
+}
+
+/* Panel chrome: the Tabs panel is one flat surface; sections are divided by hairlines. */
+/* biome-ignore lint/style/noDescendingSpecificity: the rule order follows the panels, not specificity */
+html[data-skin="dense"] .sections > .card {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* biome-ignore lint/style/noDescendingSpecificity: the rule order follows the panels, not specificity */
+html[data-skin="dense"] .sections > .card + .card {
+  border-top: 1px solid var(--border);
+}
+
+/* Header: slimmer bar, smaller round buttons. */
+html[data-skin="dense"] .wheel > header {
+  min-height: 26px;
+  gap: 2px;
+}
+
+html[data-skin="dense"] .wheel .round {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+
+html[data-skin="dense"] .wheel h1 {
+  font-size: var(--font-size);
+}
+
+html[data-skin="dense"] .sections > .card > header {
+  padding: 4px var(--pad-panel) 2px;
+}
+
+/* Panel strip: icon-only tabs, the active one marked by a 2px accent underline. */
+html[data-skin="dense"] [role="tablist"][aria-label="Panels"] {
+  gap: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* biome-ignore lint/style/noDescendingSpecificity: the rule order follows the panels, not specificity */
+html[data-skin="dense"] [role="tablist"] > button {
+  position: relative;
+  width: 32px;
+  height: 26px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 0;
+}
+
+html[data-skin="dense"] [role="tablist"] > button > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+html[data-skin="dense"] [role="tablist"] > button:hover {
+  background-color: var(--state-hover);
+}
+
+html[data-skin="dense"] [role="tablist"] > button[aria-selected="true"] {
+  background-color: transparent;
+}
+
+html[data-skin="dense"] [role="tablist"] > button[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 0;
+  height: 2px;
+  background: var(--mPrimary);
+}
+
+/* Tree rows. Indent guides: one 1px line per depth level (layers 0-7, matching the depth cap
+   in TabRow). TabRow sets --ga<j> to the guide's alpha in percent: 0 when the level is not
+   used, 14 for a plain guide, 40 when it lies on the active row's ancestor path. */
+html[data-skin="dense"] #app .row {
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga0, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga0, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga1, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga1, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga2, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga2, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga3, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga3, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga4, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga4, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga5, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga5, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga6, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga6, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga7, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga7, 0) * 1%), transparent)
+    );
+  background-size: 1px 100%;
+  background-repeat: no-repeat;
+  background-position:
+    calc(var(--tab-inset) + 0 * var(--child-step)) 0,
+    calc(var(--tab-inset) + 1 * var(--child-step)) 0,
+    calc(var(--tab-inset) + 2 * var(--child-step)) 0,
+    calc(var(--tab-inset) + 3 * var(--child-step)) 0,
+    calc(var(--tab-inset) + 4 * var(--child-step)) 0,
+    calc(var(--tab-inset) + 5 * var(--child-step)) 0,
+    calc(var(--tab-inset) + 6 * var(--child-step)) 0,
+    calc(var(--tab-inset) + 7 * var(--child-step)) 0;
+}
+
+html[data-skin="dense"] #app .row.active::before {
+  width: 2px;
+  border-radius: 0;
+}
+
+html[data-skin="dense"] #app .row.selected {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mPrimary) 55%, transparent);
+}
+
+/* Chevron rotation uses the skin's short transition. */
+html[data-skin="dense"] .branch-toggle svg {
+  transition: transform var(--dur) var(--ease);
+}
+
+/* Entry animation only for tabs that just appeared (TabList marks them .fresh). */
+html[data-skin="dense"] #app .row.fresh {
+  animation: vc-dense-row-in var(--dur) var(--ease) both;
+}
+
+@keyframes vc-dense-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Mirrors base.css: reduced motion removes movement and keyframes unless motion is forced on. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-skin="dense"]:not([data-motion="full"]) #app .row,
+  html[data-skin="dense"]:not([data-motion="full"]) .branch-toggle svg {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the row's own animation */
+    animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the chevron transition */
+    transition: none !important;
+  }
+}
+
+html[data-skin="dense"][data-motion="reduce"] #app .row {
+  /* biome-ignore lint/complexity/noImportantStyles: must beat the row's own animation */
+  animation: none !important;
+}
+
+/* Forced-colour modes drop fills, so the flattened cards need their border back. */
+@media (forced-colors: active) {
+  html[data-skin="dense"] .cards .card,
+  html[data-skin="dense"] .sticky > .card,
+  html[data-skin="dense"] .sections > .card {
+    border: 1px solid ButtonText;
+  }
+}

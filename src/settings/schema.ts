@@ -203,7 +203,7 @@ export const DEFAULT_SETTINGS: Settings = {
   appearance: {
     themeId: DEFAULT_THEME_ID,
     mode: 'system',
-    density: 'comfortable',
+    density: 'compact',
     radius: 14,
     fontFamily: DEFAULT_FONT,
     fontSize: 13,

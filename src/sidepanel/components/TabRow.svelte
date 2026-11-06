@@ -38,6 +38,10 @@ interface Props {
   showMute?: boolean;
   /** Not opened for a while (Settings → tab age); drawn dimmed. */
   stale?: boolean;
+  /** Indent guides on the active row's ancestor path (skin brightens them). */
+  guideDepths?: readonly number[];
+  /** Just inserted; the skin plays a short entry animation. */
+  fresh?: boolean;
   onclick: (e: MouseEvent) => void;
   oncontextmenu: (e: MouseEvent) => void;
   onclose: () => void;
@@ -69,6 +73,8 @@ let {
   showClose = true,
   showMute = true,
   stale = false,
+  guideDepths = [],
+  fresh = false,
   onclick,
   oncontextmenu,
   onclose,
@@ -76,6 +82,13 @@ let {
   onmiddle,
   ondouble,
 }: Props = $props();
+
+// Per-guide alpha for the skin: 0 hides guides past the depth, 14 dims, 40 marks the active path.
+const guideAlpha = $derived(
+  Array.from({ length: 8 }, (_, j) =>
+    j < Math.min(childDepth, 8) ? (guideDepths.includes(j) ? 40 : 14) : 0,
+  ),
+);
 
 const icon = $derived(faviconUrl(tab.url, 16, tab.favIconUrl));
 // Tracks the URL that failed so a navigation to a new page retries the favicon.
@@ -113,12 +126,21 @@ function muteClick(e: MouseEvent): void {
   class:selected={selectedLook}
   class:discarded={tab.discarded}
   class:stale={stale && !tab.active}
+  class:fresh
   class:indent={grouped}
   class:nested
   class:pinned-end={pinnedEnd}
   class:two-line={showUrl}
   style:--gc={groupColor}
   style:--child-depth={Math.min(childDepth, 8)}
+  style:--ga0={guideAlpha[0]}
+  style:--ga1={guideAlpha[1]}
+  style:--ga2={guideAlpha[2]}
+  style:--ga3={guideAlpha[3]}
+  style:--ga4={guideAlpha[4]}
+  style:--ga5={guideAlpha[5]}
+  style:--ga6={guideAlpha[6]}
+  style:--ga7={guideAlpha[7]}
   role="treeitem"
   tabindex="-1"
   aria-level={level}

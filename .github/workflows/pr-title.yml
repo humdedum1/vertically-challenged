@@ -13,6 +13,8 @@ concurrency:
 
 jobs:
   title:
+    # dev -> main merges with a merge commit, so its title never reaches the history semantic-release reads.
+    if: ${{ !(github.head_ref == 'dev' && github.base_ref == 'main') }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read

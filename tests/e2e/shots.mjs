@@ -14,7 +14,7 @@ const { ctx, extId, close } = await launch(extensionDir(), {
   width: 360,
   height: 760,
   scale: 2,
-  headed: true,
+  headed: !process.env.SHOTS_HEADLESS, // headless often misses favicons
 });
 try {
   // Background tabs often never store a favicon, so load each site in the foreground first.
@@ -61,6 +61,19 @@ try {
       await sleep(300);
       await page.screenshot({ path: `docs/store/readme-${n.toLowerCase()}-${scheme}.png` });
     }
+    // Search and the command palette, on the Tabs panel.
+    await tab('Tabs');
+    const search = page.getByRole('searchbox', { name: 'Search tabs' });
+    for (const [n, query] of [
+      ['search', 'web'],
+      ['commands', '>'],
+    ]) {
+      await search.fill(query);
+      await page.mouse.move(2, 2);
+      await sleep(800);
+      await page.screenshot({ path: `docs/store/readme-${n}-${scheme}.png` });
+    }
+    await search.fill('');
   }
 } finally {
   await close();

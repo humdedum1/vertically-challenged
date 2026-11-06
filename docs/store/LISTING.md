@@ -46,7 +46,7 @@ After approval, copy the extension ID and set up [automatic uploads](#automatic-
 
 | Use | File | Size |
 | --- | --- | --- |
-| Screenshots | `store-1-tabs.png`, `store-2-search.png`, `store-3-history.png`, `store-4-settings.png` | 1280x800 |
+| Screenshots | `store-1-tabs.png`, `store-2-search.png`, `store-3-commands.png`, `store-4-history.png`, `store-5-settings.png` | 1280x800 |
 | Small promo tile | `store-promo-small.png` | 440x280 |
 | Icon | `public/icon/128.png` | 128x128 |
 
@@ -78,22 +78,38 @@ Vertical tabs in Chrome's side panel: search, pin, group, snooze and back up. Lo
 
 ## Detailed description
 
+The store shows this as plain text, so sections and bullets use characters, not Markdown.
+
 ```text
-Vertically Challenged puts all your tabs in a fast, searchable vertical list in Chrome's side
-panel (or an in-page popup, or its own window).
+All your tabs in one fast, searchable vertical list. Vertically Challenged lives in Chrome's side panel, an in-page popup, or its own window.
 
-- Every tab in every window, with window names. Incognito stays separate.
-- Search tabs with fuzzy matching, or type > to run commands from the keyboard.
-- Staples, pinned folders, child tabs and native tab groups.
-- Save sessions and window setups, restore them later, or snooze a tab until tomorrow.
-- Suspend idle tabs to save memory.
-- Themes, density and layout you control, including custom CSS.
-- Full backups with optional encryption, saved to Downloads, Nextcloud/WebDAV, S3-compatible
-  storage or Dropbox, on a schedule you choose. Restore from the server in one click.
-- Free and open source (GPLv3). No account, no analytics, no ads.
+FIND ANYTHING
+• Fuzzy search over your tabs
+• Type > to run commands from the keyboard
+• Every tab in every window, with window names
 
-This is a young, AI-assisted project with a small test sample. Keep backups of anything you
-cannot afford to lose, and please report problems on GitHub.
+STAY ORGANIZED
+• Staples, pinned folders, child tabs and native tab groups
+• Save sessions and window setups, and restore them later
+• Snooze a tab until tomorrow
+• Suspend idle tabs to save memory
+
+MAKE IT YOURS
+• Themes, density and layout you control
+• Custom CSS
+
+BACK UP YOUR SETUP
+• Full backups with optional encryption, on a schedule you choose
+• Save to Downloads, Nextcloud/WebDAV, S3-compatible storage or Dropbox
+• Restore from the server in one click
+
+PRIVATE BY DESIGN
+• No account, no analytics, no ads
+• Incognito stays separate
+• Free and open source (GPLv3)
+
+A NOTE ON MATURITY
+This is a young, AI-assisted project with a small test sample. Keep backups of anything you cannot afford to lose, and please report problems on GitHub.
 
 Source code and issue tracker: https://github.com/humdedum1/vertically-challenged
 ```

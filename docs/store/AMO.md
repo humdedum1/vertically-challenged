@@ -27,8 +27,8 @@ has to be a new release.
    for the review, so no signed `.xpi` is attached to that GitHub release; people install it from
    AMO once it's approved.
 5. **Finish the product page in the Developer Hub** (the parts the API doesn't cover):
-   - Screenshots: upload `store-1-tabs.png`, `store-2-search.png`, `store-3-history.png`,
-     `store-4-settings.png`.
+   - Screenshots: upload `store-1-tabs.png`, `store-2-search.png`, `store-3-commands.png`,
+     `store-4-history.png`, `store-5-settings.png`.
    - Privacy policy: paste the text of [`../PRIVACY.md`](../PRIVACY.md), or link
      <https://github.com/humdedum1/vertically-challenged/blob/main/docs/PRIVACY.md>.
    - Support email: optional; the support URL already points at the issue tracker.

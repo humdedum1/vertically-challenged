@@ -7,24 +7,22 @@ const SITES = [
   'https://github.com/',
   'https://developer.mozilla.org/en-US/',
   'https://news.ycombinator.com/',
-  'https://www.rust-lang.org/',
+  'https://www.python.org/',
   'https://svelte.dev/',
 ];
 const { ctx, extId, close } = await launch(extensionDir(), {
   width: 360,
   height: 760,
   scale: 2,
-  headed: true,
+  headed: !process.env.SHOTS_HEADLESS, // headless often misses favicons
 });
 try {
   // Background tabs often never store a favicon, so load each site in the foreground first.
-  // One tab navigated in turn leaves nothing extra in Recently closed.
   const warm = ctx.pages()[0];
   for (const url of SITES) {
     await warm.goto(url, { waitUntil: 'load', timeout: 20000 }).catch(() => {});
     await sleep(1500);
   }
-  await warm.goto('about:blank');
   // One windows.create call, so the tabs open flat rather than as each other's children.
   const boot = await ctx.newPage();
   await boot.goto(`chrome-extension://${extId}/sidepanel.html`);
@@ -34,7 +32,7 @@ try {
     [`chrome-extension://${extId}/sidepanel.html`, ...SITES],
   );
   const page = await opened;
-  for (const p of ctx.pages()) if (p.url() === 'about:blank') await p.close();
+  await warm.close(); // on a real site, so Recently closed shows it rather than about:blank
   await boot.close();
   await page.bringToFront();
   await sleep(5000);
@@ -61,6 +59,41 @@ try {
       await sleep(300);
       await page.screenshot({ path: `docs/store/readme-${n.toLowerCase()}-${scheme}.png` });
     }
+  }
+  // One view per store image, in each style. store-assets.mjs lays the three side by side.
+  await page.setViewportSize({ width: 360, height: 640 });
+  const search = page.getByRole('searchbox', { name: 'Search tabs' });
+  const appearance = async () => {
+    await tab('Settings');
+    const style = page.getByRole('radio', { name: 'Classic', exact: true });
+    if (!(await style.isVisible())) await page.getByText('Appearance', { exact: true }).click();
+    return style;
+  };
+  for (const skin of ['classic', 'dense', 'glass']) {
+    await appearance();
+    await page
+      .getByRole('radio', { name: skin[0].toUpperCase() + skin.slice(1), exact: true })
+      .click();
+    for (const [view, scheme] of [
+      ['tabs', 'light'],
+      ['search', 'dark'],
+      ['history', 'light'],
+      ['settings', 'dark'],
+    ]) {
+      await page.emulateMedia({ colorScheme: scheme });
+      if (view === 'settings') {
+        await (await appearance()).scrollIntoViewIfNeeded();
+        await page.evaluate(() => document.activeElement?.blur());
+      } else {
+        await tab(view === 'history' ? 'History' : 'Tabs');
+        await search.fill(view === 'search' ? 'web' : '').catch(() => {});
+      }
+      await page.mouse.move(2, 2);
+      await sleep(1000);
+      await page.screenshot({ path: `docs/store/style-${view}-${skin}.png` });
+    }
+    await tab('Tabs');
+    await search.fill('');
   }
 } finally {
   await close();

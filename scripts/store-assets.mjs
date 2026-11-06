@@ -165,12 +165,14 @@ const promo = () => `<style>${BASE}
   <div class="crop"><img src="${shot('tabs', 'Glass')}"></div>`;
 
 const browser = await chromium.launch();
-const render = async (html, width, height, file) => {
-  const page = await browser.newPage({ viewport: { width, height } });
+const render = async (html, width, height, file, deviceScaleFactor = 1) => {
+  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor });
   await page.setContent(`<!doctype html><meta charset="utf-8">${html}`, { waitUntil: 'load' });
   await page.screenshot({ path: `${OUT}/${file}.png` });
   await page.close();
 };
 for (const s of SHOTS) await render(slide(s), 1280, 800, s.file);
 await render(promo(), 440, 280, 'store-promo-small');
+// The README shows the tile larger; 2x keeps it sharp there.
+await render(promo(), 440, 280, 'readme-promo', 2);
 await browser.close();

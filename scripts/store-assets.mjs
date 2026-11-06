@@ -20,12 +20,13 @@ const SHOTS = [
     title: 'Every tab, one fast list',
     sub: 'All your windows in one vertical list, in the style you like.',
     callouts: [
-      { at: 0.25, head: 'Search or command', text: 'Type to filter, or > for commands' },
-      { at: 0.32, head: 'Active tab', text: 'Always easy to spot' },
-      { at: 0.638, head: 'Child tabs', text: 'Nest related pages and fold them away' },
+      { at: 0.252, head: 'Search or command', text: 'Type to filter, or > for commands' },
+      { at: 0.329, head: 'Staples', text: 'Your everyday sites, one click away' },
+      { at: 0.413, head: 'Pinned folders', text: 'Keep pinned tabs sorted and tidy' },
+      { at: 0.625, head: 'Active tab', text: 'Always easy to spot' },
       { at: 0.9, head: 'Recently closed', text: 'Bring back a tab in one click' },
     ],
-    facts: ['Every window', 'Tab groups', 'Pinned folders', 'Staples', 'Snooze', 'Suspend'],
+    facts: ['Every window', 'Child tabs', 'Tab groups', 'Snooze', 'Suspend'],
   },
   {
     file: 'store-2-search',
@@ -36,7 +37,7 @@ const SHOTS = [
     callouts: [
       { at: 0.25, head: 'One search box', text: 'Type > to run commands instead' },
       { at: 0.31, head: 'Instant matches', text: 'Hits are highlighted as you type' },
-      { at: 0.417, head: 'Fuzzy matching', text: 'Partial words still match' },
+      { at: 0.53, head: 'Fuzzy matching', text: 'Partial words still match' },
     ],
     facts: ['Tabs', 'Bookmarks', 'History', 'Saved sessions', '> Commands'],
   },
@@ -143,12 +144,12 @@ const promo = () => `<style>${BASE}
   .logo{position:absolute;left:24px;top:32px;width:60px;height:60px}
   h1{position:absolute;left:24px;top:102px;font-size:27px;line-height:1.15;font-weight:800}
   p{position:absolute;left:24px;top:174px;width:150px;font-size:15px;line-height:1.3;color:#a9b0bf}
-  img.s{position:absolute;width:104px;height:185px;border-radius:8px;box-shadow:0 6px 18px #000a}
+  img.s{position:absolute;width:150px;height:267px;border-radius:8px;box-shadow:0 6px 18px #000a}
   </style><img class="logo" src="${png('public/icon/128.png')}"><h1>Vertically<br>Challenged</h1>
   <p>Vertical tabs<br>in three styles</p>
-  <img class="s" src="${shot('tabs', 'Classic')}" style="left:214px;top:30px">
-  <img class="s" src="${shot('tabs', 'Dense')}" style="left:268px;top:48px">
-  <img class="s" src="${shot('tabs', 'Glass')}" style="left:322px;top:66px">`;
+  <img class="s" src="${shot('tabs', 'Classic')}" style="left:190px;top:22px">
+  <img class="s" src="${shot('tabs', 'Dense')}" style="left:236px;top:44px">
+  <img class="s" src="${shot('tabs', 'Glass')}" style="left:282px;top:66px">`;
 
 const browser = await chromium.launch();
 const render = async (html, width, height, file) => {

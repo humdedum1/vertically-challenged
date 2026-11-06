@@ -6,7 +6,7 @@
 
 **Everything the store form asks for, and the steps to a published listing.**
 
-The images in this folder are built by `node scripts/store-assets.mjs` from the README screenshots.
+The images in this folder are built by `node scripts/store-assets.mjs` from the screenshots `tests/e2e/shots.mjs` takes.
 
 [![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-submit-0071e3?logo=googlechrome&logoColor=white&labelColor=1d1d1f)](https://chrome.google.com/webstore/devconsole)
 [![Firefox](https://img.shields.io/badge/Firefox-AMO.md-0071e3?logo=firefoxbrowser&logoColor=white&labelColor=1d1d1f)](AMO.md)
@@ -77,6 +77,8 @@ Vertical tabs in Chrome's side panel: search, pin, group, snooze and back up. Lo
 ```
 
 ## Detailed description
+
+The store shows this as plain text, so sections and bullets use characters, not Markdown.
 
 ```text
 🗂️ Every tab in every window, in one searchable vertical list. Free, open source and local-first.

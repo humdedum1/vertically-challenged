@@ -84,7 +84,7 @@ Local-first, no tracking, free and open source.
 
 **Support site:** <https://github.com/humdedum1/vertically-challenged/issues>
 
-**Description:** see `description` in `amo-metadata.json`.
+**Description:** see `description` in `amo-metadata.json`. AMO renders it as limited Markdown (bold, italics, links, lists, blockquotes), and any HTML shows up as literal text.
 
 ## What differs from the Chrome listing
 

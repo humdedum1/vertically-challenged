@@ -42,8 +42,8 @@ export function applyAppearance(
   if (a.mode === 'system') delete root.dataset.mode;
   else root.dataset.mode = a.mode;
   root.dataset.density = a.density;
-  // Hardcoded on this branch: the dense skin is CSS-only (styles/skin-dense.css).
-  root.dataset.skin = 'dense';
+  // Hardcoded on this branch: the glass skin is CSS-only (styles/skin-glass.css).
+  root.dataset.skin = 'glass';
   root.dataset.motion = a.motion;
   root.dataset.rowLayout = settings.tabs.layout;
   root.dataset.actions = settings.tabs.actions;

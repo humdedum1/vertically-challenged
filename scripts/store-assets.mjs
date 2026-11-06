@@ -1,6 +1,6 @@
 // Builds the store images from the style screenshots (docs/store/style-*.png, from
 // tests/e2e/shots.mjs): 1280x800 images showing each view in all three styles with numbered
-// callouts, and the 440x280 small promo tile.
+// callouts, the 440x280 small promo tile and the 1400x560 marquee promo tile.
 //   node scripts/store-assets.mjs
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
@@ -164,6 +164,22 @@ const promo = () => `<style>${BASE}
   <p>Vertical tabs, Staples and pinned folders</p>
   <div class="crop"><img src="${shot('tabs', 'Glass')}"></div>`;
 
+// The three styles side by side, each whole panel running to the bottom edge.
+const marquee = () => `<style>${BASE}
+  body{width:1400px;height:560px;position:relative;background:linear-gradient(#1a1d24,#0d0e12);color:#f3f5f9}
+  .logo{position:absolute;left:72px;top:92px;width:92px;height:92px}
+  h1{position:absolute;left:72px;top:204px;font-size:60px;line-height:1.1;font-weight:800;letter-spacing:-.5px}
+  p{position:absolute;left:72px;top:352px;width:430px;font-size:29px;line-height:1.3;color:#a9b0bf}
+  figure{position:absolute;top:64px;width:279px;height:496px;overflow:hidden;border-radius:16px 16px 0 0;box-shadow:0 10px 28px #000a}
+  figure img{display:block;width:279px}
+  figcaption{position:absolute;top:26px;font-size:21px;font-weight:700;color:#7cb7ff}
+  </style><img class="logo" src="${png('public/icon/128.png')}"><h1>Vertically<br>Challenged</h1>
+  <p>Vertical tabs in<br>the style you like</p>
+  ${SKINS.map((skin, i) => {
+    const x = 500 + i * 293;
+    return `<figcaption style="left:${x + 2}px">${skin}</figcaption><figure style="left:${x}px"><img src="${shot('tabs', skin)}"></figure>`;
+  }).join('')}`;
+
 const browser = await chromium.launch();
 const render = async (html, width, height, file, deviceScaleFactor = 1) => {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor });
@@ -173,6 +189,7 @@ const render = async (html, width, height, file, deviceScaleFactor = 1) => {
 };
 for (const s of SHOTS) await render(slide(s), 1280, 800, s.file);
 await render(promo(), 440, 280, 'store-promo-small');
+await render(marquee(), 1400, 560, 'store-promo-marquee');
 // The README shows the tile larger; 2x keeps it sharp there.
 await render(promo(), 440, 280, 'readme-promo', 2);
 await browser.close();

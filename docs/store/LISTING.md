@@ -48,6 +48,7 @@ After approval, copy the extension ID and set up [automatic uploads](#automatic-
 | --- | --- | --- |
 | Screenshots | `store-1-tabs.png`, `store-2-search.png`, `store-3-history.png`, `store-4-settings.png` | 1280x800 |
 | Small promo tile | `store-promo-small.png` | 440x280 |
+| Marquee promo tile | `store-promo-marquee.png` | 1400x560 |
 | Icon | `public/icon/128.png` | 128x128 |
 
 **Privacy policy URL:** <https://github.com/humdedum1/vertically-challenged/blob/main/docs/PRIVACY.md>

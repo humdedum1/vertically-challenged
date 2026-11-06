@@ -1,6 +1,6 @@
 reviews:
   auto_approvals:
     # Options: minimal, low, moderate, high, critical
-    max_merge_risk: low 
+    max_merge_risk: low
     # Allows the author to use "@coderabbitai approve" if needed
-    allow_author_approval: true 
+    allow_author_approval: true

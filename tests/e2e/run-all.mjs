@@ -42,6 +42,9 @@ const run = (s) =>
   spawnSync(process.execPath, [path.join(HERE, s), ...process.argv.slice(2)], {
     encoding: 'utf8',
     timeout: 180_000, // a hung browser fails this script instead of stalling CI for hours
+    // The tail of this trace, printed on failure, names the Playwright call that hung.
+    env: { ...process.env, DEBUG: 'pw:api' },
+    maxBuffer: 64 * 1024 * 1024,
   });
 for (const s of SCRIPTS) {
   const t0 = Date.now();

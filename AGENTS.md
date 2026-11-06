@@ -25,7 +25,7 @@ Vertically Challenged is a Chrome and Firefox MV3 extension (WXT 0.21, Svelte 5,
 - `npm run test:e2e`: Playwright in Chrome
 - `npm run test:e2e:firefox`: Firefox 140 smoke (set `FIREFOX_BIN`)
 - `npm run bench:pure`: pure-logic benchmarks
-- `npm run ci`: local CI gate (validate.sh, e2e and Firefox smoke)
+- `just ci`: the local gate (validate.sh). `just qa`: Chromium e2e and Firefox smoke. There is no hosted PR CI; checks are local.
 
 ## Working loop
 
@@ -34,7 +34,7 @@ Vertically Challenged is a Chrome and Firefox MV3 extension (WXT 0.21, Svelte 5,
   - Always: unit tests, lint, `check`.
   - When `src/sidepanel/`, `src/background/` or the manifest changes: e2e.
   - When Firefox-specific code or the manifest changes: the Firefox smoke.
-  - `npm run ci` runs all of them.
+  - `just ci` runs the first group; `just qa` runs the browser checks. Run both before a PR.
 - Report failures plainly, with the output. Do not claim a check passed unless you ran it.
 
 ## Tests
@@ -54,7 +54,7 @@ Data loss is the worst failure. Any change to stored or synced data shape:
 
 ## Platform constraints
 
-- **No host permissions.** The popup overlay is injected via `activeTab` + `scripting` from a user gesture. Pages that refuse injection (chrome://, Web Store, New Tab, PDFs, incognito) fall back to a popup window (`src/background/display.ts`).
+- **No install-time host permissions.** Remote backups request an optional origin grant at runtime. The popup overlay is injected via `activeTab` + `scripting` from a user gesture. Pages that refuse injection (chrome://, Web Store, New Tab, PDFs, incognito) fall back to a popup window (`src/background/display.ts`).
 - **Gestures.** `sidePanel.open` only works synchronously inside a user-gesture listener. At browser startup the side panel goes through a notification click; the popup window opens directly.
 - **Incognito separation** is a hard requirement. Incognito tabs and data never reach normal windows or sync.
 

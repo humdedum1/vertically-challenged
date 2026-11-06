@@ -10,11 +10,12 @@ It sits in the side panel (the sidebar on Firefox), floats over the page as a po
 
 I made this because I loved Sidebery and Zen Browser and couldn't get anything like them in Chromium. I kept adding the little things I wanted, and it slowly grew into this. Now there's a Firefox release too.
 
-[![CI](https://github.com/humdedum1/vertically-challenged/actions/workflows/checks.yml/badge.svg?branch=dev)](https://github.com/humdedum1/vertically-challenged/actions/workflows/checks.yml?query=branch%3Adev)
 [![Release](https://img.shields.io/github/v/release/humdedum1/vertically-challenged?label=release&color=0071e3&labelColor=1d1d1f)](https://github.com/humdedum1/vertically-challenged/releases)
 [![License: GPLv3](https://img.shields.io/badge/license-GPLv3-0071e3?labelColor=1d1d1f)](LICENSE)
 ![Chrome 116+](https://img.shields.io/badge/Chrome-116%2B-0071e3?logo=googlechrome&logoColor=white&labelColor=1d1d1f)
 ![Firefox 140+](https://img.shields.io/badge/Firefox-140%2B-0071e3?logo=firefoxbrowser&logoColor=white&labelColor=1d1d1f)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-install-0071e3?logo=googlechrome&logoColor=white&labelColor=1d1d1f)](https://chromewebstore.google.com/detail/vertically-challenged/bekjjhfjknegeaaaieadcgakkipcgfjm)
+[![Firefox Add-ons](https://img.shields.io/badge/Firefox_Add--ons-install-0071e3?logo=firefoxbrowser&logoColor=white&labelColor=1d1d1f)](https://addons.mozilla.org/firefox/addon/vertically-challenged/)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/humdedum1)
 [![PayPal](https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white)](https://paypal.me/oddboxx)
 
@@ -63,8 +64,8 @@ I made this because I loved Sidebery and Zen Browser and couldn't get anything l
 
 You need Chrome 116 or newer (141 to close the side panel with the shortcut), or Firefox 140 or newer.
 
-- **Chrome Web Store:** not listed yet.
-- **Firefox:** download the signed `.xpi` from [Releases](https://github.com/humdedum1/vertically-challenged/releases) and open it in Firefox. There's no addons.mozilla.org listing yet.
+- **Chrome Web Store:** [install from the store](https://chromewebstore.google.com/detail/vertically-challenged/bekjjhfjknegeaaaieadcgakkipcgfjm).
+- **Firefox:** download the signed `.xpi` from [Releases](https://github.com/humdedum1/vertically-challenged/releases) and open it in Firefox. The [addons.mozilla.org listing](https://addons.mozilla.org/firefox/addon/vertically-challenged/) isn't public until Mozilla's review finishes.
 - **Chrome, from Releases:** download `vertically-challenged-<version>-crx.zip` and extract the signed `.crx`. Chrome often blocks extensions from outside the Web Store. If it blocks this one, use an unpacked build instead. The zip isn't an unpacked folder, so Load unpacked won't accept it.
 - **From source:** see [Build from source](#build-from-source).
 

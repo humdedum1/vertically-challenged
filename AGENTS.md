@@ -54,7 +54,7 @@ Data loss is the worst failure. Any change to stored or synced data shape:
 
 ## Platform constraints
 
-- **No host permissions.** The popup overlay is injected via `activeTab` + `scripting` from a user gesture. Pages that refuse injection (chrome://, Web Store, New Tab, PDFs, incognito) fall back to a popup window (`src/background/display.ts`).
+- **No install-time host permissions.** Remote backups request an optional origin grant at runtime. The popup overlay is injected via `activeTab` + `scripting` from a user gesture. Pages that refuse injection (chrome://, Web Store, New Tab, PDFs, incognito) fall back to a popup window (`src/background/display.ts`).
 - **Gestures.** `sidePanel.open` only works synchronously inside a user-gesture listener. At browser startup the side panel goes through a notification click; the popup window opens directly.
 - **Incognito separation** is a hard requirement. Incognito tabs and data never reach normal windows or sync.
 

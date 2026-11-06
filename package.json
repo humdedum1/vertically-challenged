@@ -27,7 +27,6 @@
     "node": ">=22"
   },
   "scripts": {
-    "ci": "bash .github/release/validate.sh && npm run test:e2e && npm run test:e2e:firefox",
     "dev": "wxt",
     "build": "wxt build",
     "zip": "wxt zip",

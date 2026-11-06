@@ -10,7 +10,6 @@ It sits in the side panel (the sidebar on Firefox), floats over the page as a po
 
 I made this because I loved Sidebery and Zen Browser and couldn't get anything like them in Chromium. I kept adding the little things I wanted, and it slowly grew into this. Now there's a Firefox release too.
 
-[![CI](https://github.com/humdedum1/vertically-challenged/actions/workflows/checks.yml/badge.svg?branch=dev)](https://github.com/humdedum1/vertically-challenged/actions/workflows/checks.yml?query=branch%3Adev)
 [![Release](https://img.shields.io/github/v/release/humdedum1/vertically-challenged?label=release&color=0071e3&labelColor=1d1d1f)](https://github.com/humdedum1/vertically-challenged/releases)
 [![License: GPLv3](https://img.shields.io/badge/license-GPLv3-0071e3?labelColor=1d1d1f)](LICENSE)
 ![Chrome 116+](https://img.shields.io/badge/Chrome-116%2B-0071e3?logo=googlechrome&logoColor=white&labelColor=1d1d1f)

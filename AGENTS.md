@@ -25,7 +25,7 @@ Vertically Challenged is a Chrome and Firefox MV3 extension (WXT 0.21, Svelte 5,
 - `npm run test:e2e`: Playwright in Chrome
 - `npm run test:e2e:firefox`: Firefox 140 smoke (set `FIREFOX_BIN`)
 - `npm run bench:pure`: pure-logic benchmarks
-- `npm run ci`: local CI gate (validate.sh, e2e and Firefox smoke)
+- `just ci`: the local gate (validate.sh). `just qa`: Chromium e2e and Firefox smoke. There is no hosted PR CI; checks are local.
 
 ## Working loop
 
@@ -34,7 +34,7 @@ Vertically Challenged is a Chrome and Firefox MV3 extension (WXT 0.21, Svelte 5,
   - Always: unit tests, lint, `check`.
   - When `src/sidepanel/`, `src/background/` or the manifest changes: e2e.
   - When Firefox-specific code or the manifest changes: the Firefox smoke.
-  - `npm run ci` runs all of them.
+  - `just ci` runs the first group; `just qa` runs the browser checks. Run both before a PR.
 - Report failures plainly, with the output. Do not claim a check passed unless you ran it.
 
 ## Tests

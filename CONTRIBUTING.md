@@ -14,7 +14,13 @@ Report the extension version, browser/OS, installation method, reproduction step
 
 ## Local development
 
-1. Fork the repository on GitHub, clone your fork, and create a feature branch from `dev`: `git switch -c fix/short-description origin/dev`.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:23da45be114b0a348d050ee0151805955b82267fe276b1a06359c465e001c17d -->
+
+1. Fork the repository on GitHub and clone your fork. Ensure your fork includes the `dev` branch, then run `git fetch origin dev` before creating a feature branch with `git switch -c fix/short-description origin/dev`. If your fork lacks `dev`, add the original repository as an upstream remote with `git remote add upstream https://github.com/humdedum1/vertically-challenged.git`, then run `git fetch upstream dev` and `git switch -c fix/short-description upstream/dev`.
+
+<!-- /coderabbit-ai-generated:v1 -->
 2. Use Node.js 22 or later and run `npm ci`.
 3. Run `npm run dev`, or build with `npm run build` and load `.output/chrome-mv3` through Chrome's Load unpacked. For Firefox, `npm run build:firefox` writes `.output/firefox-mv3` (load its `manifest.json` from `about:debugging`), and `npm run start:firefox` runs it with web-ext.
 4. Keep changes focused and follow nearby TypeScript/Svelte code and the existing UI components. Avoid adding dependencies for small changes.
@@ -22,11 +28,18 @@ Report the extension version, browser/OS, installation method, reproduction step
 
 ## Checks before a PR
 
-Run the local CI gate. It runs the validation script, the Chromium end-to-end tests, and the Firefox 140 smoke test:
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:81f6dabed85ded4978a254eadabf3a67d31df70507a2d0ccfd6d69b660d57bdf -->
+
+Install Chromium before running the local CI gate. The gate runs the validation script, the Chromium end-to-end tests, and the Firefox 140 smoke test:
 
 ```sh
+npx playwright-core install chromium
 FIREFOX_BIN=/path/to/firefox npm run ci
 ```
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 `FIREFOX_BIN` must point to Firefox 140 or newer. To run the steps one at a time:
 

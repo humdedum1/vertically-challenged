@@ -60,14 +60,18 @@ representative at an online or offline event.
 
 ## Enforcement
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:a967c99b02496acc3196bcb02a036fee75e20dcd5af00cb8e89f5454eeb7880d -->
+
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement by contacting the
-maintainer privately through GitHub: use the GitHub user
-[humdedum1](https://github.com/humdedum1) (send a direct message or contact
-them through their profile), or open a private report via the
+reported to the community leaders responsible for enforcement by opening a
+private report via the
 [private vulnerability reporting form](https://github.com/humdedum1/vertically-challenged/security/advisories/new)
-and say that it is a conduct report. Do not post conduct reports in public
+and saying that it is a conduct report. Do not post conduct reports in public
 issues, pull requests, or discussions.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 All complaints will be reviewed and investigated promptly and fairly. The
 maintainer is obligated to respect the privacy and security of the reporter of

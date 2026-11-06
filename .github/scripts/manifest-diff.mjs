@@ -1,6 +1,6 @@
 // Usage: node manifest-diff.mjs <base-output-dir> <head-output-dir>
 // Compares permission-bearing manifest keys per browser build. Prints markdown
-// and exits 0 always; writes "changed=true|false" to $GITHUB_OUTPUT.
+// and exits 0 on success; writes "changed=true|false" to $GITHUB_OUTPUT.
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -13,14 +13,15 @@ const KEYS = [
   'content_scripts',
 ];
 const builds = ['chrome-mv3', 'firefox-mv3'];
-const load = (dir, b) => {
+const load = (dir, b, allowMissing = false) => {
   const f = join(dir, b, 'manifest.json');
-  return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : {};
+  if (allowMissing && !existsSync(f)) return {};
+  return JSON.parse(readFileSync(f, 'utf8'));
 };
 const norm = (v) => (v === undefined ? [] : v);
 let out = '';
 for (const b of builds) {
-  const [a, h] = [load(base, b), load(head, b)];
+  const [a, h] = [load(base, b, true), load(head, b)];
   for (const k of KEYS) {
     const [x, y] = [norm(a[k]), norm(h[k])];
     if (JSON.stringify(x) === JSON.stringify(y)) continue;

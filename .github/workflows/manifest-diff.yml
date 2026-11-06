@@ -44,9 +44,11 @@ jobs:
           done
       - name: Diff manifests
         id: diff
+        shell: bash
         env:
           BODY_FILE: ${{ runner.temp }}/manifest-diff.md
         run: |
+          set -o pipefail
           # The job holds no repository secrets (only the GITHUB_TOKEN, read-only for forks), so running the PR copy of the script is acceptable.
           node head/.github/scripts/manifest-diff.mjs base/.output head/.output | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Comment on PR

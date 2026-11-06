@@ -2,9 +2,7 @@
 //   node tests/e2e/shots.mjs [extension dir]
 import { extensionDir, launch, sleep } from './harness.mjs';
 
-const SITES = [
-  'https://en.wikipedia.org/wiki/Tab_(interface)',
-];
+const SITES = ['https://en.wikipedia.org/wiki/Tab_(interface)'];
 // Opened from the Wikipedia tab, so it shows as a child tab.
 const CHILD = 'https://svelte.dev/';
 // Closed after the warm-up, so Recently closed shows a page that is not also open.
@@ -26,7 +24,7 @@ const { ctx, extId, close } = await launch(extensionDir(), {
 try {
   // Background tabs often never store a favicon, so load each site in the foreground first.
   const warm = ctx.pages()[0];
-    for (const url of [...STAPLES, ...FOLDER, ...SITES, CHILD, CLOSED]) {
+  for (const url of [...STAPLES, ...FOLDER, ...SITES, CHILD, CLOSED]) {
     await warm.goto(url, { waitUntil: 'load', timeout: 20000 }).catch(() => {});
     await sleep(1500);
   }

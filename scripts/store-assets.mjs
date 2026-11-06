@@ -126,9 +126,9 @@ function slide(s) {
   const panels = s.zoom
     ? `<figure class="zoom" style="left:${ZOOM_X}px"><figcaption>${s.zoom}</figcaption><img src="${shot(s.view, s.zoom)}"></figure>`
     : SKINS.map(
-    (skin, i) =>
-      `<figure style="left:${PANEL_X + i * (PANEL_W + GAP)}px"><figcaption>${skin}</figcaption><img src="${shot(s.view, skin)}"></figure>`,
-  ).join('');
+        (skin, i) =>
+          `<figure style="left:${PANEL_X + i * (PANEL_W + GAP)}px"><figcaption>${skin}</figcaption><img src="${shot(s.view, skin)}"></figure>`,
+      ).join('');
   return `<style>${BASE}
   body{width:1280px;height:800px;position:relative;background:linear-gradient(${c.bg});color:${c.ink}}
   h1{position:absolute;left:56px;top:22px;font-size:46px;font-weight:800;letter-spacing:-.5px}

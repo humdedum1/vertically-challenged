@@ -6,6 +6,8 @@ import { customCss } from '../../sidepanel/custom-css.svelte';
 import { SettingsState } from '../../sidepanel/settings-state.svelte';
 import { ThemeRegistry } from '../../sidepanel/theme-registry.svelte';
 import '../../sidepanel/styles/base.css';
+import '../../sidepanel/styles/skin-dense.css';
+import '../../sidepanel/styles/skin-glass.css';
 
 const target = document.getElementById('app');
 if (!target) throw new Error('Missing #app mount point');

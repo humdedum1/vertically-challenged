@@ -15,6 +15,7 @@ const SCRIPTS = [
   'csp.mjs',
   'put-away-search.mjs',
   'settings-search.mjs',
+  'skin.mjs',
   'help-and-contrast.mjs',
   'undo-toasts.mjs',
   'tidy-up.mjs',

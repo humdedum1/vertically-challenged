@@ -1,0 +1,327 @@
+/* Glass skin: translucent layered chrome over an ambient colour wash, with cheap motion.
+   CSS only: every rule is scoped under html[data-skin="glass"], so removing the attribute in
+   appearance.ts turns the skin off. Colours come only from theme roles and color-mix().
+   Backdrop blur is limited to chrome that content scrolls beneath, behind @supports. Row rules
+   sit under #app so they outrank the hashed scoped styles in TabRow.svelte. */
+
+html[data-skin="glass"] {
+  --dur: 120ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --glass-fill: color-mix(in srgb, var(--mSurface) 92%, transparent);
+  --glass-solid: color-mix(in srgb, var(--mSurface) 92%, transparent);
+  --glass-edge: color-mix(in srgb, var(--mOnSurface) 14%, transparent);
+  --glass-top: inset 0 1px 0 color-mix(in srgb, var(--mOnSurface) 14%, transparent);
+}
+
+/* Spacing follows the density setting (compact is the default), as in the dense skin. */
+html[data-skin="glass"][data-density="compact"] {
+  --gap: 5px;
+  --pad-card: 8px;
+  --pad-panel: 8px;
+}
+
+html[data-skin="glass"][data-density="comfortable"] {
+  --gap: 8px;
+  --pad-card: 10px;
+  --pad-panel: 10px;
+}
+
+/* Ambient backdrop: two large primary washes over the surface, fixed behind the content. A
+   pseudo-element rather than body's own background, so body keeps its rule (csp.mjs injects one). */
+html[data-skin="glass"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      color-mix(in srgb, var(--mPrimary) 13%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      circle at 100% 100%,
+      color-mix(in srgb, var(--mPrimary) 11%, transparent),
+      transparent 62%
+    ),
+    var(--mSurface);
+}
+
+/* Glass chrome: header, panel strip, sticky Preview card, search field, menus, modal, toasts.
+   The fill is translucent; the inner edge and the top sheen (--glass) give the surface its depth. */
+html[data-skin="glass"] .wheel > header {
+  min-height: 28px;
+  border-radius: var(--radius-card);
+}
+
+html[data-skin="glass"] [role="tablist"][aria-label="Panels"] {
+  border-radius: var(--radius-card);
+}
+
+html[data-skin="glass"] .wheel > header,
+html[data-skin="glass"] [role="tablist"][aria-label="Panels"],
+html[data-skin="glass"] .sticky,
+html[data-skin="glass"] .menu,
+html[data-skin="glass"] .dialog {
+  background: var(--glass), var(--glass-solid);
+  border-color: var(--glass-edge);
+  box-shadow:
+    var(--glass-top),
+    inset 0 0 0 1px var(--glass-edge),
+    var(--shadow-2);
+}
+
+html[data-skin="glass"] .search input {
+  background: var(--glass), var(--glass-fill);
+  border-color: var(--glass-edge);
+  box-shadow: inset 0 0 0 1px var(--glass-edge);
+}
+
+html[data-skin="glass"] .toast {
+  background: var(--glass), var(--glass-solid);
+  border-color: var(--glass-edge);
+  box-shadow:
+    var(--glass-top),
+    inset 0 0 0 1px var(--glass-edge),
+    var(--shadow-2);
+}
+
+/* Header and panel strip share the list card's edge and shadow, so the chrome reads as one family. */
+html[data-skin="glass"] .wheel > header,
+html[data-skin="glass"] [role="tablist"][aria-label="Panels"] {
+  box-shadow:
+    var(--glass-top),
+    inset 0 0 0 1px var(--glass-edge),
+    var(--shadow-1);
+}
+
+/* Blur only where content slides under the surface. Without support the 92% fill above stands. */
+@supports (backdrop-filter: blur(1px)) {
+  html[data-skin="glass"] .wheel > header,
+  html[data-skin="glass"] [role="tablist"][aria-label="Panels"],
+  html[data-skin="glass"] .sticky,
+  html[data-skin="glass"] .menu,
+  html[data-skin="glass"] .dialog {
+    background: var(--glass), var(--glass-fill);
+    backdrop-filter: blur(14px) saturate(1.3);
+  }
+}
+
+/* List and settings cards: translucent fill and a hairline, no blur (they are not overlays). */
+html[data-skin="glass"] .cards .card,
+html[data-skin="glass"] .sections > .card {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--mPrimary) 4%, transparent), transparent 60%),
+    var(--glass), color-mix(in srgb, var(--mSurface) 40%, transparent);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-card);
+  box-shadow: var(--glass-top), var(--shadow-1);
+}
+
+html[data-skin="glass"] .cards summary {
+  padding: 6px var(--pad-card);
+  border-radius: var(--radius-control);
+}
+
+html[data-skin="glass"] .sections > .card > header {
+  padding: 4px var(--pad-panel) 2px;
+}
+
+/* Settings controls: shorter, as in the dense skin. */
+html[data-skin="glass"] .settings .field {
+  gap: 2px;
+}
+
+html[data-skin="glass"] .settings .group {
+  padding: 1px;
+  border-radius: 6px;
+}
+
+html[data-skin="glass"] .settings .group button {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 5px;
+}
+
+html[data-skin="glass"] .settings select {
+  height: 24px;
+  border-radius: 6px;
+}
+
+html[data-skin="glass"] .settings input[type="range"] {
+  height: 18px;
+}
+
+html[data-skin="glass"] .settings input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+}
+
+html[data-skin="glass"] .settings input[type="range"]::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+}
+
+/* Rows: soft fill and primary glow on hover, a 16% primary fill when selected. No blur filters. */
+html[data-skin="glass"] #app .row:hover {
+  background: color-mix(in srgb, var(--mOnSurface) 6%, transparent);
+  box-shadow: inset 0 0 10px color-mix(in srgb, var(--mPrimary) 14%, transparent);
+}
+
+html[data-skin="glass"] #app .row.selected {
+  background: color-mix(in srgb, var(--mPrimary) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mPrimary) 45%, transparent);
+}
+
+/* Active row: a 2px rounded primary bar with a soft glow. */
+html[data-skin="glass"] #app .row.active::before {
+  width: 2px;
+  border-radius: 2px;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--mPrimary) 45%, transparent);
+}
+
+/* Indent guides: 1px lines, inset 2px top and bottom so they read as rounded-ended.
+   TabRow sets --ga<j> per level: 0 unused, 14 plain, 40 on the active ancestor path. */
+html[data-skin="glass"] #app .row {
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga0, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga0, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga1, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga1, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga2, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga2, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga3, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga3, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga4, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga4, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga5, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga5, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga6, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga6, 0) * 1%), transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga7, 0) * 1%), transparent),
+      color-mix(in srgb, var(--mOnSurface) calc(var(--ga7, 0) * 1%), transparent)
+    );
+  background-size: 1px calc(100% - 4px);
+  background-repeat: no-repeat;
+  background-position:
+    calc(var(--tab-inset) + 0 * var(--child-step)) 2px,
+    calc(var(--tab-inset) + 1 * var(--child-step)) 2px,
+    calc(var(--tab-inset) + 2 * var(--child-step)) 2px,
+    calc(var(--tab-inset) + 3 * var(--child-step)) 2px,
+    calc(var(--tab-inset) + 4 * var(--child-step)) 2px,
+    calc(var(--tab-inset) + 5 * var(--child-step)) 2px,
+    calc(var(--tab-inset) + 6 * var(--child-step)) 2px,
+    calc(var(--tab-inset) + 7 * var(--child-step)) 2px;
+}
+
+/* Motion: cheap properties only (opacity, transform, colours, shadows on small elements). */
+html[data-skin="glass"] .branch-toggle svg,
+html[data-skin="glass"] .chevron svg {
+  transition: transform 180ms var(--ease-spring);
+}
+
+html[data-skin="glass"] #app .row.fresh {
+  animation: vc-glass-row-in 180ms var(--ease-spring) both;
+}
+
+html[data-skin="glass"] .panel > * {
+  animation: vc-glass-panel-in 140ms var(--ease) both;
+}
+
+html[data-skin="glass"] button:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+@keyframes vc-glass-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes vc-glass-panel-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Mirrors base.css: reduced motion removes movement and keyframes unless motion is forced on. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-skin="glass"]:not([data-motion="full"]) #app .row,
+  html[data-skin="glass"]:not([data-motion="full"]) .panel > *,
+  html[data-skin="glass"]:not([data-motion="full"]) .branch-toggle svg,
+  html[data-skin="glass"]:not([data-motion="full"]) .chevron svg,
+  html[data-skin="glass"]:not([data-motion="full"]) button:active {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the row's own animation and transitions */
+    animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: must beat the chevron transition */
+    transition: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: no press movement under reduced motion */
+    transform: none !important;
+  }
+}
+
+html[data-skin="glass"][data-motion="reduce"] #app .row,
+html[data-skin="glass"][data-motion="reduce"] .panel > * {
+  /* biome-ignore lint/complexity/noImportantStyles: must beat the row's own animation */
+  animation: none !important;
+}
+
+/* Forced-colour modes drop fills, gradients and blur. Surfaces get their own border back. */
+@media (forced-colors: active) {
+  html[data-skin="glass"] body::before,
+  html[data-skin="glass"] #app .row,
+  html[data-skin="glass"] .wheel > header,
+  html[data-skin="glass"] [role="tablist"][aria-label="Panels"],
+  html[data-skin="glass"] .sticky,
+  html[data-skin="glass"] .menu,
+  html[data-skin="glass"] .dialog,
+  html[data-skin="glass"] .toast,
+  html[data-skin="glass"] .search input {
+    background-image: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  html[data-skin="glass"] .wheel > header,
+  html[data-skin="glass"] [role="tablist"][aria-label="Panels"],
+  html[data-skin="glass"] .sticky,
+  html[data-skin="glass"] .menu,
+  html[data-skin="glass"] .dialog,
+  html[data-skin="glass"] .toast,
+  html[data-skin="glass"] .search input,
+  html[data-skin="glass"] .cards .card,
+  html[data-skin="glass"] .sections > .card {
+    background: Canvas;
+    border: 1px solid ButtonText;
+  }
+}
+
+/* Disabled menu items read as 3:1 over the glass (the component's 0.45 opacity fell below it). */
+html[data-skin="glass"] .menu .entry[aria-disabled="true"] {
+  opacity: 0.6;
+}

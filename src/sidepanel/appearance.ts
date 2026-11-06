@@ -42,6 +42,7 @@ export function applyAppearance(
   if (a.mode === 'system') delete root.dataset.mode;
   else root.dataset.mode = a.mode;
   root.dataset.density = a.density;
+  root.dataset.skin = a.skin;
   root.dataset.motion = a.motion;
   root.dataset.rowLayout = settings.tabs.layout;
   root.dataset.actions = settings.tabs.actions;

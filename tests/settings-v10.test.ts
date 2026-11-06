@@ -6,7 +6,7 @@ it('upgrades v9 with archiving off and keeps existing suspend settings', () => {
     version: 9,
     suspend: { auto: true, minutes: 45, whitelist: ['a.com'] },
   });
-  expect(s.version).toBe(10);
+  expect(s.version).toBe(11);
   expect(s.suspend).toMatchObject({
     auto: true,
     minutes: 45,

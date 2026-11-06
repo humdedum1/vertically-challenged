@@ -1,14 +1,6 @@
-<div align="center">
-
-<img src="public/icon/128.png" alt="Vertically Challenged icon" width="128" height="128">
-
 # Vertically Challenged
 
-**A vertical tab list for Chrome and Firefox.**
-
-It sits in the side panel (the sidebar on Firefox), floats over the page as a popup (Chrome only), or runs in its own window. Staples, pinned folders, tab groups, saved sessions and themes come with it.
-
-I made this because I loved Sidebery and Zen Browser and couldn't get anything like them in Chromium. I kept adding the little things I wanted, and it slowly grew into this. Now there's a Firefox release too.
+**Vertical tabs for Chrome and Firefox: every tab in every window, in one searchable, local-first list.**
 
 [![Release](https://img.shields.io/github/v/release/humdedum1/vertically-challenged?label=release&color=0071e3&labelColor=1d1d1f)](https://github.com/humdedum1/vertically-challenged/releases)
 [![License: GPLv3](https://img.shields.io/badge/license-GPLv3-0071e3?labelColor=1d1d1f)](LICENSE)
@@ -16,10 +8,6 @@ I made this because I loved Sidebery and Zen Browser and couldn't get anything l
 ![Firefox 140+](https://img.shields.io/badge/Firefox-140%2B-0071e3?logo=firefoxbrowser&logoColor=white&labelColor=1d1d1f)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-install-0071e3?logo=googlechrome&logoColor=white&labelColor=1d1d1f)](https://chromewebstore.google.com/detail/vertically-challenged/bekjjhfjknegeaaaieadcgakkipcgfjm)
 [![Firefox Add-ons](https://img.shields.io/badge/Firefox_Add--ons-install-0071e3?logo=firefoxbrowser&logoColor=white&labelColor=1d1d1f)](https://addons.mozilla.org/firefox/addon/vertically-challenged/)
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/humdedum1)
-[![PayPal](https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white)](https://paypal.me/oddboxx)
-
-[Install](#install) · [Features](#features) · [Shortcuts](#keyboard-shortcuts) · [Privacy](#privacy) · [Releases](https://github.com/humdedum1/vertically-challenged/releases) · [Report a bug](https://github.com/humdedum1/vertically-challenged/issues/new/choose) · [Contribute](CONTRIBUTING.md)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/store/readme-tabs-dark.png">
@@ -32,114 +20,86 @@ I made this because I loved Sidebery and Zen Browser and couldn't get anything l
   <img src="docs/store/readme-settings-light.png" alt="Settings with every group collapsed" width="260">
 </picture>
 
-<sub>Tab list with child tabs and fuzzy search (type <code>&gt;</code> for commands) · History grouped by day · Settings with its own search. Noctalia theme, shown in your GitHub light or dark mode.</sub>
-
-<table>
-  <tr>
-    <td align="center" width="50%"><b>Local-first</b><br><sub>No telemetry, no server run by the project</sub></td>
-    <td align="center" width="50%"><b>Your choice of surface</b><br><sub>Pick it in Settings</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><b>No host permissions</b><br><sub>Nothing asked for at install</sub></td>
-    <td align="center"><b>Free, GPLv3</b><br><sub>And it stays free</sub></td>
-  </tr>
-</table>
-
-</div>
-
 > [!WARNING]
-> This was mostly written with AI coding tools and has only been tested lightly. It has unit and end-to-end tests, but they've run on a handful of machines and profiles, so expect rough edges. Keep backups of anything you can't lose, and please report what breaks.
+> **Young, AI-assisted repository.** Mostly written with AI coding tools. Tested on few machines and profiles. Expect rough edges.
 >
-> Firefox support is newer and has had much less testing than Chrome. It has been checked mainly by an automated headless smoke test, not by people using it day to day, so there will be bugs I haven't found. Pull requests that fix Firefox problems are very welcome.
+> **Firefox is less tested.** Checked mainly by an automated headless smoke test.
+>
+> **Keep backups** of anything you can't lose. [Report what breaks](https://github.com/humdedum1/vertically-challenged/issues/new/choose).
 
-## Install
+## Why it exists
 
-<table>
-  <tr>
-    <td valign="top" width="33%"><b>1. Get it</b><br>From Releases, or build it yourself.</td>
-    <td valign="top" width="33%"><b>2. Open it</b><br>Click the toolbar icon or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>.</td>
-    <td valign="top" width="33%"><b>3. Make it yours</b><br>Theme, layout, shortcuts and sync are all in Settings.</td>
-  </tr>
-</table>
+I made this because I loved Sidebery and Zen Browser and couldn't get anything like them in Chromium. I kept adding the little things I wanted, and it slowly grew into this. Now there's a Firefox release too.
 
-You need Chrome 116 or newer (141 to close the side panel with the shortcut), or Firefox 140 or newer.
+## Quick start
+
+Requires Node.js 22+ and npm.
+
+```sh
+git clone https://github.com/humdedum1/vertically-challenged.git
+cd vertically-challenged
+npm ci
+npm run build            # Chrome: .output/chrome-mv3
+npm run build:firefox    # Firefox: .output/firefox-mv3
+```
+
+- **Load in Chrome:** `chrome://extensions` → Developer mode → Load unpacked → `.output/chrome-mv3`.
+- **Load in Firefox:** `about:debugging` → This Firefox → Load Temporary Add-on → `.output/firefox-mv3/manifest.json`. Removed when Firefox closes.
+- **Open the panel:** toolbar icon or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>.
+
+## Install a release
 
 - **Chrome Web Store:** [install from the store](https://chromewebstore.google.com/detail/vertically-challenged/bekjjhfjknegeaaaieadcgakkipcgfjm).
-- **Firefox:** download the signed `.xpi` from [Releases](https://github.com/humdedum1/vertically-challenged/releases) and open it in Firefox. The [addons.mozilla.org listing](https://addons.mozilla.org/firefox/addon/vertically-challenged/) isn't public until Mozilla's review finishes.
-- **Chrome, from Releases:** download `vertically-challenged-<version>-crx.zip` and extract the signed `.crx`. Chrome often blocks extensions from outside the Web Store. If it blocks this one, use an unpacked build instead. The zip isn't an unpacked folder, so Load unpacked won't accept it.
-- **From source:** see [Build from source](#build-from-source).
+- **addons.mozilla.org:** [listing](https://addons.mozilla.org/firefox/addon/vertically-challenged/) isn't public until Mozilla's review finishes.
+- **Firefox release:** open the signed `.xpi` from [Releases](https://github.com/humdedum1/vertically-challenged/releases).
+- **Chrome release:** extract the signed `.crx` from `vertically-challenged-<version>-crx.zip`. Chrome often blocks it outside the Web Store. Fall back to an unpacked build.
 
-## Features
+## Capabilities
 
-<table>
-  <tr>
-    <td valign="top" width="50%">
-      <b>Organize</b>
-        <ul>
-          <li><b>One list for every window.</b> Each normal window gets a name and its active tab. Incognito and private windows stay separate.</li>
-          <li><b>Staples.</b> A compact grid of the pages you use all day, each with a fixed home URL. A closed tile reopens when you click it.</li>
-          <li><b>Pinned tabs and folders.</b> Folders can nest, take custom icons, and be dragged between sections or windows.</li>
-          <li><b>Child tabs.</b> A tab opened from a page can sit under it. Drag to nest or unnest.</li>
-          <li><b>Tab groups.</b> Create, rename, recolor, collapse and move the browser's own groups.</li>
-        </ul>
-    </td>
-    <td valign="top" width="50%">
-      <b>Find and select</b>
-        <ul>
-          <li><b>Search.</b> Fuzzy search over titles and URLs, and over bookmarks, history, saved sessions and snoozed tabs. Settings has its own search box.</li>
-          <li><b>Multi-select.</b> Pick a range or single tabs and act on them together.</li>
-          <li><b>Bookmarks, history, recently closed.</b> Each has its own panel for searching and opening. Closed tabs and windows can be reopened.</li>
-        </ul>
-    </td>
-  </tr>
-  <tr>
-    <td valign="top">
-      <b>Declutter</b>
-        <ul>
-          <li><b>Clear.</b> Closes ordinary tabs. Staples and pins stay.</li>
-          <li><b>Suspend tabs.</b> Discard tabs by hand or after a stretch of inactivity. Pinned and audible tabs and sites you pick can be excluded. The browser reloads a tab when you switch back to it.</li>
-          <li><b>Snooze and park.</b> Put a tab away until later today, tomorrow, Monday or next month, or park it without a reminder. Snoozed tabs come back on time, even after a restart.</li>
-          <li><b>Tidy up.</b> "Tidy up tabs…" in the command palette lists tabs you haven't touched for 7, 30 or 90 days, grouped by site, so you can park or close a whole site at once.</li>
-        </ul>
-    </td>
-    <td valign="top">
-      <b>Make it yours</b>
-        <ul>
-          <li><b>Themes and appearance.</b> Built-in and custom themes, accent colors, light, dark or system mode, import and export. You can also change density, fonts, row layout, panel order, which sections show and which actions each tab offers.</li>
-          <li><b>Shortcuts and menus.</b> Rebind the in-panel shortcuts, the browser-level commands and the context-menu actions.</li>
-          <li><b>Panel recovery.</b> Reload the panel from the button next to the color mode, or from its context menu.</li>
-        </ul>
-    </td>
-  </tr>
-  <tr>
-    <td valign="top" colspan="2">
-      <b>Save and move</b>
-        <ul>
-          <li><b>Window setups.</b> Save window names, Staples, pins and folders to reuse later.</li>
-          <li><b>Saved sessions.</b> Save one window or all of them and restore the tabs, groups and pinned layout. Export as a Markdown outline or a bookmarks file.</li>
-          <li><b>Other devices.</b> Browse workspaces and sessions from your other computers, open them, or keep a copy.</li>
-          <li><b>Full backups.</b> Scheduled, optionally encrypted backups to Downloads, WebDAV (Nextcloud works), S3-compatible storage or Dropbox. You can restore from the server, undo a restore, and see a warning on the toolbar button if backups stop.</li>
-        </ul>
-    </td>
-  </tr>
-</table>
+**Organize**
+- **One list** for every window, with window names.
+- **Staples grid** of daily pages with fixed home URLs.
+- **Nested pinned folders** with custom icons, draggable between sections and windows.
+- **Child tabs** nested under their opener.
+- **Native tab groups:** create, rename, recolor, collapse, move.
 
-### Chrome and Firefox
+**Find and select**
+- **Fuzzy search** over tabs, bookmarks, history, saved sessions and snoozed tabs.
+- **Command palette:** type `>`.
+- **Multi-select** ranges or single tabs for bulk actions.
+- **Dedicated panels** for bookmarks, history and recently closed.
 
-Everything above should work on both, with these exceptions. Firefox is the less tested of the two (see the note at the top), and fixes for it are especially welcome.
+**Declutter**
+- **Clear** closes ordinary tabs. Keeps Staples and pins.
+- **Suspend tabs** by hand or after inactivity, with exclusions.
+- **Snooze and park** tabs. Snoozed tabs return on time, even after a restart.
+- **Tidy up** tabs untouched for 7, 30 or 90 days, grouped by site.
 
-| | Chrome | Firefox |
+**Customize**
+- **Themes and CSS:** built-in or custom themes, accent colors, custom CSS, import and export.
+- **Layout controls:** density, fonts, row layout, panel order, visible sections, tab actions.
+- **Rebindable input:** in-panel shortcuts, browser commands, context-menu actions.
+
+**Save and restore**
+- **Window setups** store names, Staples, pins and folders.
+- **Saved sessions** restore tabs, groups and pinned layout. Export as Markdown or bookmarks.
+- **Other devices:** browse, open or keep workspaces from your other computers.
+- **Full backups:** scheduled, optionally encrypted, to Downloads, WebDAV, S3-compatible storage or Dropbox.
+- **Restore safety:** restore from the server, undo a restore, get a toolbar warning if backups stop.
+
+## Chrome and Firefox
+
+| | Chrome 116+ | Firefox 140+ |
 | --- | --- | --- |
-| Where the panel opens | Side panel, in-page popup, or window | Sidebar or window |
-| Synced tabs from other devices (Other devices) | Yes, Chrome's own list | No. Firefox has no API for it. Workspaces and sessions from this extension still sync. |
-| Favicons | From the browser's cache | Loaded from each site's own server |
-| Remote images in custom CSS | Blocked | Blocked, and a stylesheet that tries is left unapplied |
+| Surface | Side panel, in-page popup, window | Sidebar, window |
+| Browser's synced tabs from other devices | Yes | No API. Extension workspaces and sessions still sync. |
+| Favicons | Browser cache | Each site's own server |
+| Remote images in custom CSS | Blocked | Blocked, stylesheet left unapplied |
 
-An in-page popup setting that arrives on Firefox through a backup opens the window instead. Firefox doesn't give a page that's embedded in a website the tabs and windows APIs the panel needs.
+- **Closing by shortcut:** closing the Chrome side panel with the shortcut needs Chrome 141+.
+- **Popup setting on Firefox:** arriving through a backup, it opens the window instead.
 
 ## Keyboard shortcuts
-
-<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> opens and closes the panel. Search, selection, tab navigation and context menus all work from the keyboard. Rebind the in-panel shortcuts in Settings. To rebind the browser-level commands below, use `chrome://extensions/shortcuts` in Chrome, or Settings → Shortcuts in Firefox, which opens Firefox's own shortcut manager.
 
 | Command | Default |
 | --- | --- |
@@ -147,93 +107,72 @@ An in-page popup setting that arrives on Firefox through a backup opens the wind
 | Open the panel with search focused | Unassigned |
 | Suspend the current tab | Unassigned |
 | Suspend the other tabs in the window | Unassigned |
-| Switch to the previously used tab (press again to go further back) | Unassigned |
+| Switch to the previously used tab (repeat to go further back) | Unassigned |
 | Switch forward through recently used tabs | Unassigned |
 
-On Chrome, the popup only injects into a page after you click the toolbar button or press a shortcut on that tab, so the extension never needs access to every site. Where Chrome blocks injection, the popup opens in its own window.
+- **In-panel shortcuts:** rebind in Settings.
+- **Browser commands:** `chrome://extensions/shortcuts` in Chrome, Settings → Shortcuts in Firefox.
 
 ## Sync and its limits
 
-Sync goes through your browser's own sync, which means Chrome Sync or Firefox Sync. Chrome and Firefox don't share data with each other.
-
-Sign in to the same account on each computer, turn on sync for extensions, and install the extension on all of them. Settings and themes sync as soon as they change. Open workspaces publish on a schedule you set, from manual to every 60 minutes. On Chrome, the browser's own remote-tab list also needs its Open tabs sync setting turned on.
-
-<details>
-<summary>How it works, and the limits</summary>
-
-- Open workspaces publish ordinary tabs, groups, Staples, pins, folders and window names. Saved setups and sessions can be shared too. Settings → Sync sets how often: manual, or every 1, 5, 15, 30 or 60 minutes. Sync now publishes immediately. Scheduled runs use browser alarms, so they can fire late while the computer sleeps. The interval doesn't change how fast settings and themes sync, or how fast Google or Mozilla delivers the data.
-- Published data shows up under Sessions → Other devices. Nothing opens or closes on the other computer by itself. "Keep here" saves a workspace's pinned layout as a setup, plus a full snapshot in Saved sessions if it has ordinary tabs.
-- Incognito and private tabs and extension pages are never captured, and snapshots don't carry browser tab IDs.
-- Chrome's sync storage holds about 100 KB in total for settings, themes and compressed snapshots, so a big collection may not fit. Settings shows storage errors and skipped snapshots. I haven't measured Firefox's limit, but the extension budgets the same way. For real backups, use Full backups.
-
-File backups cover settings, custom themes, Staples, pins, nested folders and window setups. They don't cover incognito layouts. Importing adds layouts under Sessions → Window setups without touching open windows or existing setups, and older settings-only backups still import. Updates and reloads keep saved layouts when their tabs can be matched. Uninstalling deletes the extension's local data for good, and reinstalling won't bring it back.
-
-</details>
+- **Transport:** Chrome Sync or Firefox Sync. The two browsers share nothing.
+- **Setup:** same account, extension sync on, extension installed on each computer.
+- **Chrome remote tabs:** also need the Open tabs sync setting.
+- **Settings and themes** sync on change.
+- **Open workspaces** publish manually or every 1, 5, 15, 30 or 60 minutes. Alarms can fire late during sleep.
+- **Received data** appears under Sessions → Other devices. Nothing opens or closes by itself.
+- **Keep here** saves the pinned layout as a setup, plus a snapshot if ordinary tabs exist.
+- **Never captured:** incognito and private tabs, extension pages, browser tab IDs.
+- **Storage cap:** about 100 KB on Chrome. Firefox's limit is unmeasured, same budget used. Settings shows errors and skipped snapshots.
+- **File backups** cover settings, custom themes, Staples, pins, nested folders and window setups. Incognito layouts excluded.
+- **Imports** add layouts under Sessions → Window setups. Open windows and existing setups stay untouched. Settings-only backups still import.
+- **Uninstalling** deletes local data permanently.
 
 ## Permissions
 
-No host permissions are requested at install.
+No host permissions requested at install.
 
 <details>
 <summary>Every permission and why</summary>
 
 | Permission | Why |
 | --- | --- |
-| `tabs` | Titles and URLs for the list and search, and switching and closing tabs. |
-| `sidePanel` (Chrome) | Show the UI in Chrome's side panel. Firefox uses its sidebar instead, which needs no permission. |
-| `favicon` (Chrome) | Load favicons without host permissions. |
-| `storage` | Settings (synced), plus local layouts and sessions. |
-| `tabGroups` | Manage the browser's native tab groups. |
+| `tabs` | Titles and URLs for list and search. Switching and closing tabs. |
+| `sidePanel` (Chrome) | Chrome side panel UI. Firefox's sidebar needs no permission. |
+| `favicon` (Chrome) | Favicons without host permissions. |
+| `storage` | Synced settings, local layouts and sessions. |
+| `tabGroups` | Native tab groups. |
 | `sessions` | Recently closed tabs and windows. |
-| `bookmarks` | The Bookmarks panel. |
-| `history` | The History panel: read, search and delete. |
-| `alarms` | Auto-suspend and scheduled sync. The background page sleeps when idle, so `setTimeout` can't be relied on. |
-| `contextMenus` | Items like "Suspend tab" and "Save window as session" in the browser's menus. |
-| `activeTab`, `scripting` | Chrome's in-page popup is injected into the current tab, after you invoke it there. |
-| `notifications` (optional) | Only for Open on launch. Chrome won't open the side panel without a user gesture, so a notification does it on click. |
-| `downloads` (optional) | Only for automatic backups to Downloads. |
-| Server address (optional) | Only for WebDAV, S3-compatible or Dropbox backups, and only the one address you enter. |
-| `identity` (optional on Chrome) | Only for Dropbox sign-in, with your own Dropbox app key. No shared credentials ship with the extension. Firefox doesn't allow `identity` as optional, so it's declared at install there. |
+| `bookmarks` | Bookmarks panel. |
+| `history` | History panel: read, search, delete. |
+| `alarms` | Auto-suspend and scheduled sync. The background page sleeps, so `setTimeout` is unreliable. |
+| `contextMenus` | Browser menu items. |
+| `activeTab`, `scripting` | Chrome in-page popup, injected after you invoke it on that tab. |
+| `notifications` (optional) | Open on launch. Chrome needs a user gesture, so a notification click supplies it. |
+| `downloads` (optional) | Automatic backups to Downloads. |
+| Server address (optional) | WebDAV, S3-compatible or Dropbox backups. Only the address you enter. |
+| `identity` (optional on Chrome) | Dropbox sign-in with your own app key. Required at install on Firefox, which doesn't allow it as optional. |
 
 </details>
 
-## Build from source
+## Development
 
-You need Node.js 22 or newer and npm.
-
-```sh
-git clone https://github.com/humdedum1/vertically-challenged.git
-cd vertically-challenged
-npm ci
-npm run build            # Chrome, into .output/chrome-mv3
-npm run build:firefox    # Firefox, into .output/firefox-mv3
-```
-
-**Chrome:** open `chrome://extensions`, turn on Developer mode, click Load unpacked and pick `.output/chrome-mv3`. To update, rebuild into the same folder and click Reload.
-
-**Firefox:** open `about:debugging`, choose This Firefox, click Load Temporary Add-on and pick `.output/firefox-mv3/manifest.json`. A temporary add-on goes away when Firefox closes. Release builds are signed, which is the only way to keep an add-on installed in regular Firefox.
-
-## Development and testing
-
-TypeScript, Svelte 5, WXT, Vitest, Playwright, Selenium and Biome.
-
-<details>
-<summary>Commands and end-to-end setup</summary>
+Stack: TypeScript, Svelte 5, WXT, Vitest, Playwright, Selenium, Biome.
 
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Dev browser with hot reload |
-| `npm run build` | Production build in `.output/chrome-mv3` |
-| `npm run build:firefox` | Production build in `.output/firefox-mv3` |
-| `npm run start:firefox` | Build for Firefox and run it with web-ext (`WEB_EXT_FIREFOX` is the Firefox binary) |
-| `npm run zip` / `zip:firefox` | Zip a build (not a signed CRX or XPI) |
-| `npm run pack:crx` | Signed CRX in a release ZIP (needs the signing key, see [CONTRIBUTING.md](CONTRIBUTING.md)) |
+| `npm run start:firefox` | Firefox build through web-ext (`WEB_EXT_FIREFOX` sets the binary) |
+| `npm run zip` / `zip:firefox` | Zip a build (unsigned) |
+| `npm run pack:crx` | Signed CRX in a release ZIP (needs the signing key) |
 | `npm run lint` | Formatting and lint |
 | `npm run check` | Svelte and TypeScript checks |
 | `npm test` | Unit and integration tests |
-| `npm run test:e2e` | Real Chromium runs against the built extension |
-| `npm run test:e2e:firefox` | Headless Firefox smoke test (`FIREFOX_BIN` is a Firefox 140+ binary) |
+| `npm run test:e2e` | Chromium against the built extension |
+| `npm run test:e2e:firefox` | Headless Firefox smoke (`FIREFOX_BIN` sets a 140+ binary) |
 | `npm run bench:pure` | Pure-function benchmarks |
+| `just ci` | Install, lint, typecheck, unit tests, both builds, web-ext lint |
+| `just qa` | Builds, Chromium e2e, Firefox 140 smoke |
 
 ```sh
 npx playwright-core install chromium
@@ -241,30 +180,31 @@ npm run build
 npm run test:e2e
 ```
 
-The Chromium tests use throwaway profiles and need Chromium or Chrome for Testing, because branded Chrome ignores the flag that loads test extensions. Set `CHROME_BIN` to use your own binary. The Firefox test loads the unpacked build as a temporary add-on. Firefox won't run injected script files from a temporary add-on, so the test can't cover anything that depends on that. `node tests/e2e/shots.mjs` regenerates the screenshots above in Noctalia light and dark. Profiling and benchmarks are in [bench/README.md](bench/README.md).
-
-</details>
+- **E2E browser:** Chromium or Chrome for Testing. Branded Chrome ignores the test-extension flag. `CHROME_BIN` overrides.
+- **Firefox coverage gap:** temporary add-ons can't run injected script files, so the smoke test can't cover them.
+- **Screenshots:** `node tests/e2e/shots.mjs`.
+- **Profiling:** [bench/README.md](bench/README.md).
 
 ## Privacy
 
-The full policy is in [docs/PRIVACY.md](docs/PRIVACY.md). There's no analytics and no server run by the project.
+- **No analytics.** No server run by the project.
+- **Sync caveat:** shared tab URLs, titles, workspaces and settings travel through Chrome Sync or Firefox Sync.
+- **Firefox favicons** come from each site's server.
+- **Bookmarks and history** stay out of workspace snapshots.
+- **Full policy:** [docs/PRIVACY.md](docs/PRIVACY.md).
 
-With sync on, the tab URLs, titles, workspace data and settings you share travel through Chrome Sync or Firefox Sync, so "local-first" doesn't mean nothing ever leaves your computer. On Firefox, favicons are fetched from each site's own server. Bookmarks and history stay in the browser, and showing them in the panel doesn't copy them into workspace snapshots. Please keep private browsing data out of issues.
+## Contributing and security
 
-## Contributing
+- **Pull requests:** feature branch, focused change, checks listed. See [CONTRIBUTING.md](CONTRIBUTING.md).
+- **AI-assisted PRs** are welcome once reviewed and tested by you.
+- **Firefox fixes** are especially welcome.
+- **Versions:** SemVer, Conventional Commits, automatic releases from `main`.
+- **Vulnerabilities:** follow [SECURITY.md](SECURITY.md).
 
-Work on a feature branch and open a focused PR. Say what was wrong, what you changed, and which checks you ran. AI-assisted PRs are welcome if you've reviewed and tested them and kept private data out. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [issue chooser](https://github.com/humdedum1/vertically-challenged/issues/new/choose).
+## Support
 
-Versions follow Semantic Versioning, commits follow Conventional Commits, and releases are cut from `main` automatically. Don't bump versions or tag in ordinary PRs.
-
-## Security
-
-Report vulnerabilities as described in [SECURITY.md](SECURITY.md), and keep exploit details out of public issues and PRs.
-
-## Support the project
-
-It's free under the [GNU GPLv3](LICENSE), and it will stay free for the foreseeable future. If it saves you time, you can chip in on [Ko-fi](https://ko-fi.com/humdedum1) or [PayPal](https://paypal.me/oddboxx). Donations are optional and unlock nothing. Bug reports, testing on your setup, doc fixes and code review help just as much.
+Optional. Unlocks nothing. [Ko-fi](https://ko-fi.com/humdedum1) · [PayPal](https://paypal.me/oddboxx)
 
 ## License
 
-[GPL-3.0-or-later](LICENSE). Third-party palettes keep their own notices in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[GPL-3.0-or-later](LICENSE). Third-party palettes: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

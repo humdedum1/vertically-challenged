@@ -79,21 +79,23 @@ Vertical tabs in Chrome's side panel: search, pin, group, snooze and back up. Lo
 ## Detailed description
 
 ```text
-Vertically Challenged puts all your tabs in a fast, searchable vertical list in Chrome's side
-panel (or an in-page popup, or its own window).
+🗂️ Every tab in every window, in one searchable vertical list. Free, open source and local-first.
 
-- Every tab in every window, with window names. Incognito stays separate.
-- Search tabs with fuzzy matching, or type > to run commands from the keyboard.
-- Staples, pinned folders, child tabs and native tab groups.
-- Save sessions and window setups, restore them later, or snooze a tab until tomorrow.
-- Suspend idle tabs to save memory.
-- Themes, density and layout you control, including custom CSS.
-- Full backups with optional encryption, saved to Downloads, Nextcloud/WebDAV, S3-compatible
-  storage or Dropbox, on a schedule you choose. Restore from the server in one click.
-- Free and open source (GPLv3). No account, no analytics, no ads.
+• Side panel, sidebar or window: side panel and in-page popup on Chrome, sidebar on Firefox, own window on both.
+• One list: every tab in every window, with window names. Incognito stays separate.
+• Staples: a grid of the pages you use all day.
+• Pinned folders and child tabs: nest, drag and arrange.
+• Tab Groups: create, rename, recolor, collapse and move native groups.
+• Search: fuzzy matching, plus > for keyboard commands.
+• Snoozing: put a tab away until tomorrow, or park it without a reminder.
+• Suspensions: discard idle tabs to save memory.
+• Sessions: save sessions and window setups, restore them later.
+• Themes: density, layout and custom CSS.
+• Backups: optional encryption, on your schedule, to Downloads, Nextcloud/WebDAV, S3-compatible storage or Dropbox.
+• Local-first privacy: no account, no analytics, no ads, no server run by the project.
+• License: free and open source (GPLv3).
 
-This is a young, AI-assisted project with a small test sample. Keep backups of anything you
-cannot afford to lose, and please report problems on GitHub.
+Young, AI-assisted project with a small test sample. Firefox support has had much less testing than Chrome. Keep backups of anything you cannot afford to lose, and report problems on GitHub.
 
 Source code and issue tracker: https://github.com/humdedum1/vertically-challenged
 ```

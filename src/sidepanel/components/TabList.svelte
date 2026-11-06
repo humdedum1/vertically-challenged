@@ -406,7 +406,7 @@ function mouseAction(action: MouseAction, tab: TabInfo): void {
       send({ type: 'discard', tabIds });
       return;
     case 'duplicate':
-      send({ type: 'duplicate', tabId: tab.id });
+      for (const id of tabIds) send({ type: 'duplicate', tabId: id });
       return;
     case 'pin':
       send({ type: 'setPinned', tabIds, pinned: !tab.pinned });
@@ -1375,7 +1375,12 @@ function onSearchKeydown(e: KeyboardEvent): void {
   } else if (e.key === 'Escape') {
     e.preventDefault();
     if (query !== '') query = '';
-    else searchInput?.blur();
+    // Back to the tree, not <body>, so the arrow keys keep working.
+    else {
+      const t = tree();
+      if (t) t.focus();
+      else searchInput?.blur();
+    }
   }
 }
 

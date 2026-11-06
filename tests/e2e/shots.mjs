@@ -7,7 +7,7 @@ const SITES = [
   'https://github.com/',
   'https://developer.mozilla.org/en-US/',
   'https://news.ycombinator.com/',
-  'https://www.rust-lang.org/',
+  'https://www.python.org/',
   'https://svelte.dev/',
 ];
 const { ctx, extId, close } = await launch(extensionDir(), {

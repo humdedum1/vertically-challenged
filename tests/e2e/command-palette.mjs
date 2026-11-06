@@ -31,6 +31,8 @@ try {
   assert.equal(await count(), 1);
   assert.equal(await search.inputValue(), '');
 
+  // Closing tabs mounts this section below the list, shrinking it; wait so it can't land after the scroll.
+  await page.getByText('Recently closed').waitFor();
   await search.fill('>theme');
   const last = list.getByRole('button').last();
   await last.scrollIntoViewIfNeeded();

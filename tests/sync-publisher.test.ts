@@ -284,3 +284,17 @@ describe('sync publisher', () => {
     expect((await status(local)).error).toBe('Sync storage is full');
   });
 });
+
+describe('device identity', () => {
+  it('creates one id when first calls overlap', async () => {
+    const { p } = setup();
+    const [a, b] = await Promise.all([p.device(), p.device()]);
+    expect(a.id).toBe(b.id);
+  });
+
+  it('picks up a rename', async () => {
+    const { p } = setup();
+    await p.rename('Desk');
+    expect((await p.device()).name).toBe('Desk');
+  });
+});

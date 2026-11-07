@@ -19,7 +19,9 @@ export function selectToDelete(names: readonly string[], keep: number): string[]
   const byDevice = new Map<string, string[]>();
   for (const n of names) {
     if (!BACKUP_FILE.test(n)) continue;
-    const device = n.slice('vc-backup-00000000-000000'.length);
+    const suffix = n.slice('vc-backup-00000000-000000'.length);
+    // Newer names end in the stable device id, so a renamed device still prunes its old copies.
+    const device = /-([a-z0-9]{10})\.vcb$/.exec(suffix)?.[1] ?? suffix;
     byDevice.set(device, [...(byDevice.get(device) ?? []), n]);
   }
   return [...byDevice.values()].flatMap((list) => list.sort().reverse().slice(Math.max(1, keep)));

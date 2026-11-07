@@ -524,11 +524,13 @@ export function startBackground(): void {
     storage: browser.storage.local,
     target: (cfg: BackupConfig) => makeTarget(cfg, downloadsTarget),
     version: browser.runtime.getManifest().version,
-    device: async () =>
-      String(
-        ((await browser.storage.local.get(DEVICE_KEY))[DEVICE_KEY] as { name?: string })?.name ??
-          '',
-      ),
+    device: async () => {
+      const d = (await browser.storage.local.get(DEVICE_KEY))[DEVICE_KEY] as
+        | { id?: string; name?: string }
+        | undefined;
+      // Readable name first, then the stable id that retention groups by.
+      return [d?.name, d?.id].filter(Boolean).join('-');
+    },
     collect: async () => {
       await pins.loaded;
       const [sync, local] = await Promise.all([

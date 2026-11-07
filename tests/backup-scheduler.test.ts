@@ -333,3 +333,22 @@ describe('davUrl', () => {
     });
   });
 });
+
+describe('audit fixes', () => {
+  it('backs up again when encryption is switched on, even with unchanged data', async () => {
+    const t = target();
+    const { storage, deps } = setup({ target: 'downloads' }, t);
+    await runBackup(deps);
+    storage.data[CONFIG_KEY] = { target: 'downloads', passphrase: 'secret' };
+    const s = await runBackup(deps);
+    expect(s.skipped).toBeUndefined();
+    expect(t.files.size).toBe(2);
+  });
+
+  it('prunes a renamed device by its id', () => {
+    const at = (s: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, s));
+    const old = backupName(at(1), 'Old name-abcde12345');
+    const fresh = backupName(at(2), 'New name-abcde12345');
+    expect(selectToDelete([old, fresh], 1)).toEqual([old]);
+  });
+});

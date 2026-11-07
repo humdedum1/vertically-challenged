@@ -156,8 +156,12 @@ export function parseConfig(raw: unknown): BackupConfig {
   };
 }
 
-/** Identifies a destination without secrets. */
+/** Identifies a destination (and whether it gets encrypted copies) without secrets. */
 export function targetKey(c: BackupConfig): string {
+  return `${c.passphrase ? 'enc:' : ''}${rawTargetKey(c)}`;
+}
+
+function rawTargetKey(c: BackupConfig): string {
   return c.target === 'webdav'
     ? `webdav:${c.webdav.url}`
     : c.target === 's3'

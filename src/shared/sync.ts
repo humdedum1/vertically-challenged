@@ -285,6 +285,8 @@ export async function decodeDoc(b64: string): Promise<unknown> {
 
 // --- Fitting into a budget ----------------------------------------------------------------------
 
+const MIN_ITEM_CHARS = 16;
+
 /**
  * The largest document in priority order (workspaces, then sessions, each list already
  * ordered) whose encoding stays within `budget` characters. An item that doesn't fit is
@@ -305,6 +307,12 @@ export async function fitDoc(
   };
   let encoded = await encodeDoc(doc);
   const tryAdd = async (add: () => void, undo: () => void, kind: 'workspaces' | 'sessions') => {
+    // shortcut: an item that would compress under MIN_ITEM_CHARS is counted as omitted
+    // once the budget is all but used; drop the check if exact packing ever matters.
+    if (budget - encoded.length < MIN_ITEM_CHARS) {
+      doc.omitted[kind]++;
+      return;
+    }
     add();
     const next = await encodeDoc(doc);
     if (next.length <= budget) {

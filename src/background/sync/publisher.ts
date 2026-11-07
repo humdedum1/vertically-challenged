@@ -73,7 +73,17 @@ export function createSyncPublisher(deps: PublisherDeps) {
   /** Content of the last publish, without its timestamp, so unchanged state isn't rewritten. */
   let lastContent: string | null = null;
 
-  async function device(): Promise<SyncDevice> {
+  // Cached so concurrent first calls can't each create (and publish under) a different id.
+  let cached: Promise<SyncDevice> | null = null;
+  function device(): Promise<SyncDevice> {
+    cached ??= loadDevice().catch((err) => {
+      cached = null;
+      throw err;
+    });
+    return cached;
+  }
+
+  async function loadDevice(): Promise<SyncDevice> {
     const raw = (await deps.local.get(DEVICE_KEY))[DEVICE_KEY] as Partial<SyncDevice> | undefined;
     const os = await deps.platform().catch(() => '');
     if (
@@ -234,6 +244,7 @@ export function createSyncPublisher(deps: PublisherDeps) {
       const trimmed = name.trim().slice(0, MAX_DEVICE_NAME);
       if (!trimmed || trimmed === me.name) return;
       await deps.local.set({ [DEVICE_KEY]: { id: me.id, name: trimmed } });
+      cached = null;
       await run(true);
     },
   };

@@ -24,3 +24,7 @@ docs/release-history.md
 docs/security-review-*.md
 docs/store-listing.md
 output/
+
+# Local skills installer state
+.agents/
+skills-lock.json

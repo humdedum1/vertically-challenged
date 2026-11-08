@@ -74,10 +74,12 @@ function onkeydown(e: KeyboardEvent): void {
   }
 
   button {
-    flex: 1;
+    /* Size to the label so a long one ("In-page popup") doesn't wrap at narrow widths. */
+    flex: 1 1 auto;
     min-width: 0;
     height: 28px;
-    padding: 0 10px;
+    padding: 0 8px;
+    white-space: nowrap;
     border: 0;
     border-radius: 999px;
     background: transparent;

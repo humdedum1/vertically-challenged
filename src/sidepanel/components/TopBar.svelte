@@ -20,10 +20,13 @@ const next = $derived(ORDER[(ORDER.indexOf(mode) + 1) % ORDER.length] as ColorMo
 </script>
 
 <header>
-  {#if showBack}
-    <button type="button" class="round" aria-label="Back" onclick={onback}><Icon name="back" /></button>
-  {/if}
+  <div class="side">
+    {#if showBack}
+      <button type="button" class="round" aria-label="Back" onclick={onback}><Icon name="back" /></button>
+    {/if}
+  </div>
   <h1>{title}</h1>
+  <div class="side end">
   <button type="button" class="round" aria-label="Reload panel" title="Reload panel" onclick={() => window.location.reload()}>
     <Icon name="sync" />
   </button>
@@ -41,22 +44,33 @@ const next = $derived(ORDER[(ORDER.indexOf(mode) + 1) % ORDER.length] as ColorMo
       <Icon name="close" />
     </button>
   {/if}
+  </div>
 </header>
 
 <style>
+  /* Equal side columns keep the title centred whatever buttons sit on either side. */
   header {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr minmax(0, auto) 1fr;
     align-items: center;
     gap: 6px;
     min-height: 36px;
     padding: 0 2px;
   }
 
+  .side {
+    display: flex;
+    gap: 6px;
+  }
+
+  .end {
+    justify-content: flex-end;
+  }
+
   h1 {
-    flex: 1;
     min-width: 0;
     margin: 0;
-    padding-left: 4px;
+    text-align: center;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;

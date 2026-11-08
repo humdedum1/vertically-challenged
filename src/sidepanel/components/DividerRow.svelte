@@ -52,7 +52,7 @@ const tabsWord = $derived(clearable === 1 ? 'tab' : 'tabs');
       <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <path d="M8 3v9M4 8.5 8 12.5l4-4" />
       </svg>
-      Clear
+      Clear{clearable ? ` ${clearable}` : ''}
     </button>
   {/if}
 </div>

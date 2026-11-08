@@ -366,9 +366,10 @@ function muteClick(e: MouseEvent): void {
     outline: none;
   }
 
+  /* Secondary text colour, not a fade or italics: the moon icon already says "suspended",
+     and a faded italic title was hard to read on translucent (glass) cards. */
   .row.discarded .label {
-    opacity: 0.6;
-    font-style: italic;
+    color: var(--mOnSurfaceVariant);
   }
 
   .icon {

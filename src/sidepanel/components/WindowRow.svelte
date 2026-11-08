@@ -88,14 +88,14 @@ let {
     height: var(--row-height);
     padding: 0 8px 0 4px;
     border-radius: var(--radius-row);
-    background: var(--state-hover);
+    /* A section header, not a control: no resting fill (it read as a button), same as group rows. */
     cursor: default;
     user-select: none;
     transition: background-color var(--dur) var(--ease);
   }
 
   .row:hover {
-    background: var(--state-pressed);
+    background: var(--state-hover);
   }
 
   .row.focused {

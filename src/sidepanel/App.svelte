@@ -336,6 +336,8 @@ const count = $derived(tabState.tabs.length);
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    /* Reserve the scrollbar's lane so it never sits on top of the cards' right edge. */
+    scrollbar-gutter: stable;
   }
 
   .sections {

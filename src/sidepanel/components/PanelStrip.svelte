@@ -109,6 +109,7 @@ function onkeydown(e: KeyboardEvent): void {
 <style>
   .strip {
     display: flex;
+    justify-content: safe center;
     gap: 6px;
     padding: 2px;
     overflow-x: auto;

@@ -184,7 +184,7 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
                 {/each}
               </span>
               <span class="name">{t.name}</span>
-              {#if t.id === activeId}<span class="inuse">In use</span>{:else if custom}<span class="badge custom">Custom</span>{/if}
+              {#if t.id === activeId}<span class="inuse" title="In use"><span aria-hidden="true">✓</span><span class="sr">In use</span></span>{:else if custom}<span class="badge custom">Custom</span>{/if}
             </button>
             <button
               type="button"
@@ -363,11 +363,28 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
     gap: 6px;
   }
 
+  /* A check, not a word: at narrow widths the word pushed the theme name into an ellipsis. */
   .inuse {
     flex: none;
     color: var(--mPrimary);
     font-size: calc(var(--font-size) - 1px);
     font-weight: 600;
+  }
+
+  /* Narrow panels: the two surface swatches go, so the theme name isn't cut to "Noct…". */
+  @media (max-width: 320px) {
+    .strip > span:nth-child(n + 4) {
+      display: none;
+    }
+  }
+
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .import {

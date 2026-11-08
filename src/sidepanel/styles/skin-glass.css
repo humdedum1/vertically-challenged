@@ -57,12 +57,18 @@ html[data-skin="glass"] .wheel > header {
 }
 
 html[data-skin="glass"] [role="tablist"][aria-label="Panels"] {
+  padding: 4px;
   border-radius: var(--radius-card);
+}
+
+/* Concentric with the strip: inner radius = outer radius minus the 4px inset. */
+html[data-skin="glass"] [role="tablist"][aria-label="Panels"] button {
+  border-radius: max(4px, calc(var(--radius-card) - 4px));
 }
 
 html[data-skin="glass"] .wheel > header,
 html[data-skin="glass"] [role="tablist"][aria-label="Panels"],
-html[data-skin="glass"] .sticky,
+html[data-skin="glass"] .sticky > .card,
 html[data-skin="glass"] .menu,
 html[data-skin="glass"] .dialog {
   background: var(--glass), var(--glass-solid);
@@ -102,7 +108,7 @@ html[data-skin="glass"] [role="tablist"][aria-label="Panels"] {
 @supports (backdrop-filter: blur(1px)) {
   html[data-skin="glass"] .wheel > header,
   html[data-skin="glass"] [role="tablist"][aria-label="Panels"],
-  html[data-skin="glass"] .sticky,
+  html[data-skin="glass"] .sticky > .card,
   html[data-skin="glass"] .menu,
   html[data-skin="glass"] .dialog {
     background: var(--glass), var(--glass-fill);
@@ -298,7 +304,7 @@ html[data-skin="glass"][data-motion="reduce"] .panel > * {
   html[data-skin="glass"] #app .row,
   html[data-skin="glass"] .wheel > header,
   html[data-skin="glass"] [role="tablist"][aria-label="Panels"],
-  html[data-skin="glass"] .sticky,
+  html[data-skin="glass"] .sticky > .card,
   html[data-skin="glass"] .menu,
   html[data-skin="glass"] .dialog,
   html[data-skin="glass"] .toast,
@@ -310,7 +316,7 @@ html[data-skin="glass"][data-motion="reduce"] .panel > * {
 
   html[data-skin="glass"] .wheel > header,
   html[data-skin="glass"] [role="tablist"][aria-label="Panels"],
-  html[data-skin="glass"] .sticky,
+  html[data-skin="glass"] .sticky > .card,
   html[data-skin="glass"] .menu,
   html[data-skin="glass"] .dialog,
   html[data-skin="glass"] .toast,
@@ -325,4 +331,13 @@ html[data-skin="glass"][data-motion="reduce"] .panel > * {
 /* Disabled menu items read as 3:1 over the glass (the component's 0.45 opacity fell below it). */
 html[data-skin="glass"] .menu .entry[aria-disabled="true"] {
   opacity: 0.6;
+}
+
+/* The sticky strip behind the Preview card stays clear: an opaque fill showed as a square slab
+   against the glass backdrop. The gap below becomes a margin, so pinned section headers butt
+   against the card and nothing scrolls through a see-through strip. */
+html[data-skin="glass"] .sticky {
+  margin-bottom: var(--gap);
+  padding-bottom: 0;
+  background: transparent;
 }

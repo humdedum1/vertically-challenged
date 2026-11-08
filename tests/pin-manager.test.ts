@@ -1326,6 +1326,30 @@ describe('layout backups', () => {
     expect(flattenItems(restored)[0]?.id).not.toBe(flattenItems(live)[0]?.id);
   });
 
+  it('re-staples open pinned tabs that a restored layout had as Staples', async () => {
+    // Fresh install: Chrome kept the pinned tabs, the extension adopted them as plain pins.
+    const t = setup({
+      windows: { 1: [pinned(1, 1, 'https://mail.test/'), pinned(2, 1, 'https://chat.test/')] },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    expect(pins.layoutOf(1).essentials).toHaveLength(0);
+    const backup = layout(9, [item('chat', 'https://chat.test/')], {
+      essentials: [item('mail', 'https://mail.test/')],
+    });
+    expect(await pins.restoreBackupLayouts([backup])).toBe(1);
+    await settle();
+    const l = pins.layoutOf(1);
+    expect(l.essentials.map((i) => i.tabId)).toEqual([1]);
+    expect(
+      flattenItems(l)
+        .map((i) => i.tabId)
+        .sort(),
+    ).toEqual([1, 2]);
+    expect(pins.setups()).toHaveLength(0);
+  });
+
   it('refuses an import that would evict existing setups', async () => {
     const setups = Array.from({ length: MAX_SETUPS }, (_, i) =>
       layout(i + 1, [item(`i${i}`, 'https://saved.test/')]),

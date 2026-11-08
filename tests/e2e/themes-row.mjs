@@ -29,14 +29,14 @@ try {
   );
   console.log('PASS hovering a theme previews it and leaving restores the current one');
 
-  const pick = page.getByRole('button', { name: 'Use Noctalia', exact: true });
+  const pick = page.getByRole('button', { name: 'Use Nord', exact: true });
   assert.equal(await pick.getAttribute('aria-pressed'), 'false');
   await pick.click();
   assert.equal(await pick.getAttribute('aria-pressed'), 'true');
 
-  const dup = page.getByRole('button', { name: 'Duplicate Noctalia', exact: true });
+  const dup = page.getByRole('button', { name: 'Duplicate Nord', exact: true });
   assert.equal(await dup.count(), 0);
-  await page.getByRole('button', { name: 'More actions for Noctalia', exact: true }).click();
+  await page.getByRole('button', { name: 'More actions for Nord', exact: true }).click();
   await dup.waitFor();
   console.log('PASS a theme row picks on click and reveals its other actions behind More');
 

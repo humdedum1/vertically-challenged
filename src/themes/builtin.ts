@@ -10,14 +10,17 @@ function builtin(raw: unknown, id: string, name: string): Theme {
   return r.value;
 }
 
-export const DEFAULT_THEME_ID = 'abyss';
+export const DEFAULT_THEME_ID = 'noctalia';
 
 export const BUILTIN_THEMES: readonly Theme[] = [
-  builtin(abyss, DEFAULT_THEME_ID, 'Abyss'),
+  builtin(abyss, 'abyss', 'Abyss'),
   ...NOCTALIA_THEMES.map((t) => builtin(t.raw, t.id, t.name)),
   ...TERMINAL_THEMES.map((t) => builtin(t.raw, t.id, t.name)),
 ];
 
 export function findTheme(id: string): Theme {
-  return BUILTIN_THEMES.find((t) => t.id === id) ?? (BUILTIN_THEMES[0] as Theme);
+  return (
+    BUILTIN_THEMES.find((t) => t.id === id) ??
+    (BUILTIN_THEMES.find((t) => t.id === DEFAULT_THEME_ID) as Theme)
+  );
 }

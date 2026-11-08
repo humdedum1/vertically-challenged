@@ -52,7 +52,7 @@ try {
   await page.getByRole('button', { name: 'Reset to defaults', exact: true }).click();
   await page.waitForFunction(
     async () =>
-      (await chrome.storage.sync.get('settings')).settings?.appearance?.themeId === 'abyss',
+      (await chrome.storage.sync.get('settings')).settings?.appearance?.themeId === 'noctalia',
   );
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await page.waitForFunction(

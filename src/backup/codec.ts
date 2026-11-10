@@ -117,6 +117,9 @@ export async function decode(bytes: Uint8Array, passphrase = ''): Promise<unknow
     }
   } else if (gz[0] !== 0x1f || gz[1] !== 0x8b) {
     throw new BackupError('Not a Vertically Challenged backup file');
+  } else if (passphrase) {
+    // Otherwise whoever serves the file could swap in a plain one and skip the passphrase.
+    throw new BackupError('This backup is not encrypted: clear the passphrase to restore it');
   }
   let json: Uint8Array;
   try {

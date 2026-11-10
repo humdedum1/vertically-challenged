@@ -90,8 +90,9 @@ const uid = $props.id();
     background: var(--mPrimary);
   }
 
+  /* Surface-coloured, not on-primary: some themes' on-primary is near-black and reads heavy. */
   button[aria-checked='true'] .knob {
-    background: var(--mOnPrimary);
+    background: var(--mSwitchThumb, var(--mOnPrimary));
     transform: translateX(16px);
   }
 

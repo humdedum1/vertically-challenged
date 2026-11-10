@@ -5,8 +5,11 @@ import { type Palette, ROLES, type Theme } from './palette';
 export const primaryText = (p: Palette): string =>
   legibleOn(legibleOn(p.mPrimary, p.mSurface), p.mSurfaceVariant);
 
+/** Switch thumb on an mPrimary track: the surface colour, nudged to the 3:1 non-text minimum. */
+export const switchThumb = (p: Palette): string => legibleOn(p.mSurface, p.mPrimary, 3);
+
 const declarations = (p: Palette): string =>
-  `${ROLES.map((r) => `--${r}:${p[r]};`).join('')}--mPrimaryText:${primaryText(p)};`;
+  `${ROLES.map((r) => `--${r}:${p[r]};`).join('')}--mPrimaryText:${primaryText(p)};--mSwitchThumb:${switchThumb(p)};`;
 
 /**
  * Builds one stylesheet that serves all three modes, so switching mode is a single

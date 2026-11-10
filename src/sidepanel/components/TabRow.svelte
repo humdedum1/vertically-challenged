@@ -421,7 +421,9 @@ function muteClick(e: MouseEvent): void {
   mark {
     padding: 0;
     border-radius: 2px;
-    background: color-mix(in srgb, var(--mPrimary) 22%, transparent);
+    background: color-mix(in srgb, var(--mPrimary) 35%, transparent);
+    /* Pale dark-mode primaries mix to grey; the underline keeps the match visible. */
+    box-shadow: inset 0 -2px 0 var(--mPrimary);
     color: inherit;
   }
 

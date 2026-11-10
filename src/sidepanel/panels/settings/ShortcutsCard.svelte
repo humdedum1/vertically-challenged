@@ -388,13 +388,11 @@ function openChromeShortcuts(): void {
     display: none;
   }
 
+  /* Matches the in-card subheadings of the Backup card. */
   h3 {
     margin: 6px 0 0;
-    font-size: calc(var(--font-size) - 1px);
+    font-size: var(--font-size);
     font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--mOnSurfaceVariant);
   }
 
   .cmds li {

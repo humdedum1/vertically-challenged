@@ -3,7 +3,7 @@ import { BUILTIN_THEMES, findTheme } from '../src/themes/builtin';
 import { contrastIssues, contrastRatio, legibleTheme } from '../src/themes/contrast';
 import { NOCTALIA_THEMES } from '../src/themes/noctalia';
 import { TERMINAL_THEMES } from '../src/themes/terminal';
-import { primaryText } from '../src/themes/token-mapper';
+import { primaryText, switchThumb } from '../src/themes/token-mapper';
 
 describe('built-in themes', () => {
   it('all parse with unique ids', () => {
@@ -53,6 +53,15 @@ describe('built-in themes', () => {
         const pt = primaryText(p);
         expect(contrastRatio(pt, p.mSurface), id).toBeGreaterThanOrEqual(4.5);
         expect(contrastRatio(pt, p.mSurfaceVariant), id).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it('--mSwitchThumb reaches 3:1 on the primary track', () => {
+    for (const { id } of BUILTIN_THEMES) {
+      const t = legibleTheme(findTheme(id));
+      for (const p of [t.dark, t.light]) {
+        expect(contrastRatio(switchThumb(p), p.mPrimary), id).toBeGreaterThanOrEqual(3);
       }
     }
   });

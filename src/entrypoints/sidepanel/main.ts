@@ -1,7 +1,7 @@
 import { mount } from 'svelte';
 import { browser } from 'wxt/browser';
 import { migrateSettings } from '../../settings/migrate';
-import { POPUP_TOKEN_KEY, parseSurface, popupTokenOk } from '../../shared/surface';
+import { mayRender, POPUP_TOKEN_KEY, parseSurface } from '../../shared/surface';
 import App from '../../sidepanel/App.svelte';
 import { applyAppearance, applyCachedAppearance } from '../../sidepanel/appearance';
 import { customCss } from '../../sidepanel/custom-css.svelte';
@@ -15,11 +15,13 @@ const target = document.getElementById('app');
 if (!target) throw new Error('Missing #app mount point');
 
 async function start(el: HTMLElement): Promise<void> {
-  // An in-page popup renders only when our overlay script framed it (clickjacking guard).
-  if (parseSurface(location.search).surface === 'popup') {
-    const stored = (await browser.storage.local.get(POPUP_TOKEN_KEY))[POPUP_TOKEN_KEY];
-    if (!popupTokenOk(location.search, stored)) return;
-  }
+  // Clickjacking guard: framed, it renders only as our overlay's popup with its token.
+  const framed = window.top !== window;
+  const stored =
+    framed || parseSurface(location.search).surface === 'popup'
+      ? (await browser.storage.local.get(POPUP_TOKEN_KEY))[POPUP_TOKEN_KEY]
+      : undefined;
+  if (!mayRender(location.search, framed, stored)) return;
   // The cached theme CSS and settings are applied before mounting so the first frame is
   // already right; storage then reconciles asynchronously (settings, then custom themes).
   const settings = new SettingsState(migrateSettings(applyCachedAppearance()));

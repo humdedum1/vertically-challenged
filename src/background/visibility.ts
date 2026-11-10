@@ -30,3 +30,38 @@ export const snapshotPlan = (
   const fresh = next.filter((w) => !known.has(w.id));
   return panels.map((p) => visibleWindows(p.incognito, fresh).map((w) => w.id));
 };
+
+const TAB_KEYS = new Set(['tabId', 'tabIds', 'parentTabId', 'afterTabId', 'beforeTabId']);
+const WINDOW_KEYS = new Set(['windowId', 'toWindowId', 'otherWindowId']);
+const GROUP_KEYS = new Set(['groupId']);
+
+/**
+ * Whether a panel command names a tab or window of the other kind (or the panel's kind isn't
+ * known yet). The port is extension-only; this keeps a panel bug from crossing the
+ * incognito boundary. Ids the worker doesn't know pass: the browser call fails on them anyway.
+ */
+export function crossesKind(
+  msg: object,
+  panelIncognito: boolean | null,
+  tabKind: (id: number) => boolean | undefined,
+  windowKind: (id: number) => boolean | undefined,
+  groupKind: (id: number) => boolean | undefined,
+): boolean {
+  if (panelIncognito === null) return true;
+  const other = (kind: boolean | undefined): boolean =>
+    kind !== undefined && kind !== panelIncognito;
+  const walk = (o: object): boolean =>
+    Object.entries(o).some(([k, v]) => {
+      const ids =
+        typeof v === 'number'
+          ? [v]
+          : Array.isArray(v)
+            ? v.filter((x) => typeof x === 'number')
+            : [];
+      if (TAB_KEYS.has(k)) return ids.some((id) => other(tabKind(id)));
+      if (WINDOW_KEYS.has(k)) return ids.some((id) => other(windowKind(id)));
+      if (GROUP_KEYS.has(k)) return ids.some((id) => other(groupKind(id)));
+      return v !== null && typeof v === 'object' && !Array.isArray(v) && walk(v);
+    });
+  return walk(msg);
+}

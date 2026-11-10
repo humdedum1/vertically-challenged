@@ -20,6 +20,8 @@ interface TokenMatch {
 }
 
 const MAX_TOKENS = 8;
+/** Pages control titles and URLs (a data: URL can be megabytes); only this much is searched. */
+const MAX_FIELD = 2048;
 const MAX_QUERY = 100;
 /** URL matches count for less than title matches. */
 const URL_WEIGHT = 0.6;
@@ -116,8 +118,8 @@ export class FuzzyIndex implements SearchIndex {
               id: d.id,
               title: d.title,
               url,
-              titleLower: d.title.toLowerCase(),
-              urlLower: url.toLowerCase(),
+              titleLower: d.title.slice(0, MAX_FIELD).toLowerCase(),
+              urlLower: url.slice(0, MAX_FIELD).toLowerCase(),
             };
       next.set(d.id, e);
       return e;

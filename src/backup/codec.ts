@@ -99,8 +99,10 @@ export async function decode(bytes: Uint8Array, passphrase = ''): Promise<unknow
     if (!passphrase) throw new BackupError('This backup is encrypted: enter its passphrase');
     if (bytes.length <= HEADER) throw new BackupError('Not a valid backup file');
     const iterations = new DataView(bytes.buffer, bytes.byteOffset).getUint32(MAGIC.length);
-    // Bounded so a crafted header can't pin the CPU.
-    if (iterations < 1 || iterations > 5_000_000) throw new BackupError('Not a valid backup file');
+    // The key is derived before anything can be verified, so a crafted header could pick the
+    // cost: allow at most twice ours (every backup so far used PBKDF2_ITERATIONS; raise both together).
+    if (iterations < 1 || iterations > 2 * PBKDF2_ITERATIONS)
+      throw new BackupError('Not a valid backup file');
     const salt = bytes.slice(MAGIC.length + 4, MAGIC.length + 4 + SALT);
     const iv = bytes.slice(MAGIC.length + 4 + SALT, HEADER);
     try {

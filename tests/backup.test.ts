@@ -57,6 +57,9 @@ describe('backup codec', () => {
     const enc = await encode({ a: 1 }, 'p');
     new DataView(enc.buffer).setUint32(4, 0xffffffff);
     await expect(decode(enc, 'p')).rejects.toThrow(BackupError);
+    // A server can't make the user spend much more than a normal restore: at most 2x.
+    new DataView(enc.buffer).setUint32(4, 3_000_000);
+    await expect(decode(enc, 'p')).rejects.toThrow(/Not a valid backup/);
   });
 });
 
@@ -75,6 +78,8 @@ describe('full backup', () => {
     expect(parseFullBackup({ format: 'nope' }, isCustom).ok).toBe(false);
     const built = buildFullBackup(parts([]), '1');
     expect(parseFullBackup({ ...built, version: 99 }, isCustom).ok).toBe(false);
+    for (const version of [0, -1, Number.NaN, 0.5, '1'])
+      expect(parseFullBackup({ ...built, version }, isCustom).ok, String(version)).toBe(false);
     const r = parseFullBackup({ ...built, sessions: [session('ok', 1), { id: '../x' }] }, isCustom);
     expect(r.ok && r.value.sessions.length).toBe(1);
     expect(r.ok && r.warnings.join()).toMatch(/invalid sessions/);

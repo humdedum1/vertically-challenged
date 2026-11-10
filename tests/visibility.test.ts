@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { shouldDeliver, snapshotPlan, visibleWindows } from '../src/background/visibility';
+import {
+  crossesKind,
+  shouldDeliver,
+  snapshotPlan,
+  visibleWindows,
+} from '../src/background/visibility';
 
 describe('shouldDeliver', () => {
   it('a panel whose kind is unknown receives nothing scoped', () => {
@@ -50,5 +55,51 @@ describe('snapshotPlan', () => {
   });
   it('treats a window whose kind flipped as unchanged', () => {
     expect(snapshotPlan([w(1)], [w(1)], [{ incognito: false }])).toEqual([[]]);
+  });
+});
+
+// Defence in depth: the port is extension-only, but a panel bug must still not act on the
+// other kind's tabs or windows.
+describe('crossesKind', () => {
+  const tabs: Record<number, boolean> = { 1: false, 2: false, 9: true };
+  const wins: Record<number, boolean> = { 10: false, 90: true };
+  const groups: Record<number, boolean> = { 5: false, 7: true };
+  const check = (msg: object, incognito: boolean | null) =>
+    crossesKind(
+      msg,
+      incognito,
+      (id) => tabs[id],
+      (id) => wins[id],
+      (id) => groups[id],
+    );
+
+  it('allows ids of the panel own kind, and unknown ids', () => {
+    expect(check({ type: 'close', tabIds: [1, 2] }, false)).toBe(false);
+    expect(check({ type: 'move', tabIds: [1], target: { windowId: 10, index: 0 } }, false)).toBe(
+      false,
+    );
+    expect(check({ type: 'activate', tabId: 55 }, false)).toBe(false);
+    expect(check({ type: 'close', tabIds: [9] }, true)).toBe(false);
+  });
+
+  it('refuses any tab or window of the other kind, wherever it is named', () => {
+    expect(check({ type: 'close', tabIds: [1, 9] }, false)).toBe(true);
+    expect(check({ type: 'activate', tabId: 9 }, false)).toBe(true);
+    expect(check({ type: 'nestTab', tabId: 1, parentTabId: 9 }, false)).toBe(true);
+    expect(check({ type: 'move', tabIds: [1], target: { windowId: 90, index: 0 } }, false)).toBe(
+      true,
+    );
+    expect(check({ type: 'pinMove', windowId: 10, toWindowId: 90 }, false)).toBe(true);
+    expect(check({ type: 'setWindowCollapsed', windowId: 10, otherWindowId: 90 }, false)).toBe(
+      true,
+    );
+    expect(check({ type: 'closeGroup', groupId: 7 }, false)).toBe(true);
+    expect(check({ type: 'group', tabIds: [1], groupId: 5 }, false)).toBe(false);
+    expect(check({ type: 'group', tabIds: [1], groupId: null }, false)).toBe(false);
+    expect(check({ type: 'close', tabIds: [1] }, true)).toBe(true);
+  });
+
+  it('refuses everything while the panel kind is unknown', () => {
+    expect(check({ type: 'close', tabIds: [1] }, null)).toBe(true);
   });
 });

@@ -78,7 +78,9 @@ export function parseFullBackup(
   const b = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
   if (b.format !== FULL_FORMAT)
     return { ok: false, error: 'Not a full Vertically Challenged backup' };
-  if (typeof b.version !== 'number' || b.version > FULL_VERSION)
+  if (typeof b.version !== 'number' || !Number.isInteger(b.version) || b.version < 1)
+    return { ok: false, error: 'Not a valid backup file' };
+  if (b.version > FULL_VERSION)
     return {
       ok: false,
       error: 'This backup was made by a newer version; update the extension first',

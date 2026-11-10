@@ -1,6 +1,7 @@
 import { type Browser, browser } from 'wxt/browser';
 import { makeTarget } from '../backup/make-target';
 import { migrateSettings } from '../settings/migrate';
+import { saveSettings } from '../settings/save';
 import type { TabRule } from '../settings/schema';
 import { EXTENSION_SCHEME, isNewTabUrl } from '../shared/browser-urls';
 import { hostOf } from '../shared/host-pattern';
@@ -917,7 +918,7 @@ export function startBackground(): void {
       const host = hostOf(url);
       if (!host || s.suspend.whitelist.includes(host)) return;
       s.suspend.whitelist = [...s.suspend.whitelist, host];
-      await browser.storage.sync.set({ settings: migrateSettings(s) });
+      await saveSettings(browser.storage.sync, migrateSettings(s));
     },
     saveWindow: async (windowId) => {
       const name = `Window · ${new Date().toLocaleString()}`;

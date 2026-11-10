@@ -8,6 +8,7 @@ import {
   type MouseSettings,
   type TabRowSettings,
 } from '../../../settings/schema';
+import { isNewTabUrl } from '../../../shared/browser-urls';
 import Button from '../../components/controls/Button.svelte';
 import Field from '../../components/controls/Field.svelte';
 import SegmentedControl from '../../components/controls/SegmentedControl.svelte';
@@ -73,7 +74,9 @@ function patch(p: Partial<TabRowSettings>): void {
         onenter={saveNewTabUrl}
       />
       <p id="vc-new-tab-url-hint" class="hint">
-        {#if normalizedUrl === null}
+        {#if normalizedUrl === null && isNewTabUrl(newTabUrl.trim())}
+          That’s the browser’s own new tab page: leave this blank to use it.
+        {:else if normalizedUrl === null}
           Enter a full page URL, such as https://example.com.
         {:else}
           Leave blank to use your browser’s default. Applies to new tabs opened from this extension.

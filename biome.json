@@ -7,6 +7,7 @@
       "!.wxt",
       "!.superpowers",
       "!.claude",
+      "!.agentsroom",
       "!node_modules",
       "!public/icon",
       "!bench/.out",

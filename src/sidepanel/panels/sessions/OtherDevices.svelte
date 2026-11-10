@@ -327,6 +327,7 @@ const total = $derived(docs.length + chromeDevices.length);
 
   .devices {
     display: grid;
+    grid-template-columns: minmax(0, 1fr); /* else one long name widens the column past the card */
     gap: 10px;
     max-height: 360px;
     padding: 2px 6px 8px;
@@ -371,6 +372,7 @@ const total = $derived(docs.length + chromeDevices.length);
 
   .item {
     display: grid;
+    grid-template-columns: minmax(0, 1fr); /* else one long name widens the column past the card */
     gap: 6px;
     padding: 8px 6px;
     border-radius: var(--radius-row);

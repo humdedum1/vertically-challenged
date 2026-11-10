@@ -64,6 +64,32 @@ check(m.page <= 1, 'the page does not scroll sideways', `${m.page}px`);
 check(m.wide.length === 0, 'no element sticks out of the panel', m.wide.join(', '));
 check(m.injected === 0 && !m.pwned, 'a title that looks like HTML stays text');
 
+// A saved session with an unbreakable name: its card used to scroll sideways, cutting off the
+// Restore / Into this window / More actions.
+await page.evaluate(async (name) => {
+  const { id: windowId } = await chrome.windows.getCurrent();
+  const port = chrome.runtime.connect({ name: 'vc-panel' });
+  port.postMessage({ type: 'subscribe', windowId });
+  await new Promise((r) => setTimeout(r, 300));
+  port.postMessage({ type: 'saveSession', scope: 'window', windowId, name });
+  await new Promise((r) => setTimeout(r, 800));
+}, 'L'.repeat(90));
+await page.getByRole('tab', { name: 'Sessions', exact: true }).click();
+await sleep(800);
+const sideways = await page.evaluate(() =>
+  [...document.querySelectorAll('body *')]
+    .filter((e) => getComputedStyle(e).overflowX !== 'visible' && e.scrollWidth > e.clientWidth + 1)
+    .filter((e) => getComputedStyle(e).textOverflow !== 'ellipsis' && e.clientWidth > 20)
+    .map((e) => `${e.tagName}.${e.className}`),
+);
+check(
+  sideways.length === 0,
+  'a long session name does not make its card scroll sideways',
+  sideways.join(', '),
+);
+await page.getByRole('tab', { name: 'Tabs', exact: true }).click();
+await sleep(500);
+
 // Search copes with the same titles.
 await page.keyboard.press('/');
 const box = page

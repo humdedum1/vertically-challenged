@@ -70,6 +70,19 @@ export async function snoozeTabs(tabs: readonly TabInfo[], wakeAt: number): Prom
 }
 
 /**
+ * Snoozes are normal-window data (private tabs are never snoozed), so they must not open in a
+ * focused private window: Firefox's spanning worker would otherwise put them there.
+ */
+async function openInNormalWindow(url: string): Promise<void> {
+  const normal = (await browser.windows.getAll({ windowTypes: ['normal'] })).filter(
+    (w) => !w.incognito,
+  );
+  const win = normal.find((w) => w.focused) ?? normal[0];
+  if (win?.id !== undefined) await browser.tabs.create({ url, active: false, windowId: win.id });
+  else await browser.windows.create({ url, incognito: false, focused: false });
+}
+
+/**
  * Reopens the picked entries, removing each from storage only once its tab exists: a worker
  * stopped or a create failing midway leaves the rest stored (a duplicate beats a lost tab).
  * Runs as one queued write, so two wakes at once can't open the same entry twice.
@@ -80,7 +93,7 @@ function wake(pick: (list: Snoozed[]) => Snoozed[]): Promise<number> {
     let opened = 0;
     for (const s of pick(list)) {
       try {
-        await browser.tabs.create({ url: s.url, active: false });
+        await openInNormalWindow(s.url);
       } catch (err) {
         console.warn('[vc] reopening a snoozed tab failed; it stays snoozed', err);
         continue;

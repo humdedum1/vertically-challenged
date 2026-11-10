@@ -11,6 +11,7 @@ const api = {
     },
   },
   tabs: { create: vi.fn(), remove: vi.fn(), get: vi.fn() },
+  windows: { getAll: vi.fn(), create: vi.fn() },
   alarms: { clear: vi.fn(async () => true), create: vi.fn(async () => {}) },
 };
 vi.mock('wxt/browser', () => ({ browser: api }));
@@ -30,6 +31,34 @@ beforeEach(() => {
   api.tabs.create.mockReset();
   api.tabs.remove.mockReset();
   api.tabs.get.mockReset();
+  api.windows.create.mockReset();
+  api.windows.getAll.mockReset();
+  api.windows.getAll.mockResolvedValue([{ id: 9, incognito: false, focused: true }]);
+});
+
+// Snoozing skips private tabs, so a woken tab is normal-profile data: never open it in a
+// focused private window (Firefox's spanning worker would put it there).
+it('wakes into a normal window even when a private one is focused', async () => {
+  store[SNOOZE_KEY] = [entry('a')];
+  api.windows.getAll.mockResolvedValue([
+    { id: 1, incognito: true, focused: true },
+    { id: 2, incognito: false, focused: false },
+  ]);
+  api.tabs.create.mockResolvedValue({ id: 5 });
+  await wakeDue();
+  expect(api.tabs.create).toHaveBeenCalledWith(expect.objectContaining({ windowId: 2 }));
+});
+
+it('opens a new normal window when only private ones are open', async () => {
+  store[SNOOZE_KEY] = [entry('a')];
+  api.windows.getAll.mockResolvedValue([{ id: 1, incognito: true, focused: true }]);
+  api.windows.create.mockResolvedValue({ id: 3 });
+  await wakeDue();
+  expect(api.tabs.create).not.toHaveBeenCalled();
+  expect(api.windows.create).toHaveBeenCalledWith(
+    expect.objectContaining({ url: 'https://example.com/a', incognito: false }),
+  );
+  expect(stored()).toEqual([]);
 });
 
 it('keeps a due entry whose tab could not be created', async () => {

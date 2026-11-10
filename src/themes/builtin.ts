@@ -1,4 +1,5 @@
 import abyss from './abyss.json';
+import ember from './ember.json';
 import { NOCTALIA_THEMES } from './noctalia';
 import { parseTheme, type Theme } from './palette';
 import { TERMINAL_THEMES } from './terminal';
@@ -14,6 +15,7 @@ export const DEFAULT_THEME_ID = 'noctalia';
 
 export const BUILTIN_THEMES: readonly Theme[] = [
   builtin(abyss, 'abyss', 'Abyss'),
+  builtin(ember, 'ember', 'Ember'),
   ...NOCTALIA_THEMES.map((t) => builtin(t.raw, t.id, t.name)),
   ...TERMINAL_THEMES.map((t) => builtin(t.raw, t.id, t.name)),
 ];

@@ -8,12 +8,12 @@ import { primaryText, switchThumb } from '../src/themes/token-mapper';
 describe('built-in themes', () => {
   it('all parse with unique ids', () => {
     const ids = BUILTIN_THEMES.map((t) => t.id);
-    expect(ids).toHaveLength(18);
+    expect(ids).toHaveLength(19);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('abyss meets WCAG AA for every text pair', () => {
-    expect(contrastIssues(findTheme('abyss'))).toEqual([]);
+  it('our own themes meet WCAG AA for every text pair', () => {
+    for (const id of ['abyss', 'ember']) expect(contrastIssues(findTheme(id)), id).toEqual([]);
   });
 
   it('derives terminal palettes that meet WCAG AA', () => {

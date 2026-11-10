@@ -465,6 +465,16 @@ function reset(): void {
     gap: 8px;
   }
 
+  /* Long labels wrap inside the card instead of overflowing it at narrow widths. */
+  .row :global(button) {
+    max-width: 100%;
+    height: auto;
+    min-height: 28px;
+    padding-block: 4px;
+    white-space: normal;
+    text-align: center;
+  }
+
   .confirm {
     flex: 1;
     padding: 10px;

@@ -10,6 +10,19 @@ try {
   await page.getByRole('tab', { name: 'Settings', exact: true }).click();
   await page.locator('summary').filter({ hasText: 'Appearance' }).waitFor();
 
+  // Only the panel scrolls: an absolutely positioned child (a screen-reader label) must not
+  // escape it and give the page a second scrollbar.
+  await page.setViewportSize({ width: 340, height: 600 });
+  assert.equal(
+    await page.evaluate(
+      () => document.scrollingElement.scrollHeight <= document.scrollingElement.clientHeight,
+    ),
+    true,
+    'the page itself scrolls under Settings',
+  );
+  await page.setViewportSize({ width: 340, height: 1200 });
+  console.log('PASS Settings scrolls inside the panel only');
+
   // Hovering a theme previews it; leaving restores the real one.
   const primary = () =>
     page.evaluate(() =>

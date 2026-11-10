@@ -46,10 +46,20 @@ describe('backup codec', () => {
     await expect(decode(new TextEncoder().encode('{"a":1}'))).rejects.toThrow(BackupError);
   });
 
+  // A server (or plain-http transport) could swap in an unencrypted file to skip the passphrase.
+  it('refuses an unencrypted file when a passphrase is given', async () => {
+    const plain = await encode({ forged: 1 });
+    await expect(decode(plain, 'hunter2')).rejects.toThrow(/not encrypted/);
+    expect(await decode(plain)).toEqual({ forged: 1 });
+  });
+
   it('rejects an absurd iteration count in a crafted header', async () => {
     const enc = await encode({ a: 1 }, 'p');
     new DataView(enc.buffer).setUint32(4, 0xffffffff);
     await expect(decode(enc, 'p')).rejects.toThrow(BackupError);
+    // A server can't make the user spend much more than a normal restore: at most 2x.
+    new DataView(enc.buffer).setUint32(4, 3_000_000);
+    await expect(decode(enc, 'p')).rejects.toThrow(/Not a valid backup/);
   });
 });
 
@@ -68,6 +78,8 @@ describe('full backup', () => {
     expect(parseFullBackup({ format: 'nope' }, isCustom).ok).toBe(false);
     const built = buildFullBackup(parts([]), '1');
     expect(parseFullBackup({ ...built, version: 99 }, isCustom).ok).toBe(false);
+    for (const version of [0, -1, Number.NaN, 0.5, '1'])
+      expect(parseFullBackup({ ...built, version }, isCustom).ok, String(version)).toBe(false);
     const r = parseFullBackup({ ...built, sessions: [session('ok', 1), { id: '../x' }] }, isCustom);
     expect(r.ok && r.value.sessions.length).toBe(1);
     expect(r.ok && r.warnings.join()).toMatch(/invalid sessions/);
@@ -99,6 +111,15 @@ describe('restored custom CSS', () => {
       'a{background:src("https://x/a")}',
     ])
       expect(stripRemoteCss(css)).toEqual({ css: '', stripped: true });
+  });
+
+  // Removing the inner @import must not splice the outer pieces into a new one.
+  it('leaves no @import or url() behind after a splice', () => {
+    for (const css of [
+      '@im@import;port "https://evil/x.css";',
+      'a{background:ur url(x)l(https://evil/)}',
+    ])
+      expect(stripRemoteCss(css).css).not.toMatch(/@import|url\s*\(/i);
   });
 
   it('warns when a backup file carried remote CSS', () => {

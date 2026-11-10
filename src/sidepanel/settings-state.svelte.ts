@@ -1,6 +1,9 @@
 import { browser } from 'wxt/browser';
 import { migrateSettings } from '../settings/migrate';
+import { saveSettings } from '../settings/save';
 import type { Settings } from '../settings/schema';
+import { notify } from './notify';
+import { saveNoticeOnce } from './settings-save-notice';
 
 const KEY = 'settings';
 // storage.sync allows ~120 writes/minute; sliders and colour pickers in the settings UI
@@ -14,6 +17,7 @@ const WRITE_DELAY_MS = 400;
 export class SettingsState {
   value = $state.raw<Settings>(migrateSettings(null));
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private reportSave = saveNoticeOnce(notify);
 
   constructor(initial: Settings) {
     this.value = initial;
@@ -39,8 +43,8 @@ export class SettingsState {
     this.value = migrateSettings(fn(this.value));
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = setTimeout(() => {
-      browser.storage.sync
-        .set({ [KEY]: this.value })
+      saveSettings(browser.storage.sync, this.value)
+        .then(this.reportSave)
         .catch((err: unknown) => console.warn('[vc] settings save failed', err))
         .finally(() => {
           this.timer = null;

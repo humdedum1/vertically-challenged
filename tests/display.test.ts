@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDisplay, type DisplayApi } from '../src/background/display';
-import { parseSurface, popupQuery, popupTokenOk } from '../src/shared/surface';
+import { mayRender, parseSurface, popupQuery, popupTokenOk } from '../src/shared/surface';
 
 function fakeApi(opts: { injectFails?: boolean; noClose?: boolean; noOverlay?: boolean } = {}) {
   const calls: string[] = [];
@@ -177,5 +177,26 @@ describe('popupTokenOk', () => {
     expect(popupTokenOk('?surface=popup', 'abc')).toBe(false);
     expect(popupTokenOk('?surface=popup&t=', '')).toBe(false);
     expect(popupTokenOk(popupQuery('abc'), undefined)).toBe(false);
+  });
+});
+
+// A page that learns the panel URL must not frame it by dropping or changing ?surface=popup.
+describe('mayRender', () => {
+  const t = 'tok-123';
+  it('renders top-level surfaces without a token', () => {
+    expect(mayRender('', false, undefined)).toBe(true);
+    expect(mayRender('?surface=window&windowId=4', false, undefined)).toBe(true);
+  });
+  it('renders a framed popup only with the stored token', () => {
+    expect(mayRender(popupQuery(t), true, t)).toBe(true);
+    expect(mayRender(popupQuery('other'), true, t)).toBe(false);
+  });
+  it('refuses any other surface inside a frame', () => {
+    expect(mayRender('', true, t)).toBe(false);
+    expect(mayRender('?surface=window&windowId=4', true, t)).toBe(false);
+    expect(mayRender('?surface=bogus', true, t)).toBe(false);
+  });
+  it('still checks the token for a top-level popup URL', () => {
+    expect(mayRender(popupQuery('other'), false, t)).toBe(false);
   });
 });

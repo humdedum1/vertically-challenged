@@ -353,6 +353,38 @@ export class PinManager {
     return true;
   }
 
+  /**
+   * After a reinstall Chrome keeps the pinned tabs but the extension adopted them as plain
+   * pins. A restored layout with Staples or folders is matched (by URL, as at startup) to
+   * windows that only have plain pins, so their Staples come back instead of staying a setup.
+   * Layouts without that structure stay setups: they would change nothing in the window.
+   */
+  private rebindRestored(restored: readonly WindowLayout[]): void {
+    const structured = restored.filter(
+      (l) => l.essentials.length > 0 || l.pinned.some((n) => n.kind === 'folder'),
+    );
+    if (!structured.length) return;
+    const plain = this.deps.windows().filter((w) => {
+      if (w.incognito || this.closed.has(w.id)) return false;
+      const id = this.bindings.get(w.id);
+      const l = id === undefined ? undefined : this.layouts.get(id);
+      return !l || (l.essentials.length === 0 && l.pinned.every((n) => n.kind === 'item'));
+    });
+    const matches = matchLayouts(
+      structured,
+      plain.map((w) => ({
+        windowId: w.id,
+        incognito: w.incognito,
+        pinned: this.deps.store
+          .snapshot(w.id)
+          .tabs.filter((t) => t.pinned)
+          .map((t) => ({ id: t.id, url: t.url, title: t.title })),
+      })),
+    );
+    for (const [windowId, m] of matches) this.bindMatch(windowId, m);
+    if (matches.size) this.publish(this.pass([...matches.keys()], 0, null));
+  }
+
   /** Binds a matched layout to the window, replacing an (empty) placeholder it had. */
   private bindMatch(windowId: number, m: Match): void {
     const x = this.layouts.get(m.layoutId);
@@ -648,6 +680,7 @@ export class PinManager {
       this.writes = write.catch(() => {});
       await write;
       for (const l of restored) this.layouts.set(l.id, l);
+      this.rebindRestored(restored);
       this.deps.onChange?.();
       this.publishSetups();
       return layouts.length;

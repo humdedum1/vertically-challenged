@@ -48,34 +48,71 @@ export async function snoozeTabs(tabs: readonly TabInfo[], wakeAt: number): Prom
     const p = planSnooze(tabs, list.length, wakeAt, Date.now(), newId);
     return { list: [...list, ...p.entries], result: p };
   });
-  // Close only after the entries are stored.
-  if (plan.tabIds.length) await browser.tabs.remove(plan.tabIds);
+  // Close only after the entries are stored. A tab that won't close but is still open
+  // drops its entry (no duplicate later); one already gone keeps it (its only copy).
+  const kept = await Promise.all(
+    plan.tabIds.map((id) =>
+      browser.tabs.remove(id).then(
+        () => true,
+        () =>
+          browser.tabs.get(id).then(
+            () => false,
+            () => true,
+          ),
+      ),
+    ),
+  );
+  const drop = new Set(plan.entries.filter((_, i) => !kept[i]).map((e) => e.id));
+  if (drop.size)
+    await mutate((list) => ({ list: list.filter((s) => !drop.has(s.id)), result: null }));
   await scheduleSnoozeAlarm();
-  return plan.entries.length;
+  return plan.entries.length - drop.size;
 }
 
-async function open(entries: readonly Snoozed[]): Promise<void> {
-  for (const s of entries) await browser.tabs.create({ url: s.url, active: false });
+/**
+ * Snoozes are normal-window data (private tabs are never snoozed), so they must not open in a
+ * focused private window: Firefox's spanning worker would otherwise put them there.
+ */
+async function openInNormalWindow(url: string): Promise<void> {
+  const normal = (await browser.windows.getAll({ windowTypes: ['normal'] })).filter(
+    (w) => !w.incognito,
+  );
+  const win = normal.find((w) => w.focused) ?? normal[0];
+  if (win?.id !== undefined) await browser.tabs.create({ url, active: false, windowId: win.id });
+  else await browser.windows.create({ url, incognito: false, focused: false });
+}
+
+/**
+ * Reopens the picked entries, removing each from storage only once its tab exists: a worker
+ * stopped or a create failing midway leaves the rest stored (a duplicate beats a lost tab).
+ * Runs as one queued write, so two wakes at once can't open the same entry twice.
+ */
+function wake(pick: (list: Snoozed[]) => Snoozed[]): Promise<number> {
+  return enqueue(async () => {
+    let list = parseSnoozed((await browser.storage.local.get(SNOOZE_KEY))[SNOOZE_KEY]);
+    let opened = 0;
+    for (const s of pick(list)) {
+      try {
+        await openInNormalWindow(s.url);
+      } catch (err) {
+        console.warn('[vc] reopening a snoozed tab failed; it stays snoozed', err);
+        continue;
+      }
+      list = list.filter((x) => x.id !== s.id);
+      await browser.storage.local.set({ [SNOOZE_KEY]: list });
+      opened++;
+    }
+    return opened;
+  }).finally(() => scheduleSnoozeAlarm());
 }
 
 /** Reopens everything due (also run at startup, for tabs that came due while closed). */
-export async function wakeDue(): Promise<number> {
-  const due = await mutate((list) => {
-    const d = dueSnoozed(list, Date.now());
-    return { list: list.filter((s) => !d.includes(s)), result: d };
-  });
-  await open(due);
-  await scheduleSnoozeAlarm();
-  return due.length;
+export function wakeDue(): Promise<number> {
+  return wake((list) => dueSnoozed(list, Date.now()));
 }
 
 export async function wakeNow(id: string): Promise<void> {
-  const woken = await mutate((list) => ({
-    list: list.filter((s) => s.id !== id),
-    result: list.filter((s) => s.id === id),
-  }));
-  await open(woken);
-  await scheduleSnoozeAlarm();
+  await wake((list) => list.filter((s) => s.id === id));
 }
 
 export async function deleteSnoozed(id: string): Promise<void> {

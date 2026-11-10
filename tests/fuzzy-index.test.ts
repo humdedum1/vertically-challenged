@@ -80,6 +80,19 @@ function index(docs: SearchDoc[]) {
 }
 
 describe('FuzzyIndex.search', () => {
+  // A page controls its title and URL (a data: URL can be megabytes): matching only reads the
+  // first 2,048 characters of each, so one tab can't make every keystroke slow.
+  it('matches only the start of very long titles and URLs', () => {
+    const long = 'a'.repeat(5000);
+    const ix = index([
+      doc(1, `${long}needle`, `https://example.com/${long}haystack`),
+      doc(2, 'needle'),
+    ]);
+    expect(ix.search('needle').map((h) => h.id)).toEqual([2]);
+    expect(ix.search('haystack')).toEqual([]);
+    expect(ix.search('aaa').map((h) => h.id)).toEqual([1]);
+  });
+
   it('empty / whitespace query returns []', () => {
     const ix = index([doc(1, 'hello')]);
     expect(ix.search('')).toEqual([]);

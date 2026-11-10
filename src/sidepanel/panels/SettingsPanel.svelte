@@ -128,7 +128,7 @@ $effect(() => {
     </div>
     <div class="cards" bind:this={cardsEl}>
       <details open>
-        <summary><span><strong>Appearance</strong><small>Colors, density and themes</small></span><Icon name="chevron" size={16} /></summary>
+        <summary><span><strong>Appearance</strong><small>Colours, density and themes</small></span><Icon name="chevron" size={16} /></summary>
         <div class="category-content">
           <AppearanceCard {settings} {themes} />
           <!-- Focus fallback when the theme a flow started from no longer has a button. -->

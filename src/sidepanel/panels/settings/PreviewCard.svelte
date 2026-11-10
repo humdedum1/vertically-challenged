@@ -124,6 +124,7 @@ let open = $state(false);
   }
 
   .toggle {
+    min-height: 24px; /* WCAG 2.5.8 */
     padding: 2px 8px;
     border: 0;
     border-radius: 999px;

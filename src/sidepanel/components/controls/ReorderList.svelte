@@ -36,7 +36,7 @@ async function move(i: number, delta: -1 | 1, id: Id): Promise<void> {
     <li data-id={item.id} class:off={!item.visible}>
       <span class="name">
         <span id="{sw}-l" class="label">{item.label}</span>
-        {#if item.hint}<span id="{sw}-h" class="hint">{item.hint}</span>{/if}
+        {#if item.hint && !item.toggleDisabled}<span id="{sw}-h" class="hint">{item.hint}</span>{/if}
       </span>
       <button
         type="button"
@@ -60,6 +60,9 @@ async function move(i: number, delta: -1 | 1, id: Id): Promise<void> {
       >
         <span class="down"><Icon name="chevron" size={14} /></span>
       </button>
+      {#if item.toggleDisabled}
+        <span class="fixed">{item.hint ?? (item.visible ? 'Always on' : 'Off')}</span>
+      {:else}
       <button
         type="button"
         class="sw"
@@ -67,12 +70,12 @@ async function move(i: number, delta: -1 | 1, id: Id): Promise<void> {
         aria-checked={item.visible}
         aria-labelledby="{sw}-l"
         aria-describedby={item.hint ? `${sw}-h` : undefined}
-        title={item.toggleDisabled ? item.hint : item.visible ? 'Hide' : 'Show'}
-        disabled={item.toggleDisabled}
+        title={item.visible ? 'Hide' : 'Show'}
         onclick={() => ontoggle(item.id, !item.visible)}
       >
         <span class="knob"></span>
       </button>
+      {/if}
     </li>
   {/each}
 </ol>
@@ -139,9 +142,19 @@ async function move(i: number, delta: -1 | 1, id: Id): Promise<void> {
     color: var(--mOnSurface);
   }
 
+  /* Hidden, not removed, so the arrows stay in one column across rows. */
   .icon:disabled {
-    opacity: 0.3;
-    cursor: default;
+    visibility: hidden;
+  }
+
+  /* Stands in for the switch on rows that can't be hidden; same width keeps arrows aligned. */
+  .fixed {
+    flex: none;
+    width: 44px;
+    color: var(--mOnSurfaceVariant);
+    font-size: var(--font-size-meta);
+    line-height: 1.2;
+    text-align: right;
   }
 
   .up {
@@ -196,8 +209,4 @@ async function move(i: number, delta: -1 | 1, id: Id): Promise<void> {
     transform: translateX(16px);
   }
 
-  .sw:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
 </style>

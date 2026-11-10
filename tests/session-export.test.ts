@@ -33,4 +33,24 @@ describe('session export', () => {
     expect(html).toContain('HREF="https://a.example/x?a=1&amp;b=2"');
     expect(html).not.toContain('<plan>');
   });
+
+  // An imported session could carry javascript: URLs, which become clickable bookmarklets.
+  it('leaves javascript: links out of both exports', () => {
+    const w = session.windows[0];
+    if (!w) throw new Error('fixture');
+    const hostile = {
+      ...session,
+      windows: [
+        {
+          ...w,
+          tabs: [
+            ...w.tabs,
+            { url: ' JavaScript:alert(1)', title: 'x', pinned: false, group: null },
+          ],
+        },
+      ],
+    } as Session;
+    expect(sessionToBookmarksHtml(hostile)).not.toMatch(/javascript:/i);
+    expect(sessionToMarkdown(hostile)).not.toMatch(/javascript:/i);
+  });
 });

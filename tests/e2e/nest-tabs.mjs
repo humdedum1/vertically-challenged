@@ -138,6 +138,9 @@ try {
     const child = await create('adjacent-child', source);
     const port = chrome.runtime.connect({ name: 'vc-panel' });
     globalThis.__nestPort = port;
+    // The worker refuses commands from a port whose window kind it doesn't know yet.
+    const { windowId } = await chrome.tabs.get(source);
+    port.postMessage({ type: 'subscribe', windowId });
     port.postMessage({ type: 'nestTab', tabId: source, parentTabId: parent });
     return { parent, source, child };
   });

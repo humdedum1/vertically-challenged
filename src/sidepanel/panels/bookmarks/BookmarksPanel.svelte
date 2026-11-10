@@ -603,7 +603,7 @@ const title = (n: Node): string => n.title || (n.url ? displayUrl(n.url) : 'Unti
                   >
                 {/if}
               </span>
-              {#if folder}<span class="n" aria-hidden="true">{n.children?.length ?? 0}</span>{/if}
+              {#if folder && n.children?.length}<span class="n" aria-hidden="true">{n.children.length}</span>{/if}
             </div>
           {/snippet}
         </VirtualList>
@@ -676,6 +676,8 @@ const title = (n: Node): string => n.title || (n.url ? displayUrl(n.url) : 'Unti
 
   .search:focus-within {
     border-color: var(--focus-ring);
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
   }
 
   .search input {
@@ -796,7 +798,7 @@ const title = (n: Node): string => n.title || (n.url ? displayUrl(n.url) : 'Unti
     flex: none;
     display: grid;
     place-items: center;
-    color: var(--mPrimary);
+    color: var(--mPrimaryText);
   }
 
   .text {
@@ -849,7 +851,9 @@ const title = (n: Node): string => n.title || (n.url ? displayUrl(n.url) : 'Unti
   mark {
     padding: 0;
     border-radius: 2px;
-    background: color-mix(in srgb, var(--mPrimary) 22%, transparent);
+    background: color-mix(in srgb, var(--mPrimary) 35%, transparent);
+    /* Pale dark-mode primaries mix to grey; the underline keeps the match visible. */
+    box-shadow: inset 0 -2px 0 var(--mPrimary);
     color: inherit;
   }
 

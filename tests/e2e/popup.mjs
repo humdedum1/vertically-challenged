@@ -184,6 +184,100 @@ for (const how of ['Escape in the panel', 'the close button']) {
   check(await until(() => !panelFrame()), `${how} closes it`);
 }
 
+// The page tampering with the host (clickjacking: hide it, move it, restyle it) closes it
+const tampers = {
+  'an inline style change': (h) => {
+    h.style.opacity = '0';
+  },
+  'a class change': (h) => h.classList.add('x'),
+  'moving the host': (h) => document.documentElement.append(h),
+  'removing the host': (h) => h.remove(),
+};
+for (const [how, fn] of Object.entries(tampers)) {
+  await toggle();
+  await until(() => panelFrame());
+  await page.evaluate(`(${fn})([...document.querySelectorAll('#vertically-challenged')].pop())`);
+  check(
+    await until(async () => !panelFrame() && (await page.$('#vertically-challenged')) === null),
+    `${how} by the page closes it`,
+  );
+}
+// Page stylesheets: a rule on the host can't hide or fade it; fading the page under it closes it.
+await toggle();
+await until(() => panelFrame());
+await page.addStyleTag({
+  content:
+    '#vertically-challenged{opacity:0!important;visibility:hidden!important;display:none!important;transform:translateX(9999px)!important}',
+});
+await sleep(800);
+check(
+  !!panelFrame() &&
+    (await page.evaluate(() => {
+      const s = getComputedStyle(document.querySelector('#vertically-challenged'));
+      return (
+        s.opacity === '1' &&
+        s.visibility === 'visible' &&
+        s.display !== 'none' &&
+        s.transform === 'none'
+      );
+    })),
+  "a page stylesheet rule on the host can't hide, fade or move it",
+);
+await page.evaluate(() =>
+  document.querySelectorAll('style').forEach((s) => {
+    s.remove();
+  }),
+);
+// A page faded when the popup opens can't host it, and fading it later closes it.
+for (const [how, css] of [
+  ['body opacity', 'body{opacity:.05!important}'],
+  ['html visibility', 'html{visibility:hidden!important}'],
+]) {
+  if (panelFrame()) {
+    await toggle();
+    await until(() => !panelFrame());
+  }
+  const tag = await page.addStyleTag({ content: css });
+  await toggle();
+  await sleep(800);
+  check(
+    !panelFrame() && (await page.$('#vertically-challenged')) === null,
+    `a page with ${how} set before opening closes it`,
+  );
+  await tag.evaluate((t) => t.remove());
+}
+await toggle();
+await until(() => panelFrame());
+const fade = await page.addStyleTag({ content: 'body{opacity:.5!important}' });
+check(
+  await until(async () => !panelFrame() && (await page.$('#vertically-challenged')) === null),
+  'a fade the page starts after opening closes it',
+);
+await fade.evaluate((t) => t.remove());
+await toggle();
+check(!!(await until(() => panelFrame())), 'it opens again once the page is no longer faded');
+// Moving the page under it (an ancestor transform shifts the fixed host) closes it.
+const shift = await page.addStyleTag({
+  content: 'body{transform:translate(300px,200px)!important}',
+});
+check(
+  await until(async () => !panelFrame() && (await page.$('#vertically-challenged')) === null),
+  'an ancestor transform that moves it closes it',
+);
+await shift.evaluate((t) => t.remove());
+if (!panelFrame()) {
+  await toggle();
+  await until(() => panelFrame());
+}
+await toggle();
+await until(() => !panelFrame());
+
+// Closed by tampering, the next injection opens it again rather than toggling off.
+await toggle();
+check(!!(await until(() => panelFrame())), 'it opens again after a tamper close');
+await toggle();
+await until(() => !panelFrame());
+
 // Activating another tab from the list hides this one, which closes the popup
 await toggle();
 const f2 = await until(async () => {

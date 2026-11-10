@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_THEMES, findTheme } from '../src/themes/builtin';
-import { contrastIssues, legibleTheme } from '../src/themes/contrast';
+import { contrastIssues, contrastRatio, legibleTheme } from '../src/themes/contrast';
 import { NOCTALIA_THEMES } from '../src/themes/noctalia';
 import { TERMINAL_THEMES } from '../src/themes/terminal';
+import { primaryText, switchThumb } from '../src/themes/token-mapper';
 
 describe('built-in themes', () => {
   it('all parse with unique ids', () => {
     const ids = BUILTIN_THEMES.map((t) => t.id);
-    expect(ids).toHaveLength(18);
+    expect(ids).toHaveLength(19);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('abyss meets WCAG AA for every text pair', () => {
-    expect(contrastIssues(findTheme('abyss'))).toEqual([]);
+  it('our own themes meet WCAG AA for every text pair', () => {
+    for (const id of ['abyss', 'ember']) expect(contrastIssues(findTheme(id)), id).toEqual([]);
   });
 
   it('derives terminal palettes that meet WCAG AA', () => {
@@ -42,5 +43,26 @@ describe('built-in themes', () => {
       ]),
     );
     expect(report).toMatchSnapshot();
+  });
+
+  // Primary-coloured text stays AA on both surfaces.
+  it('--mPrimaryText reaches 4.5:1 on surface and surface-variant', () => {
+    for (const { id } of [...NOCTALIA_THEMES, ...TERMINAL_THEMES]) {
+      const t = legibleTheme(findTheme(id));
+      for (const p of [t.dark, t.light]) {
+        const pt = primaryText(p);
+        expect(contrastRatio(pt, p.mSurface), id).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(pt, p.mSurfaceVariant), id).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
+  it('--mSwitchThumb reaches 3:1 on the primary track', () => {
+    for (const { id } of BUILTIN_THEMES) {
+      const t = legibleTheme(findTheme(id));
+      for (const p of [t.dark, t.light]) {
+        expect(contrastRatio(switchThumb(p), p.mPrimary), id).toBeGreaterThanOrEqual(3);
+      }
+    }
   });
 });

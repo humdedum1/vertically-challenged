@@ -23,6 +23,10 @@ it('validates new-tab URLs from synced settings and backups', () => {
     'data:text/html,hi',
     'chrome://quit/',
     'chrome://crash/',
+    // A new-tab page would re-trigger the new-tab redirect forever.
+    'chrome://newtab/',
+    'about:newtab',
+    'about:home',
     123,
     null,
   ]) {

@@ -18,6 +18,7 @@ import {
   exchangeCode,
   newPkce,
 } from '../../../backup/dropbox';
+import { isPlainHttp } from '../../../backup/targets';
 import { FIREFOX } from '../../../shared/browser-urls';
 import Button from '../../components/controls/Button.svelte';
 import Field from '../../components/controls/Field.svelte';
@@ -117,8 +118,8 @@ async function runNow(): Promise<void> {
 const last = $derived(status.at ? new Date(status.at).toLocaleString() : 'never');
 const redirectUri = browser.identity?.getRedirectURL?.() ?? '';
 const insecure = $derived(
-  (cfg.target === 'webdav' && cfg.webdav.url.startsWith('http:')) ||
-    (cfg.target === 's3' && cfg.s3.endpoint.startsWith('http:')),
+  (cfg.target === 'webdav' && isPlainHttp(cfg.webdav.url)) ||
+    (cfg.target === 's3' && isPlainHttp(cfg.s3.endpoint)),
 );
 const remote = $derived(cfg.target !== 'downloads');
 </script>

@@ -18,7 +18,7 @@ describe('migrateSettings: non-objects', () => {
     a.appearance.radius = 1;
     a.appearance.themeId = 'mutated';
     expect(DEFAULT_SETTINGS.appearance.radius).toBe(14);
-    expect(DEFAULT_SETTINGS.appearance.themeId).toBe('abyss');
+    expect(DEFAULT_SETTINGS.appearance.themeId).toBe('noctalia');
     expect(migrateSettings(undefined)).toEqual(DEFAULT_SETTINGS);
   });
 

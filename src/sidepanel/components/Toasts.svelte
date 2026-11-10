@@ -126,7 +126,7 @@ const errors = $derived(toasts.filter((t) => t.level === 'error'));
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-control);
     background: transparent;
-    color: var(--mPrimary);
+    color: var(--mPrimaryText);
     font: inherit;
     font-weight: 600;
     cursor: pointer;

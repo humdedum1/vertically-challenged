@@ -34,6 +34,16 @@ export function popupTokenOk(search: string, stored: unknown): boolean {
     typeof stored === 'string' && stored !== '' && new URLSearchParams(search).get('t') === stored
   );
 }
+/**
+ * Clickjacking guard for every surface. Inside a frame only our overlay's popup may render,
+ * and only with its token; the side panel, sidebar and popup window are top-level pages.
+ * Checking the frame, not just the query, means a site can't skip the token by dropping it.
+ */
+export function mayRender(search: string, framed: boolean, stored: unknown): boolean {
+  if (parseSurface(search).surface === 'popup') return popupTokenOk(search, stored);
+  return !framed;
+}
+
 export const windowQuery = (windowId: number): string => `?surface=window&windowId=${windowId}`;
 
 export function parseSurface(search: string): SurfaceInfo {

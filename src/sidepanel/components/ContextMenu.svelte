@@ -212,7 +212,7 @@ function onkeydown(e: KeyboardEvent): void {
 <style>
   .check {
     margin-left: auto;
-    color: var(--mPrimary);
+    color: var(--mPrimaryText);
   }
 
   .menu {

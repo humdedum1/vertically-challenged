@@ -1,4 +1,5 @@
 import { normalizeCombo } from '../lib/keymap';
+import { isNewTabUrl } from '../shared/browser-urls';
 import { normalizeHostPattern } from '../shared/host-pattern';
 import { isRestorableUrl } from '../shared/sessions';
 import {
@@ -161,7 +162,8 @@ export function normalizeRulePath(value: unknown): string | null {
 export function normalizeNewTabUrl(value: string): string | null {
   const url = value.trim();
   if (!url) return '';
-  if (url.length > 2048 || !isRestorableUrl(url)) return null;
+  // A new-tab page here would make the new-tab redirect re-trigger itself forever.
+  if (url.length > 2048 || !isRestorableUrl(url) || isNewTabUrl(url)) return null;
   try {
     return new URL(url).href;
   } catch {

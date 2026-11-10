@@ -144,3 +144,12 @@ export function s3Target(
     },
   };
 }
+
+/** Whether a server address the user typed sends login and data unencrypted (http://). */
+export function isPlainHttp(address: string): boolean {
+  try {
+    return new URL(address.trim()).protocol === 'http:';
+  } catch {
+    return false;
+  }
+}

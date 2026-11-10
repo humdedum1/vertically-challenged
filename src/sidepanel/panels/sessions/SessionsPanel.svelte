@@ -539,6 +539,7 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
 
   .item {
     display: grid;
+    grid-template-columns: minmax(0, 1fr); /* else one long name widens the column past the card */
     gap: 6px;
     padding: 8px 6px;
     border-radius: var(--radius-row);
@@ -645,6 +646,7 @@ const strip = (s: Session) => s.windows.flatMap((w) => w.tabs).slice(0, STRIP);
   .tabs {
     margin-left: 24px;
     display: grid;
+    grid-template-columns: minmax(0, 1fr); /* else one long name widens the column past the card */
     gap: 2px;
   }
 

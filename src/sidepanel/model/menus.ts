@@ -223,9 +223,10 @@ export function tabMenu(c: TabMenuContext): MenuItem[] {
         : covered
           ? 'Site is in the never-suspend list'
           : 'Never auto-suspend this site',
-      disabled: host === null || covered,
+      // The list syncs to other devices: incognito sites never go in it.
+      disabled: host === null || covered || c.target.incognito,
       onselect: () => {
-        if (host !== null) c.onWhitelist(host, !listed);
+        if (host !== null && !c.target.incognito) c.onWhitelist(host, !listed);
       },
     },
     SEP,

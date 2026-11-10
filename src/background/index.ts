@@ -1,6 +1,7 @@
 import { type Browser, browser } from 'wxt/browser';
 import { makeTarget } from '../backup/make-target';
 import { migrateSettings } from '../settings/migrate';
+import { saveSettings } from '../settings/save';
 import type { TabRule } from '../settings/schema';
 import { EXTENSION_SCHEME, isNewTabUrl } from '../shared/browser-urls';
 import { hostOf } from '../shared/host-pattern';
@@ -45,7 +46,7 @@ import { createSyncPublisher } from './sync/publisher';
 import { applyTabRule } from './tab-rules';
 import { ChangeSet, type TabOp, TabStore } from './tab-store';
 import { toTabInfo as browserTabInfo, toGroupInfo } from './to-tab-info';
-import { shouldDeliver, snapshotPlan, visibleWindows } from './visibility';
+import { crossesKind, shouldDeliver, snapshotPlan, visibleWindows } from './visibility';
 
 /**
  * Everything is registered synchronously inside this call: MV3 only delivers the event
@@ -109,6 +110,13 @@ export function startBackground(): void {
       { toggle: false, sidebarOpen: false },
     );
     void browser.notifications.clear(id);
+  });
+  // A launch prompt for a closed window would open nothing: drop it with the window.
+  browser.windows.onRemoved.addListener(async (windowId) => {
+    if (!browser.notifications) return;
+    const prefix = `vc-launch:${windowId}:`;
+    for (const id of Object.keys(await browser.notifications.getAll().catch(() => ({}))))
+      if (id.startsWith(prefix)) void browser.notifications.clear(id);
   });
   async function notifyLaunch(): Promise<void> {
     const { display: d } = await settingsNow();
@@ -794,6 +802,21 @@ export function startBackground(): void {
         return;
       }
       const home = subs.get(port)?.windowId ?? null;
+      await windowsReady;
+      const sub = subs.get(port);
+      const kind = sub ? (sub.incognito ?? windowIncognito(sub.windowId)) : null;
+      if (
+        crossesKind(
+          msg,
+          kind,
+          (id) => store.get(id)?.incognito,
+          (id) => windowList.find((w) => w.id === id)?.incognito,
+          (id) => windowList.find((w) => store.groups(w.id).some((g) => g.id === id))?.incognito,
+        )
+      ) {
+        console.warn('[vc] refused a panel command naming the other window kind:', msg.type);
+        return;
+      }
       try {
         const text = isPinMessage(msg)
           ? await runPinCommand(msg, pins, deps)
@@ -912,12 +935,14 @@ export function startBackground(): void {
   registerContextMenus({
     openPanel,
     suspend: (tab, others) => void suspendFrom(tab, others),
-    neverSuspend: async (url) => {
+    neverSuspend: async (tab) => {
+      // The whitelist is in storage.sync: an incognito site must never reach it.
+      if (tab.incognito) return;
       const s = await settingsNow();
-      const host = hostOf(url);
+      const host = hostOf(tab.url);
       if (!host || s.suspend.whitelist.includes(host)) return;
       s.suspend.whitelist = [...s.suspend.whitelist, host];
-      await browser.storage.sync.set({ settings: migrateSettings(s) });
+      await saveSettings(browser.storage.sync, migrateSettings(s));
     },
     saveWindow: async (windowId) => {
       const name = `Window · ${new Date().toLocaleString()}`;

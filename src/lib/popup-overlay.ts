@@ -6,8 +6,9 @@ import { POPUP_CLOSE } from '../shared/surface';
  *
  * Runs in the content-script world, whose globals persist between injections into the same
  * document, so a second injection finds the open popup and closes it (toggle). The host
- * element uses a closed shadow root and `all: initial`, so page CSS and page scripts can't
- * restyle or reach into it. The iframe URL is the extension's dynamic web-accessible URL:
+ * element uses a closed shadow root and inline `!important` styles, so page CSS and page
+ * scripts can't restyle or reach into it; changing or moving it, or fading or hiding the page
+ * under it, closes the popup. The iframe URL is the extension's dynamic web-accessible URL:
  * other sites can't frame the panel because they can't know it.
  *
  * Closes on: a click outside it (unless turned off in Settings), Escape in the page, the panel's close request (Escape with
@@ -35,11 +36,26 @@ export function togglePopupOverlay(url: string, closeOnClickOutside = true): 'op
 
   const previousFocus = document.activeElement as HTMLElement | null;
   const host = document.createElement('div');
-  // Stable hooks for page CSS, userscripts and tests.
+  // Stable hooks for userscripts and tests. Page CSS can't restyle the host: its key styles are
+  // inline !important (a page could otherwise fade or hide it to trick clicks onto the panel).
   host.id = 'vertically-challenged';
   host.className = 'vertically-challenged';
   // The host spans the viewport but lets clicks through; only the backdrop and box take them.
-  host.style.cssText = `all: initial; position: fixed; inset: 0; z-index: 2147483647; pointer-events: none;`;
+  host.style.cssText = [
+    'all: initial',
+    'display: block',
+    'position: fixed',
+    'inset: 0',
+    'z-index: 2147483647',
+    'pointer-events: none',
+    'opacity: 1',
+    'visibility: visible',
+    'transform: none',
+    'filter: none',
+    'clip-path: none',
+  ]
+    .map((d) => `${d} !important;`)
+    .join(' ');
   const root = host.attachShadow({ mode: 'closed' });
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -145,9 +161,45 @@ export function togglePopupOverlay(url: string, closeOnClickOutside = true): 'op
     if (document.visibilityState === 'hidden') close();
   };
 
+  // A page could restyle, move or hide the host to trick clicks onto the panel
+  // (clickjacking); any change to it or its place in the page closes the popup.
+  const parent = document.body ?? document.documentElement;
+  // Nothing here changes the host's attributes once it is shown, so any change is the page's.
+  const tamper = new MutationObserver((records) => {
+    if (host.parentNode !== parent || records.some((r) => r.type === 'attributes')) close();
+  });
+
+  // Ancestors' opacity and visibility apply through any host style, so a faded or hidden page
+  // closes the popup, at open and while it is open. Filters are ignored: dark-mode extensions
+  // set one on <html>.
+  const faded = () =>
+    [document.documentElement, document.body].some((el) => {
+      if (!el) return false;
+      const cs = getComputedStyle(el);
+      return Number(cs.opacity) < 1 || cs.visibility !== 'visible' || cs.display === 'none';
+    });
+
+  // An ancestor transform (or filter) makes it the fixed host's containing block, so a page rule
+  // can move the host without touching it. The host must keep covering the viewport.
+  const moved = () => {
+    const r = host.getBoundingClientRect();
+    const de = document.documentElement;
+    return (
+      Math.abs(r.left) > 1 ||
+      Math.abs(r.top) > 1 ||
+      r.right < de.clientWidth - 1 ||
+      r.bottom < de.clientHeight - 1
+    );
+  };
+  const moveCheck = setInterval(() => {
+    if (faded() || moved()) close();
+  }, 500);
+
   function close(): void {
     if (g[STATE] !== state) return;
     delete g[STATE];
+    tamper.disconnect();
+    clearInterval(moveCheck);
     window.removeEventListener('message', onMessage);
     window.removeEventListener('keydown', onKey, true);
     document.removeEventListener('visibilitychange', onHidden);
@@ -168,7 +220,13 @@ export function togglePopupOverlay(url: string, closeOnClickOutside = true): 'op
   window.addEventListener('pagehide', close);
   frame.addEventListener('load', () => frame.focus(), { once: true });
 
-  (document.body ?? document.documentElement).append(host);
+  parent.append(host);
+  tamper.observe(host, { attributes: true });
+  tamper.observe(parent, { childList: true });
+  if (faded() || moved()) {
+    close();
+    return 'closed';
+  }
   if (!reduceMotion) {
     frame.animate(
       [

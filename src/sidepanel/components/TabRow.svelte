@@ -298,6 +298,9 @@ function muteClick(e: MouseEvent): void {
     cursor: pointer;
   }
 
+  /* WCAG 2.5.8: 24px hit area, visual box unchanged. */
+  .branch-toggle::after { content: ''; position: absolute; inset: 0 -6px; }
+
   .branch-toggle.expanded :global(svg) { transform: rotate(90deg); }
 
   .row.nested .guide {
@@ -366,9 +369,10 @@ function muteClick(e: MouseEvent): void {
     outline: none;
   }
 
+  /* Secondary text colour, not a fade or italics: the moon icon already says "suspended",
+     and a faded italic title was hard to read on translucent (glass) cards. */
   .row.discarded .label {
-    opacity: 0.6;
-    font-style: italic;
+    color: var(--mOnSurfaceVariant);
   }
 
   .icon {
@@ -417,7 +421,9 @@ function muteClick(e: MouseEvent): void {
   mark {
     padding: 0;
     border-radius: 2px;
-    background: color-mix(in srgb, var(--mPrimary) 22%, transparent);
+    background: color-mix(in srgb, var(--mPrimary) 35%, transparent);
+    /* Pale dark-mode primaries mix to grey; the underline keeps the match visible. */
+    box-shadow: inset 0 -2px 0 var(--mPrimary);
     color: inherit;
   }
 

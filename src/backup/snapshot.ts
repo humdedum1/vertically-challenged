@@ -42,7 +42,12 @@ export interface RestoredFull extends RestoredBackup {
  * the panel fetch from any server, which a hostile file could use to leak what the panel shows.
  */
 export function stripRemoteCss(css: string): { css: string; stripped: boolean } {
-  const out = css.replace(/@import\b[^;]*;?/gi, '').replace(/url\s*\([^)]*\)/gi, 'none');
+  let out = css;
+  // Repeat until stable: removing one @import can splice its neighbours into another.
+  for (let prev = ''; prev !== out; ) {
+    prev = out;
+    out = out.replace(/@import\b[^;]*;?/gi, '').replace(/url\s*\([^)]*\)/gi, 'none');
+  }
   // What the pass above can't see: image-set("https://…"), src(), and escapes such as \75rl(.
   // Such a file is not worth repairing: drop the stylesheet.
   if (/\\|image-set|\bsrc\(/i.test(out.replace(/\/\*[\s\S]*?\*\//g, '')))
@@ -73,7 +78,9 @@ export function parseFullBackup(
   const b = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
   if (b.format !== FULL_FORMAT)
     return { ok: false, error: 'Not a full Vertically Challenged backup' };
-  if (typeof b.version !== 'number' || b.version > FULL_VERSION)
+  if (typeof b.version !== 'number' || !Number.isInteger(b.version) || b.version < 1)
+    return { ok: false, error: 'Not a valid backup file' };
+  if (b.version > FULL_VERSION)
     return {
       ok: false,
       error: 'This backup was made by a newer version; update the extension first',

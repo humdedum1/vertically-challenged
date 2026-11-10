@@ -69,17 +69,21 @@ function onkeydown(e: KeyboardEvent): void {
     padding: 2px;
     gap: 2px;
     border: 1px solid var(--border-strong);
-    border-radius: 999px;
+    /* Half the one-line height: a pill on one line, a rounded box if a label wraps. */
+    border-radius: 16px;
     background: var(--surface-0);
   }
 
   button {
-    flex: 1;
-    min-width: 0;
-    height: 28px;
-    padding: 0 10px;
+    /* Size to the label; a long one ("In-page popup") wraps rather than overflowing at 300px. */
+    flex: 1 1 auto;
+    min-width: min-content;
+    min-height: 28px;
+    padding: 2px 8px;
+    line-height: 1.15;
+    text-wrap: balance;
     border: 0;
-    border-radius: 999px;
+    border-radius: 14px;
     background: transparent;
     color: var(--mOnSurfaceVariant);
     font-weight: 500;

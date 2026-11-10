@@ -29,7 +29,7 @@ const panelItems = $derived(
       label: PANEL_LABELS[p.id],
       visible: p.visible,
       toggleDisabled: locked || soon,
-      hint: soon ? 'Coming soon' : locked ? 'Always shown' : undefined,
+      hint: soon ? 'Coming soon' : locked ? 'Always on' : undefined,
     };
   }),
 );
@@ -42,7 +42,7 @@ const sectionItems = $derived(
       label: SECTION_LABELS[s.id],
       visible: s.visible,
       toggleDisabled: s.id === 'tabs' || soon,
-      hint: soon ? 'Coming soon' : s.id === 'tabs' ? 'Always shown' : undefined,
+      hint: soon ? 'Coming soon' : s.id === 'tabs' ? 'Always on' : undefined,
     };
   }),
 );

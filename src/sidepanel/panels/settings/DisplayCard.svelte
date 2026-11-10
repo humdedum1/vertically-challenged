@@ -1,7 +1,6 @@
 <script lang="ts">
 import type { DisplayMode } from '../../../settings/schema';
 import { BROWSER, FIREFOX } from '../../../shared/browser-urls';
-import Button from '../../components/controls/Button.svelte';
 import Field from '../../components/controls/Field.svelte';
 import SegmentedControl from '../../components/controls/SegmentedControl.svelte';
 import Toggle from '../../components/controls/Toggle.svelte';
@@ -70,11 +69,14 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
       {/if}
     </p>
     {#if mode === 'sidebar' && !FIREFOX}
-      <Field label="Side">
-        <Button onclick={() => void browser.tabs.create({ url: 'chrome://settings/appearance' })}>
-          {side ? `On the ${side} · ` : ''}Change in Chrome settings
-        </Button>
-      </Field>
+      <p class="muted">
+        {side ? `The panel opens on the ${side}. ` : ''}<button
+          type="button"
+          class="link"
+          onclick={() => void browser.tabs.create({ url: 'chrome://settings/appearance' })}
+          >Change the side in Chrome settings</button
+        >
+      </p>
     {/if}
     <Toggle
       label="Open on browser launch"
@@ -110,5 +112,16 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
     margin: 0;
     color: var(--mOnSurfaceVariant);
     font-size: calc(var(--font-size) - 1px);
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--mPrimaryText);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
   }
 </style>

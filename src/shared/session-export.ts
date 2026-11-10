@@ -12,13 +12,23 @@ const mdText = (s: string): string =>
 const mdUrl = (u: string): string =>
   u.replace(/[()\s]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
 
+/** javascript: links would become clickable bookmarklets in the exported file. */
+const exportable = (t: { url: string }): boolean => {
+  try {
+    return new URL(t.url).protocol !== 'javascript:'; // parsed: leading whitespace can't hide it
+  } catch {
+    return true;
+  }
+};
+
 /** A readable outline: one heading per window, groups as sub-headings, tabs as links. */
 export function sessionToMarkdown(s: Session): string {
   const out = [`# ${mdText(s.name) || 'Session'}`, ''];
   s.windows.forEach((w, wi) => {
     if (s.windows.length > 1) out.push(`## Window ${wi + 1}`, '');
     const sections = new Map<number | null, typeof w.tabs>();
-    for (const t of w.tabs) sections.set(t.group, [...(sections.get(t.group) ?? []), t]);
+    for (const t of w.tabs.filter(exportable))
+      sections.set(t.group, [...(sections.get(t.group) ?? []), t]);
     for (const [g, tabs] of sections) {
       if (g !== null) out.push(`### ${mdText(w.groups[g]?.title ?? '') || 'Group'}`, '');
       for (const t of tabs) out.push(`- [${mdText(t.title) || t.url}](${mdUrl(t.url)})`);
@@ -42,7 +52,7 @@ export function sessionToBookmarksHtml(s: Session): string {
   s.windows.forEach((w, wi) => {
     const nested = s.windows.length > 1;
     if (nested) lines.push(`    <DT><H3>Window ${wi + 1}</H3>`, '    <DL><p>');
-    for (const t of w.tabs)
+    for (const t of w.tabs.filter(exportable))
       lines.push(`      <DT><A HREF="${esc(t.url)}">${esc(t.title || t.url)}</A>`);
     if (nested) lines.push('    </DL><p>');
   });

@@ -153,7 +153,7 @@ function suspendOthers(): void {
           id="vc-whitelist-add"
           label="Add a site"
           value={entry}
-          placeholder="example.com or *.example.com"
+          placeholder="*.example.com"
           invalid={entryError !== ''}
           describedby="vc-whitelist-err"
           oninput={(v) => {

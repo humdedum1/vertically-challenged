@@ -298,6 +298,9 @@ function muteClick(e: MouseEvent): void {
     cursor: pointer;
   }
 
+  /* WCAG 2.5.8: 24px hit area, visual box unchanged. */
+  .branch-toggle::after { content: ''; position: absolute; inset: 0 -6px; }
+
   .branch-toggle.expanded :global(svg) { transform: rotate(90deg); }
 
   .row.nested .guide {

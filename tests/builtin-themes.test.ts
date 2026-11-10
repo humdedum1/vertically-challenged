@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { BUILTIN_THEMES, findTheme } from '../src/themes/builtin';
-import { contrastIssues, legibleTheme } from '../src/themes/contrast';
+import { contrastIssues, contrastRatio, legibleTheme } from '../src/themes/contrast';
 import { NOCTALIA_THEMES } from '../src/themes/noctalia';
 import { TERMINAL_THEMES } from '../src/themes/terminal';
+import { primaryText } from '../src/themes/token-mapper';
 
 describe('built-in themes', () => {
   it('all parse with unique ids', () => {
@@ -42,5 +43,17 @@ describe('built-in themes', () => {
       ]),
     );
     expect(report).toMatchSnapshot();
+  });
+
+  // Primary-coloured text stays AA on both surfaces.
+  it('--mPrimaryText reaches 4.5:1 on surface and surface-variant', () => {
+    for (const { id } of [...NOCTALIA_THEMES, ...TERMINAL_THEMES]) {
+      const t = legibleTheme(findTheme(id));
+      for (const p of [t.dark, t.light]) {
+        const pt = primaryText(p);
+        expect(contrastRatio(pt, p.mSurface), id).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(pt, p.mSurfaceVariant), id).toBeGreaterThanOrEqual(4.5);
+      }
+    }
   });
 });

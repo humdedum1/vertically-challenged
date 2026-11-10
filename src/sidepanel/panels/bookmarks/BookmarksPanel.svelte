@@ -796,7 +796,7 @@ const title = (n: Node): string => n.title || (n.url ? displayUrl(n.url) : 'Unti
     flex: none;
     display: grid;
     place-items: center;
-    color: var(--mPrimary);
+    color: var(--mPrimaryText);
   }
 
   .text {

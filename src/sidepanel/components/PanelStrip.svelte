@@ -150,7 +150,7 @@ function onkeydown(e: KeyboardEvent): void {
   }
 
   button.selected :global(svg) {
-    color: var(--mPrimary);
+    color: var(--mPrimaryText);
   }
 
   button.icon-only {

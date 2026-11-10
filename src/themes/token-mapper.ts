@@ -1,6 +1,12 @@
+import { legibleOn } from './contrast';
 import { type Palette, ROLES, type Theme } from './palette';
 
-const declarations = (p: Palette): string => ROLES.map((r) => `--${r}:${p[r]};`).join('');
+/** mPrimary as text: nudged until it reads (4.5:1) on both surfaces; equals mPrimary when it already does. */
+export const primaryText = (p: Palette): string =>
+  legibleOn(legibleOn(p.mPrimary, p.mSurface), p.mSurfaceVariant);
+
+const declarations = (p: Palette): string =>
+  `${ROLES.map((r) => `--${r}:${p[r]};`).join('')}--mPrimaryText:${primaryText(p)};`;
 
 /**
  * Builds one stylesheet that serves all three modes, so switching mode is a single

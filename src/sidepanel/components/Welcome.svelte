@@ -29,19 +29,19 @@ function done(): void {
 {#if show}
   <SegmentCard title="Welcome">
     <div class="body">
-      <p class="lead">Your tabs, in a fast vertical list. Three things worth knowing:</p>
-      <Field label="Pick a theme" for="vc-welcome-theme">
-        <Select
-          id="vc-welcome-theme"
-          value={settings.value.appearance.themeId}
-          onchange={(id) => settings.update((s) => ({ ...s, appearance: { ...s.appearance, themeId: id } }))}
-        >
-          {#each themes.all as t (t.id)}<option value={t.id}>{t.name}</option>{/each}
-        </Select>
-      </Field>
-      <p>Press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> to open or close this panel. You can change it at {SHORTCUTS_HINT}.</p>
-      <p>Type <kbd>&gt;</kbd> in the search box to run commands. Right-click a tab for snooze, suspend and more.</p>
-      <div class="row"><Button variant="primary" onclick={done}>Got it</Button></div>
+      <p>Toggle the panel with <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> ({SHORTCUTS_HINT}). Type <kbd>&gt;</kbd> in search for commands.</p>
+      <div class="row">
+        <Field label="Theme" for="vc-welcome-theme">
+          <Select
+            id="vc-welcome-theme"
+            value={settings.value.appearance.themeId}
+            onchange={(id) => settings.update((s) => ({ ...s, appearance: { ...s.appearance, themeId: id } }))}
+          >
+            {#each themes.all as t (t.id)}<option value={t.id}>{t.name}</option>{/each}
+          </Select>
+        </Field>
+        <Button variant="primary" onclick={done}>Got it</Button>
+      </div>
     </div>
   </SegmentCard>
 {/if}
@@ -49,10 +49,10 @@ function done(): void {
 <style>
   .body { display: flex; flex-direction: column; gap: var(--gap); padding: 4px var(--pad-card) var(--pad-card); }
   p { margin: 0; }
-  .lead { font-weight: 500; }
   kbd {
     padding: 0 5px; border: 1px solid var(--border-strong); border-radius: 4px;
     background: var(--surface-0); font: inherit; font-size: calc(var(--font-size) - 1px);
   }
-  .row { display: flex; }
+  .row { display: flex; align-items: end; gap: var(--gap); }
+  .row :global(:first-child) { flex: 1; min-width: 0; }
 </style>

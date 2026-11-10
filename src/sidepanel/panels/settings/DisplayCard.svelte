@@ -118,7 +118,7 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
     padding: 0;
     border: 0;
     background: none;
-    color: var(--mPrimary);
+    color: var(--mPrimaryText);
     font: inherit;
     text-decoration: underline;
     text-underline-offset: 2px;

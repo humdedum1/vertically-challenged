@@ -54,6 +54,9 @@ const toRgb = (hex: string): [number, number, number] => [
 const toHex = (c: readonly number[]): string =>
   `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
 
+const mixHex = (a: string, b: string, wa: number): string =>
+  toHex(toRgb(a).map((v, i) => v * wa + (toRgb(b)[i] ?? 0) * (1 - wa)));
+
 /**
  * Nudges `fg` toward black or white (whichever the background is further from) in small steps
  * until it reaches `min` against `bg`, keeping its hue as long as it can.
@@ -84,6 +87,11 @@ export function legibleTheme(theme: Theme, min = 4.5): Theme {
   const fix = (p: Palette): Palette => {
     const out: Palette = { ...p };
     for (const [fg, bg] of TEXT_PAIRS) out[fg] = legibleOn(out[fg], out[bg], min);
+    // base.css --surface-3 (and 2) sit on mSurfaceVariant mixed 8% toward mOnSurface: text
+    // that passes on the plain surface can fall under 4.5:1 on cards, chips and badges.
+    const deep = mixHex(out.mSurfaceVariant, out.mOnSurface, 0.92);
+    out.mOnSurfaceVariant = legibleOn(out.mOnSurfaceVariant, deep, min);
+    out.mOnSurface = legibleOn(out.mOnSurface, deep, min);
     return out;
   };
   return { ...theme, dark: fix(theme.dark), light: fix(theme.light) };

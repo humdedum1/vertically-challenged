@@ -366,7 +366,7 @@ async function onFile(e: Event & { currentTarget: HTMLInputElement }): Promise<v
   /* A check, not a word: at narrow widths the word pushed the theme name into an ellipsis. */
   .inuse {
     flex: none;
-    color: var(--mPrimary);
+    color: var(--mPrimaryText);
     font-size: calc(var(--font-size) - 1px);
     font-weight: 600;
   }

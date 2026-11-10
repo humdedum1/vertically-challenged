@@ -913,9 +913,11 @@ export function startBackground(): void {
   registerContextMenus({
     openPanel,
     suspend: (tab, others) => void suspendFrom(tab, others),
-    neverSuspend: async (url) => {
+    neverSuspend: async (tab) => {
+      // The whitelist is in storage.sync: an incognito site must never reach it.
+      if (tab.incognito) return;
       const s = await settingsNow();
-      const host = hostOf(url);
+      const host = hostOf(tab.url);
       if (!host || s.suspend.whitelist.includes(host)) return;
       s.suspend.whitelist = [...s.suspend.whitelist, host];
       await saveSettings(browser.storage.sync, migrateSettings(s));

@@ -7,7 +7,8 @@ interface MenuActions {
   /** Opens the side panel or the in-page popup (Display setting) for the tab's window. */
   openPanel(tab: TargetTab): void;
   suspend(tab: TabInfo, others: boolean): void;
-  neverSuspend(url: string): Promise<void>;
+  /** Ignores incognito tabs: the never-suspend list syncs to other devices. */
+  neverSuspend(tab: TabInfo): Promise<void>;
   saveWindow(windowId: number): Promise<void>;
 }
 
@@ -58,7 +59,7 @@ export function registerContextMenus(actions: MenuActions): void {
         actions.suspend(tab, true);
         return;
       case 'vc-never-suspend':
-        void actions.neverSuspend(tab.url);
+        if (!tab.incognito) void actions.neverSuspend(tab);
         return;
       case 'vc-save-window':
         void actions.saveWindow(tab.windowId);

@@ -184,6 +184,30 @@ for (const how of ['Escape in the panel', 'the close button']) {
   check(await until(() => !panelFrame()), `${how} closes it`);
 }
 
+// The page tampering with the host (clickjacking: hide it, move it, restyle it) closes it
+const tampers = {
+  'an inline style change': (h) => {
+    h.style.opacity = '0';
+  },
+  'a class change': (h) => h.classList.add('x'),
+  'moving the host': (h) => document.documentElement.append(h),
+  'removing the host': (h) => h.remove(),
+};
+for (const [how, fn] of Object.entries(tampers)) {
+  await toggle();
+  await until(() => panelFrame());
+  await page.evaluate(`(${fn})([...document.querySelectorAll('#vertically-challenged')].pop())`);
+  check(
+    await until(async () => !panelFrame() && (await page.$('#vertically-challenged')) === null),
+    `${how} by the page closes it`,
+  );
+}
+// Closed by tampering, the next injection opens it again rather than toggling off.
+await toggle();
+check(!!(await until(() => panelFrame())), 'it opens again after a tamper close');
+await toggle();
+await until(() => !panelFrame());
+
 // Activating another tab from the list hides this one, which closes the popup
 await toggle();
 const f2 = await until(async () => {

@@ -145,9 +145,18 @@ export function togglePopupOverlay(url: string, closeOnClickOutside = true): 'op
     if (document.visibilityState === 'hidden') close();
   };
 
+  // A page could restyle, move or hide the host to trick clicks onto the panel
+  // (clickjacking); any change to it or its place in the page closes the popup.
+  const parent = document.body ?? document.documentElement;
+  // Nothing here changes the host's attributes once it is shown, so any change is the page's.
+  const tamper = new MutationObserver((records) => {
+    if (host.parentNode !== parent || records.some((r) => r.type === 'attributes')) close();
+  });
+
   function close(): void {
     if (g[STATE] !== state) return;
     delete g[STATE];
+    tamper.disconnect();
     window.removeEventListener('message', onMessage);
     window.removeEventListener('keydown', onKey, true);
     document.removeEventListener('visibilitychange', onHidden);
@@ -168,7 +177,9 @@ export function togglePopupOverlay(url: string, closeOnClickOutside = true): 'op
   window.addEventListener('pagehide', close);
   frame.addEventListener('load', () => frame.focus(), { once: true });
 
-  (document.body ?? document.documentElement).append(host);
+  parent.append(host);
+  tamper.observe(host, { attributes: true });
+  tamper.observe(parent, { childList: true });
   if (!reduceMotion) {
     frame.animate(
       [

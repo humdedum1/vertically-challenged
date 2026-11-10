@@ -495,6 +495,8 @@ const activeId = $derived.by(() => {
 
   .search:focus-within {
     border-color: var(--focus-ring);
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
   }
 
   .search input {

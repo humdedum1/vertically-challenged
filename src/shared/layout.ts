@@ -192,16 +192,50 @@ export function findNode(l: WindowLayout, id: string): NodeHit | null {
 const isObj = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
+// Chrome's debug pages (kChromeDebugURLs): they crash, hang, quit or restart the browser.
+const DEBUG_PAGES = new Set([
+  'badcastcrash',
+  'crash',
+  'crashdump',
+  'gpuclean',
+  'gpucrash',
+  'gpuhang',
+  'hang',
+  'inducebrowsercrashforrealz',
+  'inducebrowserdcheckforrealz',
+  'kill',
+  'memory-exhaust',
+  'memory-pressure-critical',
+  'memory-pressure-moderate',
+  'quit',
+  'restart',
+  'shorthang',
+  'webuijserror',
+]);
+
+/**
+ * Whether a URL opens one of Chrome's debug pages. Parsed first, so the spellings the browser
+ * normalises (embedded tab or newline, `chrome:crash`, `chrome:///kill`) match too.
+ */
+export function isDebugUrl(url: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== 'chrome:') return false;
+  const page = u.host || u.pathname.replace(/^\/+/, '').split('/')[0] || '';
+  return DEBUG_PAGES.has(page.toLowerCase());
+}
+
 /**
  * Whether a URL may be stored in a layout. Every writer checks it, so whatever is saved
  * also survives the next load.
  */
 export const isLayoutUrl = (v: unknown): v is string => {
-  if (typeof v !== 'string' || !v || v.length > MAX_URL) return false;
+  if (typeof v !== 'string' || !v || v.length > MAX_URL || isDebugUrl(v)) return false;
   try {
-    // Chrome's debug pages crash or hang the browser; a hostile backup must not store them.
-    if (/^chrome:\/\/(kill|hang|crash|quit|restart|inducebrowsercrashforrealz)/i.test(v))
-      return false;
     return SCHEMES.has(new URL(v).protocol);
   } catch {
     return false;

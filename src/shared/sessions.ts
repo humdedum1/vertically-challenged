@@ -1,6 +1,7 @@
 import {
   FOLDER_ICONS,
   type FolderIcon,
+  isDebugUrl,
   MAX_FOLDER_DEPTH,
   MAX_ITEMS,
   MAX_NAME,
@@ -328,9 +329,7 @@ function parseLayout(
  * than show the page). Restore skips them and reports how many.
  */
 export function isRestorableUrl(url: string): boolean {
-  if (/^(javascript|data|file|chrome-error|devtools):/i.test(url)) return false;
-  if (/^chrome:\/\/(kill|hang|crash|quit|restart|inducebrowsercrashforrealz)/i.test(url))
-    return false;
+  if (/^(javascript|data|file|chrome-error|devtools):/i.test(url) || isDebugUrl(url)) return false;
   return /^(https?|chrome|chrome-extension|moz-extension|about|ftp):/i.test(url);
 }
 

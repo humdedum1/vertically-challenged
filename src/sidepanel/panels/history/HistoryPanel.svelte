@@ -1,8 +1,7 @@
 <script lang="ts">
 import { onMount, tick } from 'svelte';
-import { browser } from 'wxt/browser';
 import { displayUrl } from '../../../lib/search/search-index';
-import { api } from '../../api';
+import { api, onRelayed } from '../../api';
 import ContextMenu from '../../components/ContextMenu.svelte';
 import Favicon from '../../components/Favicon.svelte';
 import Icon from '../../components/Icon.svelte';
@@ -179,22 +178,13 @@ onMount(() => {
       items = items.filter((i) => !gone.has(i.url));
     }
   };
-  // Some profiles (policy, kiosk) have no history API at all.
-  try {
-    browser.history.onVisited.addListener(onVisited);
-    browser.history.onVisitRemoved.addListener(onRemoved);
-  } catch {
-    // Search already reports the error state.
-  }
+  const offVisited = onRelayed('history.onVisited', onVisited);
+  const offRemoved = onRelayed('history.onVisitRemoved', onRemoved);
   return () => {
     clearTimeout(searchTimer);
     clearTimeout(visitTimer);
-    try {
-      browser.history.onVisited.removeListener(onVisited);
-      browser.history.onVisitRemoved.removeListener(onRemoved);
-    } catch {
-      // Nothing was registered.
-    }
+    offVisited();
+    offRemoved();
   };
 });
 

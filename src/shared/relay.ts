@@ -24,3 +24,22 @@ export interface RelayRequest {
 }
 
 export type RelayResponse = { ok: true; value: unknown } | { ok: false; error: string };
+
+/** Browser events the background forwards to the framed popup, which can't listen itself. */
+export const RELAY_EVENTS = [
+  'sessions.onChanged',
+  'history.onVisited',
+  'history.onVisitRemoved',
+  'bookmarks.onCreated',
+  'bookmarks.onRemoved',
+  'bookmarks.onChanged',
+  'bookmarks.onMoved',
+] as const;
+
+export type RelayEvent = (typeof RELAY_EVENTS)[number];
+
+export interface RelayEventMessage {
+  type: 'relayEvent';
+  event: RelayEvent;
+  args: unknown[];
+}

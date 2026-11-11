@@ -6,7 +6,7 @@ import { BROWSER, FIREFOX } from '../../../shared/browser-urls';
 import { isRestorableUrl, type SavedPinNode, sessionTabCount } from '../../../shared/sessions';
 import type { SyncDoc, SyncWorkspace } from '../../../shared/sync';
 import { DEVICE_KEY, DEVICE_PREFIX, readSync } from '../../../shared/sync-store';
-import { api } from '../../api';
+import { api, onRelayed } from '../../api';
 import Button from '../../components/controls/Button.svelte';
 import Favicon from '../../components/Favicon.svelte';
 import Icon from '../../components/Icon.svelte';
@@ -60,12 +60,11 @@ onMount(() => {
     if (area === 'sync' && Object.keys(changes).some((k) => k.startsWith(DEVICE_PREFIX)))
       void loadDocs();
   };
-  const onSessions = () => void loadChrome();
+  const offSessions = onRelayed('sessions.onChanged', () => void loadChrome());
   browser.storage.onChanged.addListener(onStorage);
-  browser.sessions.onChanged.addListener(onSessions);
   return () => {
     browser.storage.onChanged.removeListener(onStorage);
-    browser.sessions.onChanged.removeListener(onSessions);
+    offSessions();
   };
 });
 

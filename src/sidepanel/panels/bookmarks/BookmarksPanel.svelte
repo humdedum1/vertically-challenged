@@ -1,8 +1,7 @@
 <script lang="ts">
 import { onMount, tick } from 'svelte';
-import { browser } from 'wxt/browser';
 import { displayUrl } from '../../../lib/search/search-index';
-import { api } from '../../api';
+import { api, onRelayed } from '../../api';
 import ContextMenu from '../../components/ContextMenu.svelte';
 import Favicon from '../../components/Favicon.svelte';
 import Icon from '../../components/Icon.svelte';
@@ -116,21 +115,16 @@ function scheduleReload(): void {
 
 onMount(() => {
   void load();
-  const ev = browser.bookmarks;
-  const events = [ev.onCreated, ev.onRemoved, ev.onChanged, ev.onMoved];
-  try {
-    for (const e of events) e.addListener(scheduleReload);
-  } catch {
-    // The load above reports the error state.
-  }
+  const offs = [
+    onRelayed('bookmarks.onCreated', scheduleReload),
+    onRelayed('bookmarks.onRemoved', scheduleReload),
+    onRelayed('bookmarks.onChanged', scheduleReload),
+    onRelayed('bookmarks.onMoved', scheduleReload),
+  ];
   return () => {
     clearTimeout(reloadTimer);
     clearTimeout(searchTimer);
-    try {
-      for (const e of events) e.removeListener(scheduleReload);
-    } catch {
-      // Nothing was registered.
-    }
+    for (const off of offs) off();
   };
 });
 

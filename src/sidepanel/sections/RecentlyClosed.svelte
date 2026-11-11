@@ -1,7 +1,7 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import { browser } from 'wxt/browser';
-import { api } from '../api';
+import { api, onRelayed } from '../api';
 import Favicon from '../components/Favicon.svelte';
 import Icon from '../components/Icon.svelte';
 import SegmentCard from '../components/SegmentCard.svelte';
@@ -77,18 +77,10 @@ onMount(() => {
     clearTimeout(timer);
     timer = setTimeout(() => void refresh(), 100);
   };
-  try {
-    browser.sessions.onChanged.addListener(onChanged);
-  } catch {
-    // refresh() reports the error state.
-  }
+  const off = onRelayed('sessions.onChanged', onChanged);
   return () => {
     clearTimeout(timer);
-    try {
-      browser.sessions.onChanged.removeListener(onChanged);
-    } catch {
-      // Nothing was registered.
-    }
+    off();
   };
 });
 

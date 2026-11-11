@@ -1,5 +1,11 @@
 import { type Browser, browser } from 'wxt/browser';
-import type { RelayMethod, RelayRequest, RelayResponse } from '../shared/relay';
+import type {
+  RelayEvent,
+  RelayEventMessage,
+  RelayMethod,
+  RelayRequest,
+  RelayResponse,
+} from '../shared/relay';
 
 // The framed Firefox popup has no tabs/bookmarks/history/sessions APIs, so it asks the background.
 function call<T>(method: RelayMethod, args: unknown[]): Promise<T> {
@@ -13,6 +19,44 @@ function call<T>(method: RelayMethod, args: unknown[]): Promise<T> {
     if (!res.ok) throw new Error(res.error);
     return res.value as T;
   });
+}
+
+/**
+ * Subscribes to a browser event. The framed popup has no such API, so it hears the
+ * background's relayed copy instead. Returns the unsubscribe.
+ */
+export function onRelayed(
+  event: 'history.onVisited',
+  cb: (item: Browser.history.HistoryItem) => void,
+): () => void;
+export function onRelayed(
+  event: 'history.onVisitRemoved',
+  cb: (removed: { allHistory: boolean; urls?: string[] }) => void,
+): () => void;
+// biome-ignore lint/suspicious/noExplicitAny: callbacks take each event's own payload
+export function onRelayed(event: RelayEvent, cb: (...args: any[]) => void): () => void;
+// biome-ignore lint/suspicious/noExplicitAny: see the overload above
+export function onRelayed(event: RelayEvent, cb: (...args: any[]) => void): () => void {
+  const [ns, ev] = event.split('.') as [string, string];
+  // biome-ignore lint/suspicious/noExplicitAny: dynamic dispatch over RELAY_EVENTS
+  const target = (browser as any)[ns]?.[ev] as
+    | { addListener(fn: unknown): void; removeListener(fn: unknown): void }
+    | undefined;
+  if (target) {
+    // Some profiles (policy, kiosk) have the namespace but refuse the event.
+    try {
+      target.addListener(cb);
+    } catch {
+      return () => {};
+    }
+    return () => target.removeListener(cb);
+  }
+  const onMsg = (msg: unknown) => {
+    const m = msg as Partial<RelayEventMessage> | null;
+    if (m?.type === 'relayEvent' && m.event === event && Array.isArray(m.args)) cb(...m.args);
+  };
+  browser.runtime.onMessage.addListener(onMsg);
+  return () => browser.runtime.onMessage.removeListener(onMsg);
 }
 
 export const api = {

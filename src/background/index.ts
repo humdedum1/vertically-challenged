@@ -36,6 +36,7 @@ import { placeChildTab } from './child-tabs';
 import { type CommandDeps, runCommand } from './commands';
 import { registerContextMenus } from './context-menus';
 import { createDisplay, launchAction, POPUP_WINDOW, type TargetTab } from './display';
+import { createEventRelay } from './event-relay';
 import { createMruCycle } from './mru';
 import { runPinCommand } from './pins/commands';
 import { PinManager } from './pins/pin-manager';
@@ -191,6 +192,22 @@ export function startBackground(): void {
   /** Whether the window's side panel is open (in-page popups and popup windows don't count). */
   const hasPanel = (windowId: number) =>
     [...subs.values()].some((s) => s.windowId === windowId && s.surface === 'sidebar');
+  // Firefox only: the framed popup can't listen to browser events itself, so the background
+  // forwards them while a popup is open. Ports counted once, even if they re-subscribe.
+  const popupPorts = new Set<Browser.runtime.Port>();
+  const eventRelay = import.meta.env.FIREFOX
+    ? createEventRelay({
+        listen(event, fn) {
+          const [ns, ev] = event.split('.') as [string, string];
+          // biome-ignore lint/suspicious/noExplicitAny: dynamic dispatch over RELAY_EVENTS
+          const target = (browser as any)[ns]?.[ev];
+          if (!target) return () => {};
+          target.addListener(fn);
+          return () => target.removeListener(fn);
+        },
+        send: (msg) => browser.runtime.sendMessage(msg),
+      })
+    : undefined;
   /** Set by the "focus search" shortcut when the panel isn't connected yet. */
   const pendingFocus = new Set<number>();
 
@@ -811,6 +828,10 @@ export function startBackground(): void {
           incognito: subs.get(port)?.incognito ?? null,
           surface,
         });
+        if (surface === 'popup' && !popupPorts.has(port)) {
+          popupPorts.add(port);
+          eventRelay?.popupOpened();
+        }
         await ready;
         await windowsReady;
         await pins.loaded;
@@ -914,6 +935,7 @@ export function startBackground(): void {
 
     port.onDisconnect.addListener(() => {
       subs.delete(port);
+      if (popupPorts.delete(port)) eventRelay?.popupClosed();
     });
   });
 

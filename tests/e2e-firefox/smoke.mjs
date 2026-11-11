@@ -331,6 +331,19 @@ try {
     }
     assert.deepEqual(all, []);
   });
+  await check('sidebar mode explains that Firefox cannot open it at launch', async () => {
+    // sidebarAction.open needs user input, and Firefox doesn't count a notification click.
+    await driver.get(PANEL);
+    await (
+      await waitFor(() => driver.findElements(By.css('#vc-tab-settings')).then((t) => t[0]))
+    ).click();
+    const text = await waitFor(async () => {
+      const body = await driver.executeScript('return document.body.textContent');
+      return /Open as/.test(body) ? body : null;
+    });
+    assert.match(text, /Firefox doesn’t let extensions open the sidebar at launch/);
+    assert.doesNotMatch(text, /Open on browser launch/);
+  });
   await check('a popup setting (synced from Chrome) opens the window on Firefox', async () => {
     // Firefox gives a panel framed in a web page no tabs/windows API, so there is no in-page popup.
     await driver.get(PANEL);

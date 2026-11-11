@@ -27,6 +27,16 @@ export interface TargetTab {
   incognito: boolean;
 }
 
+/**
+ * What "Open on launch" can do. Chrome's side panel needs a gesture, which a notification click
+ * supplies. Firefox's sidebarAction.open needs user input, and a notification click isn't (Firefox
+ * also rejects Chrome's requireInteraction), so its sidebar can't open at launch.
+ */
+export function launchAction(mode: DisplayMode, firefox: boolean): 'open' | 'notify' | 'none' {
+  if (mode !== 'sidebar') return 'open';
+  return firefox ? 'none' : 'notify';
+}
+
 /** Fallback window size: a side-panel-like column. */
 export const POPUP_WINDOW = { width: 380, height: 720 };
 

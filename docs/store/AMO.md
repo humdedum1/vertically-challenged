@@ -90,4 +90,5 @@ Local-first, no tracking, free and open source.
 
 - The panel is Firefox's sidebar, or a window. There is no in-page popup on Firefox.
 - Synced open tabs from other devices aren't available (Firefox has no API for them).
+- "Open on browser launch" works only in Window mode: Firefox opens the sidebar only on user input.
 - Firefox has had much less testing than Chrome; the description says so and asks for fixes.

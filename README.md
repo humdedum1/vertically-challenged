@@ -42,6 +42,7 @@ Open the panel with the toolbar icon or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</
 | Opens as | Side panel, in-page popup or window | Sidebar or window |
 | Synced tabs from the browser's other devices | Yes | No (no API). The extension's own workspaces still sync. |
 | Favicons load from | The browser's cache | Each site's server |
+| Open at browser launch | Yes (side panel via a notification click) | Window mode only |
 
 Closing the Chrome side panel with the keyboard shortcut needs Chrome 141 or later.
 

@@ -78,16 +78,22 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
         >
       </p>
     {/if}
-    <Toggle
-      label="Open on browser launch"
-      hint={mode === 'window'
-        ? 'Opens the panel window at launch.'
-        : mode === 'popup'
-        ? 'Opens the popup over the first page at launch; needs access to sites. Chrome pages (like the New Tab page) get the small window instead.'
-        : `${BROWSER} doesn’t let extensions open the panel on their own, so a notification appears at launch; click it to open the panel.`}
-      checked={settings.value.display.openOnLaunch}
-      onchange={(on) => void setOpenOnLaunch(on)}
-    />
+    {#if FIREFOX && mode === 'sidebar'}
+      <p class="muted">
+        Firefox doesn’t let extensions open the sidebar at launch. To open the panel at launch, choose Window.
+      </p>
+    {:else}
+      <Toggle
+        label="Open on browser launch"
+        hint={mode === 'window'
+          ? 'Opens the panel window at launch.'
+          : mode === 'popup'
+          ? 'Opens the popup over the first page at launch; needs access to sites. Chrome pages (like the New Tab page) get the small window instead.'
+          : `${BROWSER} doesn’t let extensions open the panel on their own, so a notification appears at launch; click it to open the panel.`}
+        checked={settings.value.display.openOnLaunch}
+        onchange={(on) => void setOpenOnLaunch(on)}
+      />
+    {/if}
     {#if mode !== 'sidebar'}
       <Toggle
         label="Close when clicking outside"

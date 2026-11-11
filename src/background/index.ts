@@ -34,7 +34,7 @@ import { createBatcher } from './batcher';
 import { placeChildTab } from './child-tabs';
 import { type CommandDeps, runCommand } from './commands';
 import { registerContextMenus } from './context-menus';
-import { createDisplay, POPUP_WINDOW, type TargetTab } from './display';
+import { createDisplay, launchAction, POPUP_WINDOW, type TargetTab } from './display';
 import { createMruCycle } from './mru';
 import { runPinCommand } from './pins/commands';
 import { PinManager } from './pins/pin-manager';
@@ -124,9 +124,10 @@ export function startBackground(): void {
     const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
     if (tab?.id === undefined) return;
     // The popup and window need no gesture (the popup falls back to a window without activeTab).
-    if (d.mode !== 'sidebar')
+    const action = launchAction(d.mode, !!import.meta.env.FIREFOX);
+    if (action === 'open')
       return display.open(targetOf(tab), { toggle: false, sidebarOpen: false });
-    if (!browser.notifications) return;
+    if (action === 'none' || !browser.notifications) return;
     await browser.notifications.create(
       `vc-launch:${tab.windowId}:${tab.id}:${tab.incognito ? 1 : 0}`,
       {

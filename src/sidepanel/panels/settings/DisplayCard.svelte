@@ -84,7 +84,7 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
       </p>
     {:else if !browser.permissions && mode === 'popup'}
       <p class="muted">
-        Change this from the sidebar or the panel window: Firefox doesn't allow it in the in-page popup.
+        Change this from the sidebar or the panel window: Firefox doesn’t allow it in the in-page popup.
       </p>
     {:else}
       <Toggle

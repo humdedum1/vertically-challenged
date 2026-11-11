@@ -125,7 +125,7 @@ const remote = $derived(cfg.target !== 'downloads');
 // The framed Firefox popup has no permissions API, so no backup grant can be requested there.
 const framed = !browser.permissions;
 const FRAMED_COPY =
-  "Change this from the sidebar or the panel window: Firefox doesn't allow it in the in-page popup.";
+  'Change this from the sidebar or the panel window: Firefox doesn’t allow it in the in-page popup.';
 </script>
 
 <div class="auto" data-sf-group>
@@ -161,9 +161,7 @@ const FRAMED_COPY =
     <Field label="Dropbox app key" for="vc-db-key">
       <TextInput id="vc-db-key" label="Dropbox app key" mono value={cfg.dropbox.appKey} oninput={(v) => (cfg.dropbox.appKey = v)} />
     </Field>
-    {#if framed}
-      <p class="muted">{FRAMED_COPY}</p>
-    {:else}
+    {#if !framed}
       <div class="row">
         <Button onclick={connectDropbox}>{cfg.dropbox.refreshToken ? 'Reconnect Dropbox' : 'Connect Dropbox'}</Button>
         <span class="hint">{cfg.dropbox.refreshToken ? 'Connected' : 'Not connected'}</span>
@@ -226,9 +224,7 @@ const FRAMED_COPY =
     </p>
   </details>
 
-  {#if framed}
-    <p class="muted">{FRAMED_COPY}</p>
-  {:else}
+  {#if !framed}
     <div class="row">
       <Button variant="primary" onclick={() => save(cfg)}>Save schedule</Button>
       <Button disabled={running} onclick={runNow}>{running ? 'Backing up…' : 'Back up now'}</Button>

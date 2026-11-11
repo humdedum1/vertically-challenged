@@ -109,6 +109,7 @@ html[data-skin="glass"] [role="tablist"][aria-label="Panels"] {
   html[data-skin="glass"] .wheel > header,
   html[data-skin="glass"] [role="tablist"][aria-label="Panels"],
   html[data-skin="glass"] .sticky > .card,
+  html[data-skin="glass"] .cards details[open] > summary,
   html[data-skin="glass"] .menu,
   html[data-skin="glass"] .dialog {
     background: var(--glass), var(--glass-fill);
@@ -129,7 +130,26 @@ html[data-skin="glass"] .sections > .card {
 
 html[data-skin="glass"] .cards summary {
   padding: 6px var(--pad-card);
+}
+
+html[data-skin="glass"] .cards summary::before {
   border-radius: var(--radius-control);
+}
+
+/* An open section's header pins under the Preview card, so it wears the same glass chrome
+   instead of an opaque slab over the ambient wash. */
+html[data-skin="glass"] .cards details[open] > summary {
+  margin: 2px 0 var(--gap);
+  border-radius: var(--radius-card);
+  background: var(--glass), var(--glass-solid);
+  box-shadow:
+    var(--glass-top),
+    inset 0 0 0 1px var(--glass-edge),
+    var(--shadow-1);
+}
+
+html[data-skin="glass"] .cards details[open] > summary::before {
+  border-radius: var(--radius-card);
 }
 
 html[data-skin="glass"] .sections > .card > header {
@@ -307,6 +327,7 @@ html[data-skin="glass"][data-motion="reduce"] .panel > * {
   html[data-skin="glass"] .wheel > header,
   html[data-skin="glass"] [role="tablist"][aria-label="Panels"],
   html[data-skin="glass"] .sticky > .card,
+  html[data-skin="glass"] .cards details[open] > summary,
   html[data-skin="glass"] .menu,
   html[data-skin="glass"] .dialog,
   html[data-skin="glass"] .toast,

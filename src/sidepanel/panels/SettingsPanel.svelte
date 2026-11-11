@@ -222,16 +222,26 @@ $effect(() => {
     padding: 12px var(--pad-card);
     cursor: pointer;
     list-style: none;
-    border-radius: var(--radius-card);
-    /* An open section's header stays pinned under the sticky preview while its contents scroll. */
+    /* An open section's header stays pinned under the sticky preview while its contents scroll.
+       Square and opaque: rounded corners let the card scrolling beneath show through them. */
     position: sticky;
     top: var(--preview-h, 0);
     z-index: 1;
     background: var(--mSurface);
   }
 
+  /* The rounded hover fill lives on a layer between the band and the text. */
+  summary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: var(--radius-card);
+    transition: background-color var(--dur) var(--ease);
+  }
+
   summary::-webkit-details-marker { display: none; }
-  summary:hover { background: linear-gradient(var(--surface-1), var(--surface-1)) var(--mSurface); }
+  summary:hover::before { background: var(--surface-1); }
   summary:focus-visible { outline: 2px solid var(--mPrimary); outline-offset: -2px; }
   summary span { display: grid; gap: 4px; min-width: 0; }
   summary strong { font-size: var(--font-size); font-weight: 600; }

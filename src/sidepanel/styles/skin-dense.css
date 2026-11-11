@@ -38,6 +38,9 @@ html[data-skin="dense"] .cards .category-content > .card + .card {
 
 html[data-skin="dense"] .cards summary {
   padding: 6px var(--pad-card);
+}
+
+html[data-skin="dense"] .cards summary::before {
   border-radius: 0;
 }
 

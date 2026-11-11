@@ -179,7 +179,14 @@ for (const how of ['Escape in the panel', 'the close button']) {
   if (how === 'the close button') await f.click('button[aria-label="Close"]');
   else {
     await f.focus('[role=tree]');
-    await page.keyboard.press('Escape');
+    // keyboard.press waits for the frame to ack the key, but Escape tears the frame down, so
+    // the ack can be lost and the call never returns (1 in ~40). Fire the keydown in the frame;
+    // 'Escape in the page' above still sends a real key.
+    await f.evaluate(() =>
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+      ),
+    );
   }
   check(await until(() => !panelFrame()), `${how} closes it`);
 }

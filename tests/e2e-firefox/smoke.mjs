@@ -281,7 +281,14 @@ try {
       `http://127.0.0.1:${port}`,
       titles,
     );
+    // Size the page, not the window: newer Firefox's sidebar and launcher take part of the width.
     await driver.manage().window().setRect({ width: 360, height: 800 });
+    const taken = 360 - (await driver.executeScript('return document.documentElement.clientWidth'));
+    if (taken > 0)
+      await driver
+        .manage()
+        .window()
+        .setRect({ width: 360 + taken, height: 800 });
     const count = () =>
       driver.executeScript(
         "return document.querySelectorAll('[role=treeitem],[role=option],[data-tab-id]').length",
@@ -289,11 +296,19 @@ try {
     await waitFor(async () => (await count()) > 5, 15000);
     const m = await driver.executeScript(`return {
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      width: document.documentElement.clientWidth,
       xss: document.querySelectorAll('img[src="x"]').length,
       text: document.body.innerText.includes('<img src=x onerror=alert(1)>'),
+      wide: [...document.querySelectorAll('body *')]
+        .filter((e) => e.getBoundingClientRect().right > document.documentElement.clientWidth + 4)
+        .slice(0, 3)
+        .map((e) => e.tagName.toLowerCase() + '.' + [...e.classList].join('.') + ' ' + Math.round(e.getBoundingClientRect().right)),
     }`);
-    // A few px can come from rounding or a scrollbar; the element-level check below is the strict one.
-    assert.ok(m.overflow <= 4, `horizontal overflow of ${m.overflow}px`);
+    // A few px can come from rounding or a scrollbar.
+    assert.ok(
+      m.overflow <= 4,
+      `horizontal overflow of ${m.overflow}px at ${m.width}px: ${m.wide.join(', ')}`,
+    );
     assert.equal(m.xss, 0, 'a title was rendered as HTML');
   });
   await check('axe: no serious or critical violations on any panel', async () => {

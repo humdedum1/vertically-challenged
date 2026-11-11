@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { Browser, Builder, By } from 'selenium-webdriver';
+import { Browser, Builder, By, Key } from 'selenium-webdriver';
 import firefox from 'selenium-webdriver/firefox.js';
 import { Command, Name } from 'selenium-webdriver/lib/command.js';
 
@@ -388,6 +388,136 @@ try {
     });
     assert.match(text, /Firefox doesn’t let extensions open the sidebar at launch/);
     assert.doesNotMatch(text, /Open on browser launch/);
+  });
+  // Panel commands only count from a port that subscribed to a window first.
+  const panelCmd = (msg) =>
+    inPanel(async (m) => {
+      const windowId = (await browser.windows.getCurrent()).id;
+      const p = browser.runtime.connect({ name: 'vc-panel' });
+      p.postMessage({ type: 'subscribe', windowId });
+      await new Promise((r) => setTimeout(r, 300));
+      p.postMessage({ ...m, windowId: m.windowId ?? windowId });
+      await new Promise((r) => setTimeout(r, 800));
+      p.disconnect();
+    }, msg);
+  await check('search filters the tab list; clearing restores it', async () => {
+    await driver.get(PANEL);
+    const rowIds = () =>
+      driver.executeScript(
+        "return [...document.querySelectorAll('[id^=vc-row-t]')].map((e) => Number(e.id.slice(8)))",
+      );
+    // Rows render once the background has answered over the port.
+    await waitFor(async () => (await rowIds()).length > 0);
+    const id = await inPanel(
+      async (u) => (await browser.tabs.create({ url: u, active: false })).id,
+      `http://127.0.0.1:${port}/vc-search-target`,
+    );
+    try {
+      const box = await driver.findElement(By.css('input[role=searchbox]'));
+      await box.sendKeys('vc-search-target');
+      // The list is virtualised: only the match is guaranteed to be rendered.
+      await waitFor(async () => (await rowIds()).join() === String(id));
+      // clear() fires no input event, so the filter would stay on; delete the text by keys.
+      await box.sendKeys(Key.chord(Key.CONTROL, 'a'), Key.BACK_SPACE);
+      await waitFor(async () => (await rowIds()).length > 1);
+    } finally {
+      await inPanel((t) => browser.tabs.remove(t), id);
+    }
+  });
+  await check(
+    'pinning a tab moves it into the pinned section; unpinning moves it back',
+    async () => {
+      await driver.get(PANEL);
+      const id = await inPanel(
+        async (u) => (await browser.tabs.create({ url: u, active: false })).id,
+        `http://127.0.0.1:${port}/pin-target`,
+      );
+      // Pinned tabs render as "p<item>" rows above the unpinned list.
+      const pinRows = () =>
+        driver.executeScript("return document.querySelectorAll('[id^=vc-row-p]').length");
+      const isPinned = () => inPanel((t) => browser.tabs.get(t).then((x) => x.pinned), id);
+      const before = await pinRows();
+      try {
+        await panelCmd({ type: 'setPinned', tabIds: [id], pinned: true });
+        await waitFor(async () => (await pinRows()) === before + 1);
+        assert.equal(await isPinned(), true);
+        await panelCmd({ type: 'setPinned', tabIds: [id], pinned: false });
+        await waitFor(async () => (await pinRows()) === before);
+        assert.equal(await isPinned(), false);
+      } finally {
+        await inPanel((t) => browser.tabs.remove(t), id);
+      }
+    },
+  );
+  await check(
+    'saving a session lists it; restoring it opens its tabs in a new window',
+    async () => {
+      await driver.get(PANEL);
+      const name = 'vc-smoke-session';
+      const sessionId = () =>
+        inPanel(async (n) => {
+          const { sessions = [] } = await browser.storage.local.get('sessions');
+          return sessions.find((s) => s.name === n)?.id ?? null;
+        }, name);
+      const mainWin = await inPanel(async () => (await browser.windows.getCurrent()).id);
+      await panelCmd({ type: 'saveSession', scope: 'window', name });
+      const sid = await waitFor(sessionId);
+      try {
+        await (await driver.findElement(By.css('#vc-tab-sessions'))).click();
+        await waitFor(async () =>
+          (await driver.findElement(By.css('body')).getText()).includes(name),
+        );
+        const before = await inPanel(async () => (await browser.windows.getAll()).map((w) => w.id));
+        await panelCmd({ type: 'restoreSession', id: sid, target: 'newWindow' });
+        const opened = await waitFor(async () => {
+          const wins = await inPanel(() => browser.windows.getAll({ populate: true }));
+          const w = wins.find((x) => !before.includes(x.id));
+          return w?.tabs.some((t) => t.url?.startsWith(`http://127.0.0.1:${port}/a`)) ? w : null;
+        });
+        assert.notEqual(opened.id, mainWin);
+        await inPanel((id) => browser.windows.remove(id), opened.id);
+      } finally {
+        if (sid) await panelCmd({ type: 'deleteSession', id: sid });
+        await driver.get(PANEL);
+      }
+      await waitFor(async () => (await sessionId()) === null);
+    },
+  );
+  await check('dragging a tab above another reorders the real browser tabs', async () => {
+    await driver.get(PANEL);
+    const [a, b] = await inPanel(() =>
+      browser.tabs
+        .query({ currentWindow: true })
+        .then((ts) => ts.filter((t) => t.url?.endsWith('/a') || t.url?.endsWith('/b')))
+        .then((ts) => ts.sort((x, y) => x.index - y.index).map((t) => t.id)),
+    );
+    assert.ok(a && b, 'fixture tabs a and b are not both in this window');
+    const rectOf = (id) =>
+      driver.executeScript(
+        `const r = document.getElementById('vc-row-t${id}').getBoundingClientRect(); return {x: r.left + 40, y: r.top + r.height / 2, top: r.top};`,
+      );
+    await waitFor(async () => (await rectOf(b)).y > 0);
+    const from = await rectOf(b);
+    const to = await rectOf(a);
+    const actions = driver.actions({ bridge: true });
+    actions.move({ origin: 'viewport', x: Math.round(from.x), y: Math.round(from.y) }).press();
+    const steps = 12;
+    for (let i = 1; i <= steps; i++)
+      actions.move({
+        origin: 'viewport',
+        x: Math.round(from.x + ((to.x - from.x) * i) / steps),
+        y: Math.round(from.y + ((to.top + 3 - from.y) * i) / steps),
+      });
+    await actions.pause(150).release().perform();
+    await driver.sleep(800);
+    const order = await inPanel(
+      async (ids) => {
+        const ts = await browser.tabs.query({ currentWindow: true });
+        return ids.map((id) => ts.find((t) => t.id === id).index);
+      },
+      [a, b],
+    );
+    assert.ok(order[1] < order[0], `b is at ${order[1]}, a at ${order[0]}`);
   });
   await check('a popup setting (synced from Chrome) opens the window on Firefox', async () => {
     // Firefox gives a panel framed in a web page no tabs/windows API, so there is no in-page popup.

@@ -8,9 +8,13 @@ Vertical tabs for Chrome and Firefox. Every tab in every window sits in one sear
 
 I built it because I loved Sidebery and Zen Browser and couldn't find anything like them for Chromium. It grew from there, and now runs on Firefox too.
 
-[![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-Install-0071e3?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/vertically-challenged/bekjjhfjknegeaaaieadcgakkipcgfjm)
-[![Latest release](https://img.shields.io/github/v/release/humdedum1/vertically-challenged?color=0071e3)](https://github.com/humdedum1/vertically-challenged/releases)
-[![License: GPLv3](https://img.shields.io/badge/license-GPLv3-0071e3)](LICENSE)
+<p align="center">
+  <a href="https://chromewebstore.google.com/detail/vertically-challenged/bekjjhfjknegeaaaieadcgakkipcgfjm"><img src="https://img.shields.io/badge/Chrome_Web_Store-Install-0071e3?logo=googlechrome&logoColor=white" alt="Chrome Web Store"></a>
+  <a href="https://github.com/humdedum1/vertically-challenged/releases"><img src="https://img.shields.io/github/v/release/humdedum1/vertically-challenged?color=0071e3" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-0071e3" alt="License: GPLv3"></a>
+  <a href="https://ko-fi.com/humdedum1"><img src="https://img.shields.io/badge/Ko--fi-Support-0071e3?logo=kofi&logoColor=white" alt="Support on Ko-fi"></a>
+  <a href="https://paypal.me/oddboxx"><img src="https://img.shields.io/badge/PayPal-Donate-0071e3?logo=paypal&logoColor=white" alt="Donate with PayPal"></a>
+</p>
 
 > [!NOTE]
 > This is a young project, written mostly with AI coding tools and tested on a handful of machines. Firefox gets less testing than Chrome. Keep backups of anything you can't lose, and [report what breaks](https://github.com/humdedum1/vertically-challenged/issues/new/choose).
@@ -98,8 +102,6 @@ npm run build:firefox   # Firefox → .output/firefox-mv3
 ## Contributing
 
 Pull requests are welcome, especially Firefox fixes. AI-assisted PRs are fine if you've reviewed and tested them yourself. [CONTRIBUTING.md](CONTRIBUTING.md) covers the dev commands, tests and commit style. Report security issues as described in [SECURITY.md](SECURITY.md).
-
-If you'd like to support the project: [Ko-fi](https://ko-fi.com/humdedum1) or [PayPal](https://paypal.me/oddboxx). It unlocks nothing.
 
 ## License
 

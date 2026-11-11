@@ -1,6 +1,7 @@
 <script lang="ts">
 import { onMount } from 'svelte';
 import { browser } from 'wxt/browser';
+import { api } from '../api';
 import Favicon from '../components/Favicon.svelte';
 import Icon from '../components/Icon.svelte';
 import SegmentCard from '../components/SegmentCard.svelte';
@@ -43,7 +44,7 @@ function toggleCollapsed(): void {
 async function refresh(): Promise<void> {
   try {
     const own = browser.runtime.getURL('/');
-    const list = await browser.sessions.getRecentlyClosed({ maxResults: MAX });
+    const list = await api.sessions.getRecentlyClosed({ maxResults: MAX });
     const out: Closed[] = [];
     for (const s of list) {
       if (s.tab?.sessionId) {
@@ -93,7 +94,7 @@ onMount(() => {
 
 async function restore(sessionId: string, what: string): Promise<void> {
   try {
-    await browser.sessions.restore(sessionId);
+    await api.sessions.restore(sessionId);
     status = `Restored ${what}.`;
   } catch (e) {
     status = e instanceof Error ? e.message : 'Could not restore that item.';

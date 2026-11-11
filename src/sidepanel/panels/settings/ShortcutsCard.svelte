@@ -8,6 +8,7 @@ import {
   type ShortcutAction,
 } from '../../../settings/schema';
 import { BROWSER, FIREFOX } from '../../../shared/browser-urls';
+import { api } from '../../api';
 import Button from '../../components/controls/Button.svelte';
 import Icon from '../../components/Icon.svelte';
 import SegmentCard from '../../components/SegmentCard.svelte';
@@ -138,7 +139,7 @@ function openChromeShortcuts(): void {
     void (
       browser.commands as unknown as { openShortcutSettings(): Promise<void> }
     ).openShortcutSettings();
-  else void browser.tabs.create({ url: 'chrome://extensions/shortcuts' });
+  else void api.tabs.create({ url: 'chrome://extensions/shortcuts' });
 }
 </script>
 

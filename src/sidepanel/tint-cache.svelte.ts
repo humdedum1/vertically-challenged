@@ -1,5 +1,5 @@
-import { browser } from 'wxt/browser';
 import { faviconUrl } from '../shared/favicon';
+import { api } from './api';
 import { dominantColor } from './model/tint';
 import {
   parseStoredTints,
@@ -81,7 +81,7 @@ export class TintCache {
 
   constructor() {
     this.tints = readStored();
-    browser.windows
+    api.windows
       .getCurrent()
       .then((w) => this.setIncognito(w.incognito))
       // Unknown stays memory-only: failing closed only costs a re-extraction next time.

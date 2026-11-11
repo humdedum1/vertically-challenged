@@ -2,6 +2,7 @@
 import { onMount, tick } from 'svelte';
 import { browser } from 'wxt/browser';
 import { displayUrl } from '../../../lib/search/search-index';
+import { api } from '../../api';
 import ContextMenu from '../../components/ContextMenu.svelte';
 import Favicon from '../../components/Favicon.svelte';
 import Icon from '../../components/Icon.svelte';
@@ -54,7 +55,7 @@ function toEntry(h: {
 }
 
 async function fetchPage(text: string, endTime?: number): Promise<Entry[]> {
-  const found = await browser.history.search({
+  const found = await api.history.search({
     text,
     startTime: 0,
     maxResults: PAGE,
@@ -202,17 +203,17 @@ onMount(() => {
 async function openUrl(url: string, newTab: boolean): Promise<void> {
   try {
     if (newTab) {
-      await browser.tabs.create({ url });
+      await api.tabs.create({ url });
       return;
     }
     // Target the home window's active tab explicitly: "current tab" from a panel page is ambiguous.
     // Asks the browser instead of the mirrored list, which can lag a tab switch.
-    const [active] = await browser.tabs.query({
+    const [active] = await api.tabs.query({
       active: true,
       windowId: tabState.windowId ?? undefined,
     });
-    if (active?.id !== undefined) await browser.tabs.update(active.id, { url });
-    else await browser.tabs.create({ url });
+    if (active?.id !== undefined) await api.tabs.update(active.id, { url });
+    else await api.tabs.create({ url });
   } catch (e) {
     status = e instanceof Error ? e.message : 'Could not open that page.';
   }
@@ -220,7 +221,7 @@ async function openUrl(url: string, newTab: boolean): Promise<void> {
 
 async function removeEntry(e: Entry): Promise<void> {
   try {
-    await browser.history.deleteUrl({ url: e.url });
+    await api.history.deleteUrl({ url: e.url });
     items = items.filter((i) => i.url !== e.url);
     status = 'Removed from history.';
   } catch (err) {

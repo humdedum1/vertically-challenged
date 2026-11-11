@@ -65,6 +65,11 @@ const MIGRATIONS: readonly ((s: Raw) => Raw)[] = [
   (s) => s,
   // v10 → v11: `appearance.skin` (classic); default-filled.
   (s) => s,
+  // v11 → v12: the built-in Ember theme was replaced by Velo, its closest match.
+  (s) =>
+    isObj(s.appearance) && s.appearance.themeId === 'ember'
+      ? { ...s, appearance: { ...s.appearance, themeId: 'velo' } }
+      : s,
 ];
 
 const isObj = (v: unknown): v is Raw => typeof v === 'object' && v !== null && !Array.isArray(v);

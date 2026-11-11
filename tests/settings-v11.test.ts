@@ -1,10 +1,11 @@
 import { expect, it } from 'vitest';
 import { migrateSettings } from '../src/settings/migrate';
+import { SETTINGS_VERSION } from '../src/settings/schema';
 import { createBackup, parseBackup } from '../src/themes/transfer';
 
 it('upgrades v10 with the classic skin and keeps the rest of appearance', () => {
   const s = migrateSettings({ version: 10, appearance: { density: 'compact', radius: 8 } });
-  expect(s.version).toBe(11);
+  expect(s.version).toBe(SETTINGS_VERSION);
   expect(s.appearance).toMatchObject({ skin: 'classic', density: 'compact', radius: 8 });
 });
 

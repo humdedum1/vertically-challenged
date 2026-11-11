@@ -1,12 +1,13 @@
 import { expect, it } from 'vitest';
 import { migrateSettings } from '../src/settings/migrate';
+import { SETTINGS_VERSION } from '../src/settings/schema';
 
 it('upgrades v9 with archiving off and keeps existing suspend settings', () => {
   const s = migrateSettings({
     version: 9,
     suspend: { auto: true, minutes: 45, whitelist: ['a.com'] },
   });
-  expect(s.version).toBe(11);
+  expect(s.version).toBe(SETTINGS_VERSION);
   expect(s.suspend).toMatchObject({
     auto: true,
     minutes: 45,

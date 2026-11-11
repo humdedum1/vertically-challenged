@@ -248,8 +248,10 @@ html[data-skin="glass"] #app .row.fresh {
   animation: vc-glass-row-in 180ms var(--ease-spring) both;
 }
 
+/* backwards, not both: a fill that outlives the fade makes the panel a backdrop root, so menus
+   and the sticky Preview card stop blurring what is behind them and show it sharp. */
 html[data-skin="glass"] .panel > * {
-  animation: vc-glass-panel-in 140ms var(--ease) both;
+  animation: vc-glass-panel-in 140ms var(--ease) backwards;
 }
 
 html[data-skin="glass"] button:not(:disabled):active {

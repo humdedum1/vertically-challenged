@@ -172,7 +172,7 @@ function muteClick(e: MouseEvent): void {
     {#if tab.loading}
       <span class="spinner" aria-hidden="true"></span>
     {:else if showImg && icon}
-      <img src={icon} width="16" height="16" alt="" loading="lazy" decoding="async" onerror={() => (failedFor = icon)} />
+      <img class="favicon" src={icon} width="16" height="16" alt="" loading="lazy" decoding="async" onerror={() => (failedFor = icon)} />
     {:else}
       <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
         <circle cx="8" cy="8" r="6" />

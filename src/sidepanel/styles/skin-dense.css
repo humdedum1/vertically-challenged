@@ -261,3 +261,15 @@ html[data-skin="dense"][data-motion="reduce"] #app .row {
     border: 1px solid ButtonText;
   }
 }
+
+/* Menus match the tightened rows. Mouse only: touch keeps the 32px default as a tap target. */
+@media (pointer: fine) {
+  html[data-skin="dense"] .menu {
+    padding: 2px;
+  }
+
+  html[data-skin="dense"] .menu .entry {
+    height: 26px;
+    padding: 0 8px;
+  }
+}

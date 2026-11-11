@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import zlib from 'node:zlib';
-import { check, extensionDir, finish, launch, sleep } from './harness.mjs';
+import { check, extensionDir, finish, launch, sleep, waitUntil } from './harness.mjs';
 
 const srv = http.createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -341,11 +341,12 @@ await api(async (url) => {
 const cdp = await ctx.newCDPSession(page);
 await cdp.send('ServiceWorker.enable');
 await cdp.send('ServiceWorker.stopAllWorkers');
-await page.waitForFunction(
+await waitUntil(
+  page,
   async (previous) =>
     (await chrome.storage.local.get('vc:syncStatus'))['vc:syncStatus']?.publishedAt > previous,
   publishedBeforeWake,
-  { timeout: 8000 },
+  8000,
 );
 let wokeWithTabs = false;
 for (let attempt = 0; attempt < 30 && !wokeWithTabs; attempt++) {

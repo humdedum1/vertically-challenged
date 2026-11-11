@@ -1,6 +1,6 @@
 // Optional new-tab URL: setting validation, persistence, and browser-default fallback.
 import assert from 'node:assert/strict';
-import { extensionDir, launch } from './harness.mjs';
+import { extensionDir, launch, waitUntil } from './harness.mjs';
 
 const { ctx, extId, close } = await launch(extensionDir(), { width: 360, height: 1000 });
 try {
@@ -53,7 +53,8 @@ try {
       return id;
     });
   const customId = await create();
-  await page.waitForFunction(
+  await waitUntil(
+    page,
     async (id) => (await chrome.tabs.get(id)).url === 'about:blank#custom-new-tab',
     customId,
   );
@@ -62,7 +63,8 @@ try {
   await save.click();
   await waitForSetting('');
   const defaultId = await create();
-  await page.waitForFunction(
+  await waitUntil(
+    page,
     async (id) => (await chrome.tabs.get(id)).url?.startsWith('chrome://newtab'),
     defaultId,
   );

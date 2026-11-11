@@ -166,6 +166,36 @@ try {
       ),
     );
   });
+  await check('a site icon reaches bookmarks of pages that were never opened', async () => {
+    // The worker stores each site's icon (shared/site-icons.ts) about 3 s after the tab reports it.
+    const stored = await waitFor(() =>
+      inPanel(async () => (await browser.storage.local.get('siteIcons')).siteIcons),
+    );
+    // Firefox re-encodes the data: icon, so only its type is stable.
+    assert.match(stored[`http://127.0.0.1:${port}`] ?? '', /^data:image\/png/);
+    await inPanel(async (url) => {
+      await browser.bookmarks.create({ parentId: 'toolbar_____', title: 'Never opened', url });
+      localStorage.setItem('vc.bookmarks.expanded', JSON.stringify(['toolbar_____']));
+    }, `http://127.0.0.1:${port}/never-opened`);
+    await driver.get(PANEL);
+    await (
+      await waitFor(() => driver.findElements(By.css('#vc-tab-bookmarks')).then((t) => t[0]))
+    ).click();
+    await waitFor(() =>
+      driver.executeScript(
+        `const row = [...document.querySelectorAll('#vc-panel-bookmarks [role=treeitem]')]
+           .find((r) => r.textContent.includes('Never opened'));
+         return row?.querySelector('img')?.src.startsWith('data:image/png') ?? false;`,
+      ),
+    );
+    await (await driver.findElement(By.css('#vc-tab-tabs'))).click();
+  });
+  await check('clearing all history forgets the site icons', async () => {
+    await inPanel(() => browser.history.deleteAll());
+    await waitFor(() =>
+      inPanel(async () => !('siteIcons' in (await browser.storage.local.get('siteIcons')))),
+    );
+  });
   await check('toolbar button toggles the sidebar', async () => {
     assert.equal(await sidebarOpen(), true, 'open after install');
     const click = `const { ExtensionParent } = ChromeUtils.importESModule('resource://gre/modules/ExtensionParent.sys.mjs');

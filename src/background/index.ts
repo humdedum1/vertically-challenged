@@ -14,6 +14,7 @@ import {
   type WorkerMessage,
 } from '../shared/protocol';
 import { parseSessions, SESSIONS_KEY } from '../shared/sessions';
+import { rememberIcons, SITE_ICONS_KEY, type SiteIcons } from '../shared/site-icons';
 import type { Surface } from '../shared/surface';
 import { DEVICE_KEY } from '../shared/sync-store';
 import type { GroupInfo, TabInfo, WindowInfo } from '../shared/types';
@@ -140,6 +141,30 @@ export function startBackground(): void {
     );
   }
 
+  // Firefox: remember each site's icon for bookmarks, history and Staples (shared/site-icons.ts).
+  let iconBatch: TabInfo[] = [];
+  let iconTimer: ReturnType<typeof setTimeout> | undefined;
+  function noteIcons(tabs: TabInfo[]): void {
+    if (!import.meta.env.FIREFOX) return;
+    iconBatch.push(...tabs);
+    if (iconTimer !== undefined) return;
+    iconTimer = setTimeout(() => {
+      iconTimer = undefined;
+      const batch = iconBatch;
+      iconBatch = [];
+      void (async () => {
+        const stored = (await browser.storage.local.get(SITE_ICONS_KEY))[SITE_ICONS_KEY];
+        const next = rememberIcons((stored ?? {}) as SiteIcons, batch);
+        if (next) await browser.storage.local.set({ [SITE_ICONS_KEY]: next });
+      })().catch((err: unknown) => console.debug('[vc] site icons', err));
+    }, 3000);
+  }
+  // Clearing all history also forgets which sites the icons came from.
+  if (import.meta.env.FIREFOX)
+    browser.history.onVisitRemoved.addListener(({ allHistory }) => {
+      if (allHistory) void browser.storage.local.remove(SITE_ICONS_KEY);
+    });
+
   const detachedTabs = new Set<number>();
   const detachedReady = browser.storage.session.get('detachedTabs').then((stored) => {
     if (Array.isArray(stored.detachedTabs))
@@ -203,6 +228,7 @@ export function startBackground(): void {
     for (const tab of all.sort((a, b) => a.index - b.index)) {
       const info = toTabInfo(tab);
       if (!info) continue;
+      noteIcons([info]);
       let list = byWindow.get(info.windowId);
       if (!list) {
         list = [];
@@ -371,6 +397,7 @@ export function startBackground(): void {
       );
     const info = toTabInfo(tab);
     if (!info) return;
+    if (changeInfo.favIconUrl) noteIcons([info]);
     pending.upserts.set(info.id, info);
     // Pinning reorders the tab strip; group changes may too.
     if (changeInfo.pinned !== undefined || changeInfo.groupId !== undefined)

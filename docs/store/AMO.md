@@ -55,7 +55,9 @@ These are also in `amo-metadata.json` (`version.approval_notes`).
   `script-src 'self'`.
 - **Network:** nothing is contacted by default. With the user's explicit permission it talks to a
   backup server they type in (WebDAV, S3-compatible or Dropbox). It also loads each tab's favicon
-  from that site's own server, since Firefox has no favicon API for extensions. The page's CSP
+  from that site's own server, since Firefox has no favicon API for extensions. Bookmarks, history
+  and Staples reuse the icon their site last had in a normal tab (up to 500 sites, kept in
+  `storage.local`, never from private tabs, erased when all history is cleared). The page's CSP
   allows `img-src https:` for that, and custom CSS that tries to load remote images is not
   applied.
 - **Permissions:** `tabs`, `tabGroups`, `sessions`, `bookmarks`, `history` (the panels),

@@ -1,6 +1,7 @@
 import { mount } from 'svelte';
 import { browser } from 'wxt/browser';
 import { migrateSettings } from '../../settings/migrate';
+import { loadSiteIcons } from '../../shared/favicon';
 import { mayRender, POPUP_TOKEN_KEY, parseSurface } from '../../shared/surface';
 import App from '../../sidepanel/App.svelte';
 import { applyAppearance, applyCachedAppearance } from '../../sidepanel/appearance';
@@ -31,6 +32,7 @@ async function start(el: HTMLElement): Promise<void> {
   }
   void settings.start();
   customCss.start();
+  if (import.meta.env.FIREFOX) loadSiteIcons();
   void themes.start();
 
   mount(App, { target: el, props: { settings, themes } });

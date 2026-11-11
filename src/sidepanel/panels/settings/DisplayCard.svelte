@@ -82,6 +82,10 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
       <p class="muted">
         Firefox doesn’t let extensions open the sidebar at launch. To open the panel at launch, choose Window.
       </p>
+    {:else if !browser.permissions && mode === 'popup'}
+      <p class="muted">
+        Change this from the sidebar or the panel window: Firefox doesn't allow it in the in-page popup.
+      </p>
     {:else}
       <Toggle
         label="Open on browser launch"

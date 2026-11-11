@@ -122,17 +122,25 @@ const insecure = $derived(
     (cfg.target === 's3' && isPlainHttp(cfg.s3.endpoint)),
 );
 const remote = $derived(cfg.target !== 'downloads');
+// The framed Firefox popup has no permissions API, so no backup grant can be requested there.
+const framed = !browser.permissions;
+const FRAMED_COPY =
+  "Change this from the sidebar or the panel window: Firefox doesn't allow it in the in-page popup.";
 </script>
 
 <div class="auto" data-sf-group>
-  <Field label="Where to save" for="vc-backup-target">
-    <Select id="vc-backup-target" value={cfg.target} onchange={(v) => (cfg.target = v as TargetKind)}>
-      <option value="downloads">Downloads folder</option>
-      <option value="webdav">WebDAV (Nextcloud, ownCloud…)</option>
-      <option value="s3">S3-compatible (AWS, R2, B2, MinIO…)</option>
-      <option value="dropbox">Dropbox</option>
-    </Select>
-  </Field>
+  {#if framed}
+    <p class="muted">{FRAMED_COPY}</p>
+  {:else}
+    <Field label="Where to save" for="vc-backup-target">
+      <Select id="vc-backup-target" value={cfg.target} onchange={(v) => (cfg.target = v as TargetKind)}>
+        <option value="downloads">Downloads folder</option>
+        <option value="webdav">WebDAV (Nextcloud, ownCloud…)</option>
+        <option value="s3">S3-compatible (AWS, R2, B2, MinIO…)</option>
+        <option value="dropbox">Dropbox</option>
+      </Select>
+    </Field>
+  {/if}
 
   {#if cfg.target === 'webdav'}
     <Field label="Folder URL" for="vc-wd-url">
@@ -153,10 +161,14 @@ const remote = $derived(cfg.target !== 'downloads');
     <Field label="Dropbox app key" for="vc-db-key">
       <TextInput id="vc-db-key" label="Dropbox app key" mono value={cfg.dropbox.appKey} oninput={(v) => (cfg.dropbox.appKey = v)} />
     </Field>
-    <div class="row">
-      <Button onclick={connectDropbox}>{cfg.dropbox.refreshToken ? 'Reconnect Dropbox' : 'Connect Dropbox'}</Button>
-      <span class="hint">{cfg.dropbox.refreshToken ? 'Connected' : 'Not connected'}</span>
-    </div>
+    {#if framed}
+      <p class="muted">{FRAMED_COPY}</p>
+    {:else}
+      <div class="row">
+        <Button onclick={connectDropbox}>{cfg.dropbox.refreshToken ? 'Reconnect Dropbox' : 'Connect Dropbox'}</Button>
+        <span class="hint">{cfg.dropbox.refreshToken ? 'Connected' : 'Not connected'}</span>
+      </div>
+    {/if}
   {:else if cfg.target === 's3'}
     <Field label="Endpoint" for="vc-s3-endpoint">
       <TextInput id="vc-s3-endpoint" label="S3 endpoint" placeholder="https://s3.eu-west-1.amazonaws.com" mono value={cfg.s3.endpoint} oninput={(v) => (cfg.s3.endpoint = v)} />
@@ -214,10 +226,14 @@ const remote = $derived(cfg.target !== 'downloads');
     </p>
   </details>
 
-  <div class="row">
-    <Button variant="primary" onclick={() => save(cfg)}>Save schedule</Button>
-    <Button disabled={running} onclick={runNow}>{running ? 'Backing up…' : 'Back up now'}</Button>
-  </div>
+  {#if framed}
+    <p class="muted">{FRAMED_COPY}</p>
+  {:else}
+    <div class="row">
+      <Button variant="primary" onclick={() => save(cfg)}>Save schedule</Button>
+      <Button disabled={running} onclick={runNow}>{running ? 'Backing up…' : 'Back up now'}</Button>
+    </div>
+  {/if}
   <p class="hint" role="status">{saved ? 'Saved. ' : ''}Last backup: {last}{status.name ? ` (${status.name})` : ''}</p>
   <p class="error" role="alert">{status.error && !error ? `Last run failed: ${status.error}` : error}</p>
 </div>
@@ -226,6 +242,7 @@ const remote = $derived(cfg.target !== 'downloads');
   .auto { display: flex; flex-direction: column; gap: var(--gap); }
   .row { display: flex; flex-wrap: wrap; gap: 8px; }
   .hint, .error { margin: 0; font-size: calc(var(--font-size) - 1px); color: var(--mOnSurfaceVariant); }
+  .muted { margin: 0; font-size: calc(var(--font-size) - 1px); color: var(--mOnSurfaceVariant); }
   .error { color: var(--mError); }
   .error:empty { display: none; }
   .how summary { cursor: pointer; font-size: calc(var(--font-size) - 1px); color: var(--mOnSurfaceVariant); }

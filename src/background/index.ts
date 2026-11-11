@@ -15,7 +15,7 @@ import {
 } from '../shared/protocol';
 import { parseSessions, SESSIONS_KEY } from '../shared/sessions';
 import { rememberIcons, SITE_ICONS_KEY, type SiteIcons } from '../shared/site-icons';
-import type { Surface } from '../shared/surface';
+import { POPUP_TOKEN_KEY, type Surface } from '../shared/surface';
 import { DEVICE_KEY } from '../shared/sync-store';
 import type { GroupInfo, TabInfo, WindowInfo } from '../shared/types';
 import { parseCustomThemes } from '../themes/custom-themes';
@@ -39,6 +39,7 @@ import { createDisplay, launchAction, POPUP_WINDOW, type TargetTab } from './dis
 import { createMruCycle } from './mru';
 import { runPinCommand } from './pins/commands';
 import { PinManager } from './pins/pin-manager';
+import { planRelay, runRelay } from './relay';
 import { addSession, addSessions, listSessions, restoreSessionValue } from './sessions';
 import { SNOOZE_ALARM, scheduleSnoozeAlarm, wakeDue } from './snooze';
 import { createSuspender } from './suspend/suspender';
@@ -714,6 +715,22 @@ export function startBackground(): void {
       new URL(sender.url).pathname !== '/sidepanel.html'
     )
       return;
+    if (raw?.type === 'relay') {
+      if (!import.meta.env.FIREFOX) {
+        respond({ ok: false, error: 'Relay is Firefox-only' });
+        return;
+      }
+      void (async () => {
+        const token = (await browser.storage.local.get(POPUP_TOKEN_KEY))[POPUP_TOKEN_KEY];
+        const plan = planRelay(raw, sender, token);
+        respond(
+          'error' in plan
+            ? { ok: false, error: plan.error }
+            : await runRelay(plan, sender.tab?.windowId ?? -1),
+        );
+      })();
+      return true;
+    }
     if (raw?.type === 'importTabs') {
       const result = importTabs(raw);
       void result.then(respond);

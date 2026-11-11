@@ -215,6 +215,41 @@ check(
   JSON.stringify(setups),
 );
 
+// --- Third run: a second restart. A restored tab can show about:blank until its URL arrives,
+// so a named window must still be matched once the rest of its tabs come in.
+await page.close();
+await run.close();
+run = await launch(ext, { profile, args: ['--restore-last-session'] });
+await sleep(4000);
+page = await observer(run.ctx, run.extId);
+// The observer page is part of window D's saved tabs, so D can only match once it is back.
+const named = async () => {
+  const wins = await api(async () =>
+    (await chrome.windows.getAll({ populate: true })).map((w) => ({
+      id: w.id,
+      urls: w.tabs.map((t) => t.url),
+    })),
+  );
+  const out = {};
+  for (const [url, name] of [
+    [`${SITE}/a1`, 'Work'],
+    [`${SITE}/b1`, 'Home'],
+    [`${SITE}/c-home`, 'No pins C'],
+    [`${SITE}/d-home`, 'No pins D'],
+  ]) {
+    const id = wins.find((w) => w.urls.includes(url))?.id;
+    out[name] = (await api((w) => globalThis.__layouts[w], id))?.name ?? null;
+  }
+  return out;
+};
+let names = await named();
+for (let i = 0; i < 16 && Object.entries(names).some(([k, v]) => k !== v); i++) {
+  await sleep(500);
+  names = await named();
+}
+for (const [want, got] of Object.entries(names))
+  check(got === want, `second restart: ${want} kept its name`, JSON.stringify(names));
+
 await run.close();
 srv.close();
 fs.rmSync(profile, { recursive: true, force: true });

@@ -504,7 +504,6 @@ export class PinManager {
     const ids = [...this.lateWaiting.keys()].filter((w) => !this.closed.has(w));
     this.lateWaiting.clear();
     if (ids.length === 0) return;
-    for (const w of ids) this.lateDone.add(w);
     if (this.inLateRestore()) {
       const windows = ids.flatMap((windowId) => {
         const tabs = this.deps.store.snapshot(windowId).tabs;
@@ -513,6 +512,9 @@ export class PinManager {
         return [this.lateWindow(windowId, tabs)];
       });
       const matches = matchLayouts(this.lateCandidateLayouts(), windows);
+      // Only a match is final: restored tabs can show about:blank until their URL arrives, so
+      // an unmatched window is tried again when its tabs change, until the grace period ends.
+      for (const windowId of matches.keys()) this.lateDone.add(windowId);
       for (const [windowId, m] of matches) this.bindMatch(windowId, m);
       if (matches.size > 0) this.publishSetups();
     }
@@ -1159,9 +1161,9 @@ export class PinManager {
       // Left alone (no layout yet, nothing adopted) until resolveLate matches it.
       if (this.lateEligible(windowId, tabs) && this.holdLate(windowId, tabs)) return null;
       if (this.lateWaiting.delete(windowId)) {
-        // Waited its maximum: matched on its own, now.
-        this.lateDone.add(windowId);
+        // Waited its maximum: matched on its own, now (and again on a later change if not).
         late = this.matchOneLate(windowId, tabs);
+        if (late) this.lateDone.add(windowId);
       }
       late = this.pairDormant(windowId, tabs) || late;
     }

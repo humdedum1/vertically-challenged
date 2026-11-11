@@ -12,6 +12,18 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Polls an async page predicate until it is truthy. page.waitForFunction does not await
+ * an async predicate: the returned Promise is truthy, so it resolves at once.
+ */
+export async function waitUntil(page, fn, arg, timeout = 30_000) {
+  const end = Date.now() + timeout;
+  while (!(await page.evaluate(fn, arg))) {
+    if (Date.now() > end) throw new Error(`waitUntil timed out: ${String(fn).slice(0, 120)}`);
+    await sleep(100);
+  }
+}
+
 /** The unpacked extension: the first CLI argument, else the production build. */
 export function extensionDir() {
   const dir = path.resolve(process.argv[2] ?? path.join(ROOT, '.output', 'chrome-mv3'));

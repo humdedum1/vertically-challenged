@@ -1383,6 +1383,33 @@ describe('layout backups', () => {
     expect(pins.setups()).toHaveLength(0);
   });
 
+  it('renames an open window whose pinned tabs match a named restored layout', async () => {
+    const t = setup({ windows: { 1: [pinned(1, 1, 'https://mail.test/')] } });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    const backup = layout(9, [item('mail', 'https://mail.test/')], { name: 'Work' });
+    expect(await pins.restoreBackupLayouts([backup])).toBe(1);
+    await settle();
+    expect(pins.layoutOf(1).name).toBe('Work');
+    expect(flattenItems(pins.layoutOf(1)).map((i) => i.tabId)).toEqual([1]);
+    expect(pins.setups()).toHaveLength(0);
+  });
+
+  it('never renames a window the user already named', async () => {
+    const t = setup({ windows: { 1: [pinned(1, 1, 'https://mail.test/')] } });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    await pins.mutate(1, (l) => ({ ...l, name: 'Mine' }));
+    await settle();
+    const backup = layout(9, [item('mail', 'https://mail.test/')], { name: 'Work' });
+    expect(await pins.restoreBackupLayouts([backup])).toBe(1);
+    await settle();
+    expect(pins.layoutOf(1).name).toBe('Mine');
+    expect(pins.setups()).toHaveLength(1);
+  });
+
   it('refuses an import that would evict existing setups', async () => {
     const setups = Array.from({ length: MAX_SETUPS }, (_, i) =>
       layout(i + 1, [item(`i${i}`, 'https://saved.test/')]),

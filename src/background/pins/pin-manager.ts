@@ -357,18 +357,23 @@ export class PinManager {
    * After a reinstall Chrome keeps the pinned tabs but the extension adopted them as plain
    * pins. A restored layout with Staples or folders is matched (by URL, as at startup) to
    * windows that only have plain pins, so their Staples come back instead of staying a setup.
-   * Layouts without that structure stay setups: they would change nothing in the window.
+   * Named layouts are matched the same way, so the window gets its name back. Layouts with
+   * neither stay setups: they would change nothing in the window. Named windows are never
+   * replaced, so a restore cannot overwrite a name the user gave.
    */
   private rebindRestored(restored: readonly WindowLayout[]): void {
     const structured = restored.filter(
-      (l) => l.essentials.length > 0 || l.pinned.some((n) => n.kind === 'folder'),
+      (l) => l.name || l.essentials.length > 0 || l.pinned.some((n) => n.kind === 'folder'),
     );
     if (!structured.length) return;
     const plain = this.deps.windows().filter((w) => {
       if (w.incognito || this.closed.has(w.id)) return false;
       const id = this.bindings.get(w.id);
       const l = id === undefined ? undefined : this.layouts.get(id);
-      return !l || (l.essentials.length === 0 && l.pinned.every((n) => n.kind === 'item'));
+      return (
+        !l ||
+        (!l.name && l.essentials.length === 0 && l.pinned.every((n) => n.kind === 'item'))
+      );
     });
     const matches = matchLayouts(
       structured,

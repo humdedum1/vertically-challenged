@@ -1,8 +1,8 @@
 import abyss from './abyss.json';
-import velo from './velo.json';
 import { NOCTALIA_THEMES } from './noctalia';
 import { parseTheme, type Theme } from './palette';
 import { TERMINAL_THEMES } from './terminal';
+import velo from './velo.json';
 
 function builtin(raw: unknown, id: string, name: string): Theme {
   const r = parseTheme(raw, { id, name });

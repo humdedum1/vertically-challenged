@@ -371,8 +371,7 @@ export class PinManager {
       const id = this.bindings.get(w.id);
       const l = id === undefined ? undefined : this.layouts.get(id);
       return (
-        !l ||
-        (!l.name && l.essentials.length === 0 && l.pinned.every((n) => n.kind === 'item'))
+        !l || (!l.name && l.essentials.length === 0 && l.pinned.every((n) => n.kind === 'item'))
       );
     });
     const matches = matchLayouts(

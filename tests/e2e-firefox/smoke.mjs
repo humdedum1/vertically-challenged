@@ -83,7 +83,11 @@ async function waitFor(fn, ms = 8000) {
 }
 
 try {
-  await driver.installAddon(EXT, true);
+  // Install the unpacked directory: Firefox 140 can't load web-accessible files (frames,
+  // scripting `files`) from the zipped temporary .xpi that installAddon() builds.
+  await driver.execute(
+    new Command('install addon').setParameter('path', EXT).setParameter('temporary', true),
+  );
   const fixtures = [];
   for (const p of ['a', 'b']) {
     await driver.switchTo().newWindow('tab');
@@ -519,49 +523,103 @@ try {
     );
     assert.ok(order[1] < order[0], `b is at ${order[1]}, a at ${order[0]}`);
   });
-  await check('a popup setting (synced from Chrome) opens the window on Firefox', async () => {
-    // Firefox gives a panel framed in a web page no tabs/windows API, so there is no in-page popup.
-    await driver.get(PANEL);
-    await inPanel(async () => {
+  // Runs privileged code in the Chrome context: grants or revokes <all_urls> (standing in for
+  // the activeTab the toolbar button gets) through the extension's own permission store.
+  const grantAllUrls = async (on) => {
+    const r =
+      await inChrome(`const { ExtensionPermissions } = ChromeUtils.importESModule('resource://gre/modules/ExtensionPermissions.sys.mjs');
+      await ExtensionPermissions.${on ? 'add' : 'remove'}('${ID}', { permissions: [], origins: ['<all_urls>'] }, ext);
+      return 'ok';`);
+    assert.equal(r, 'ok', String(r?.error ?? r));
+  };
+  const setDisplayMode = (mode) =>
+    inPanel(async (m) => {
       const { settings } = await browser.storage.sync.get('settings');
       await browser.storage.sync.set({
         settings: {
           ...(settings ?? {}),
           version: 10,
-          display: { ...(settings?.display ?? {}), mode: 'popup' },
+          display: { ...(settings?.display ?? {}), mode: m },
         },
       });
+    }, mode);
+  /** Rows of the framed popup (closed shadow root: the frame is the only way in). */
+  const framedRows = () =>
+    waitFor(async () => {
+      await driver.switchTo().defaultContent();
+      try {
+        await driver.switchTo().frame(0);
+      } catch {
+        return null;
+      }
+      const n = await driver.executeScript(
+        "return document.querySelectorAll('[id^=vc-row-t]').length",
+      );
+      return n > 2 ? n : null;
     });
-    await driver.sleep(1500);
-    const main = await driver.getWindowHandle();
-    const before = (await driver.getAllWindowHandles()).length;
-    await driver.get(`http://127.0.0.1:${port}/`);
-    await inChrome(
+  const clickToolbar = () =>
+    inChrome(
       `const { ExtensionParent } = ChromeUtils.importESModule('resource://gre/modules/ExtensionParent.sys.mjs');
        ExtensionParent.apiManager.global.browserActionFor(ext).triggerAction(w); ${sleepIn}`,
     );
-    await waitFor(async () => (await driver.getAllWindowHandles()).length === before + 1);
-    await driver.get(PANEL);
-    // Selenium's handle for the new window stays on its initial about:blank, so look at the page
-    // through the extension API: it must have mounted and be listing tabs.
-    const rows = await waitFor(async () => {
-      const r = await inPanel(async () => {
-        const win = (await browser.windows.getAll({ populate: true })).find(
-          (w) =>
-            w.type === 'popup' && /sidepanel\.html\?surface=window/.test(w.tabs?.[0]?.url ?? ''),
+  await check(
+    'popup mode: the toolbar button opens the in-page popup and it lists tabs',
+    async () => {
+      await driver.get(PANEL);
+      await setDisplayMode('popup');
+      await driver.sleep(1500);
+      await driver.get(`http://127.0.0.1:${port}/`);
+      await grantAllUrls(true);
+      try {
+        await clickToolbar();
+        const rows = await framedRows();
+        assert.ok(rows > 2);
+        // Bookmarks come through the relay too: the framed page has no bookmarks API of its own.
+        await driver.findElement(By.css('#vc-tab-bookmarks')).click();
+        await waitFor(() =>
+          driver.executeScript(
+            `return [...document.querySelectorAll('#vc-panel-bookmarks [role=treeitem]')]
+             .some((r) => r.textContent.includes('Never opened'));`,
+          ),
         );
-        if (!win) return -1;
-        const view = browser.extension.getViews({ windowId: win.id })[0];
-        return view ? view.document.querySelectorAll('[id^=vc-row-t]').length : -2;
+      } finally {
+        // Step 2b: close the overlay, revoke the grant, and restore the sidebar for later checks.
+        await driver.switchTo().defaultContent();
+        await clickToolbar().catch(() => {});
+        await grantAllUrls(false);
+        await setDisplayMode('sidebar');
+        await driver.switchTo().defaultContent();
+      }
+    },
+  );
+  await check('popup mode: the keyboard shortcut opens the in-page popup', async () => {
+    await driver.get(PANEL);
+    await setDisplayMode('popup');
+    await driver.sleep(1500);
+    await driver.get(`http://127.0.0.1:${port}/`);
+    // No <all_urls> grant here: the command itself grants activeTab (Firefox 140 and 160).
+    const toggle = () => inChrome(`ext.shortcuts.onCommand('toggle-side-panel'); ${sleepIn}`);
+    try {
+      await toggle();
+      assert.ok((await framedRows()) > 2);
+      await driver.switchTo().defaultContent();
+      await toggle();
+      // window.frames hides the shadow-root iframe; only switching into it shows it is there.
+      await waitFor(async () => {
+        await driver.switchTo().defaultContent();
+        return driver
+          .switchTo()
+          .frame(0)
+          .then(
+            () => false,
+            () => true,
+          );
       });
-      return typeof r === 'number' && r > 2 ? r : null;
-    });
-    assert.ok(rows > 2);
-    await inPanel(async () => {
-      for (const w of await browser.windows.getAll())
-        if (w.type === 'popup') await browser.windows.remove(w.id);
-    });
-    await driver.switchTo().window(main);
+    } finally {
+      await driver.switchTo().defaultContent();
+      await driver.get(PANEL);
+      await setDisplayMode('sidebar');
+    }
   });
 } finally {
   await driver.quit();

@@ -42,8 +42,18 @@ describe('launchAction', () => {
   });
 });
 
-describe('display without the in-page popup (Firefox)', () => {
-  it('a popup setting opens the window instead, and never injects', async () => {
+describe('display on Firefox (the in-page popup runs in the framed panel)', () => {
+  it('a popup setting injects the overlay, as in Chrome', async () => {
+    const { api, calls } = fakeApi();
+    const d = createDisplay(api);
+    d.setMode('popup');
+    expect(d.mode).toBe('popup');
+    await d.actionClicked(tab);
+    expect(calls).toContain('inject:7');
+    expect(calls.some((c) => c.startsWith('window:create:'))).toBe(false);
+  });
+
+  it('an api that cannot frame the panel still falls back to the window', async () => {
     const { api, calls } = fakeApi({ noOverlay: true });
     const d = createDisplay(api);
     d.setMode('popup');

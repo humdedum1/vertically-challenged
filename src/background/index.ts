@@ -75,7 +75,6 @@ export function startBackground(): void {
         openSidePanel: () => sidebar.open(),
         closeSidePanel: () => sidebar.close(),
         toggleSidebar: () => sidebar.toggle(),
-        overlay: false,
       }
     : {
         setPanelBehavior: (b: { openPanelOnActionClick: boolean }) =>
@@ -90,7 +89,13 @@ export function startBackground(): void {
     {
       ...panelApi,
       injectToggle: async (tabId) => {
-        await browser.scripting.executeScript({ target: { tabId }, files: ['/popup-toggle.js'] });
+        const [result] = await browser.scripting.executeScript({
+          target: { tabId },
+          files: ['/popup-toggle.js'],
+        });
+        // Firefox reports a failed injection in the result instead of rejecting.
+        const failed = (result as { error?: unknown } | undefined)?.error;
+        if (failed) throw failed;
       },
       createPopupWindow: (url) =>
         browser.windows.create({ url, type: 'popup', focused: true, ...POPUP_WINDOW }),

@@ -10,17 +10,13 @@ import type { SettingsState } from '../../settings-state.svelte';
 
 let { settings }: { settings: SettingsState } = $props();
 
-// Firefox gives a panel framed in a web page no tabs or windows API, so it has no in-page popup.
 const MODES: { value: DisplayMode; label: string }[] = [
   { value: 'sidebar', label: FIREFOX ? 'Sidebar' : 'Side panel' },
-  ...(FIREFOX ? [] : [{ value: 'popup' as const, label: 'In-page popup' }]),
+  { value: 'popup', label: 'In-page popup' },
   { value: 'window', label: 'Window' },
 ];
 
-// A popup setting that arrived by sync or a backup from Chrome behaves as a window here.
-const mode = $derived(
-  FIREFOX && settings.value.display.mode === 'popup' ? 'window' : settings.value.display.mode,
-);
+const mode = $derived(settings.value.display.mode);
 
 // Chrome lets extensions read the side (getLayout, Chrome 140+) but not set it.
 let side: 'left' | 'right' | null = $state(null);

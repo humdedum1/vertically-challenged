@@ -43,7 +43,7 @@ Open the panel with the toolbar icon or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</
 
 | | Chrome | Firefox |
 | --- | --- | --- |
-| Opens as | Side panel, in-page popup or window | Sidebar or window |
+| Opens as | Side panel, in-page popup or window | Sidebar, in-page popup or window |
 | Synced tabs from the browser's other devices | Yes | No (no API). The extension's own workspaces still sync. |
 | Favicons load from | The browser's cache | Each site's server |
 | Open at browser launch | Yes (side panel via a notification click) | Window mode only |
@@ -76,7 +76,7 @@ There are no analytics and no project server. Data only leaves your computer thr
 | `bookmarks`, `history` | The Bookmarks and History panels. |
 | `alarms` | Auto-suspend, snooze and scheduled sync. |
 | `contextMenus` | Right-click menu items. |
-| `activeTab`, `scripting` | The Chrome in-page popup, only on the tab where you open it. |
+| `activeTab`, `scripting` | The in-page popup, only on the tab where you open it. |
 | `notifications` (optional) | Open the panel at browser startup. Chrome needs a click to open the side panel. |
 | `downloads` (optional) | Backups to your Downloads folder. |
 | Server address (optional) | WebDAV, S3 or Dropbox backups. Only the address you enter. |

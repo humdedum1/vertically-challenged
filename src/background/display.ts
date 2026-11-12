@@ -13,8 +13,8 @@ export interface DisplayApi {
   removeWindow(windowId: number): Promise<void>;
   getURL(path: string): string;
   /**
-   * False where a panel framed in a web page gets no tabs/windows API (Firefox): the in-page
-   * popup can't work there, so that mode opens the window instead.
+   * False where a panel framed in a web page can't run at all: the popup then opens the window
+   * instead. Firefox leaves it unset, since its framed panel reaches the browser through the relay.
    */
   overlay?: boolean;
   /** Firefox only: the sidebar has no "open on action click" setting, so the button toggles it. */

@@ -1,4 +1,4 @@
-import { check, extensionDir, finish, launch } from './harness.mjs';
+import { check, extensionDir, finish, launch, waitUntil } from './harness.mjs';
 
 const { ctx, extId, close } = await launch(extensionDir());
 ctx.setDefaultTimeout(10_000);
@@ -62,7 +62,8 @@ try {
     });
     await page.waitForSelector('.drop-line');
     await page.mouse.up();
-    await page.waitForFunction(
+    await waitUntil(
+      page,
       async ({ source, target, zone }) => {
         const s = await chrome.tabs.get(source);
         const t = await chrome.tabs.get(target);
@@ -144,11 +145,15 @@ try {
     port.postMessage({ type: 'nestTab', tabId: source, parentTabId: parent });
     return { parent, source, child };
   });
-  await page.waitForFunction(async ({ parent, source, child }) => {
-    const s = await chrome.tabs.get(source);
-    const c = await chrome.tabs.get(child);
-    return s.openerTabId === parent && c.openerTabId !== source;
-  }, adjacent);
+  await waitUntil(
+    page,
+    async ({ parent, source, child }) => {
+      const s = await chrome.tabs.get(source);
+      const c = await chrome.tabs.get(child);
+      return s.openerTabId === parent && c.openerTabId !== source;
+    },
+    adjacent,
+  );
   await page.waitForFunction(
     ({ source, child }) =>
       document.querySelector(`#vc-row-t${source}`)?.getAttribute('aria-level') === '2' &&
@@ -176,7 +181,8 @@ try {
     'tab shortcuts do not run while New page has focus',
   );
   await page.keyboard.press('Enter');
-  await page.waitForFunction(
+  await waitUntil(
+    page,
     async (before) => (await chrome.tabs.query({ currentWindow: true })).length === before + 1,
     before,
   );

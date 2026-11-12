@@ -8,6 +8,7 @@ import {
 } from '../shared/protocol';
 import type { SurfaceInfo } from '../shared/surface';
 import type { GroupInfo, TabInfo, WindowInfo, WindowPatch } from '../shared/types';
+import { api } from './api';
 
 export type ConnectionStatus = 'connecting' | 'ready' | 'error';
 
@@ -85,7 +86,7 @@ export class TabState {
     try {
       const win =
         this.where.windowId === null
-          ? await browser.windows.getCurrent()
+          ? await api.windows.getCurrent()
           : await browser.windows.get(this.where.windowId);
       if (win.id === undefined) throw new Error('No window id');
       this.windowId = win.id;

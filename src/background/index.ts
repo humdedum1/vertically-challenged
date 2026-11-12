@@ -14,7 +14,8 @@ import {
   type WorkerMessage,
 } from '../shared/protocol';
 import { parseSessions, SESSIONS_KEY } from '../shared/sessions';
-import type { Surface } from '../shared/surface';
+import { rememberIcons, SITE_ICONS_KEY, type SiteIcons } from '../shared/site-icons';
+import { POPUP_TOKEN_KEY, type Surface } from '../shared/surface';
 import { DEVICE_KEY } from '../shared/sync-store';
 import type { GroupInfo, TabInfo, WindowInfo } from '../shared/types';
 import { parseCustomThemes } from '../themes/custom-themes';
@@ -34,10 +35,12 @@ import { createBatcher } from './batcher';
 import { placeChildTab } from './child-tabs';
 import { type CommandDeps, runCommand } from './commands';
 import { registerContextMenus } from './context-menus';
-import { createDisplay, POPUP_WINDOW, type TargetTab } from './display';
+import { createDisplay, launchAction, POPUP_WINDOW, type TargetTab } from './display';
+import { createEventRelay } from './event-relay';
 import { createMruCycle } from './mru';
 import { runPinCommand } from './pins/commands';
 import { PinManager } from './pins/pin-manager';
+import { planRelay, runRelay } from './relay';
 import { addSession, addSessions, listSessions, restoreSessionValue } from './sessions';
 import { SNOOZE_ALARM, scheduleSnoozeAlarm, wakeDue } from './snooze';
 import { createSuspender } from './suspend/suspender';
@@ -72,7 +75,6 @@ export function startBackground(): void {
         openSidePanel: () => sidebar.open(),
         closeSidePanel: () => sidebar.close(),
         toggleSidebar: () => sidebar.toggle(),
-        overlay: false,
       }
     : {
         setPanelBehavior: (b: { openPanelOnActionClick: boolean }) =>
@@ -87,7 +89,13 @@ export function startBackground(): void {
     {
       ...panelApi,
       injectToggle: async (tabId) => {
-        await browser.scripting.executeScript({ target: { tabId }, files: ['/popup-toggle.js'] });
+        const [result] = await browser.scripting.executeScript({
+          target: { tabId },
+          files: ['/popup-toggle.js'],
+        });
+        // Firefox reports a failed injection in the result instead of rejecting.
+        const failed = (result as { error?: unknown } | undefined)?.error;
+        if (failed) throw failed;
       },
       createPopupWindow: (url) =>
         browser.windows.create({ url, type: 'popup', focused: true, ...POPUP_WINDOW }),
@@ -124,9 +132,10 @@ export function startBackground(): void {
     const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
     if (tab?.id === undefined) return;
     // The popup and window need no gesture (the popup falls back to a window without activeTab).
-    if (d.mode !== 'sidebar')
+    const action = launchAction(d.mode, !!import.meta.env.FIREFOX);
+    if (action === 'open')
       return display.open(targetOf(tab), { toggle: false, sidebarOpen: false });
-    if (!browser.notifications) return;
+    if (action === 'none' || !browser.notifications) return;
     await browser.notifications.create(
       `vc-launch:${tab.windowId}:${tab.id}:${tab.incognito ? 1 : 0}`,
       {
@@ -138,6 +147,30 @@ export function startBackground(): void {
       },
     );
   }
+
+  // Firefox: remember each site's icon for bookmarks, history and Staples (shared/site-icons.ts).
+  let iconBatch: TabInfo[] = [];
+  let iconTimer: ReturnType<typeof setTimeout> | undefined;
+  function noteIcons(tabs: TabInfo[]): void {
+    if (!import.meta.env.FIREFOX) return;
+    iconBatch.push(...tabs);
+    if (iconTimer !== undefined) return;
+    iconTimer = setTimeout(() => {
+      iconTimer = undefined;
+      const batch = iconBatch;
+      iconBatch = [];
+      void (async () => {
+        const stored = (await browser.storage.local.get(SITE_ICONS_KEY))[SITE_ICONS_KEY];
+        const next = rememberIcons((stored ?? {}) as SiteIcons, batch);
+        if (next) await browser.storage.local.set({ [SITE_ICONS_KEY]: next });
+      })().catch((err: unknown) => console.debug('[vc] site icons', err));
+    }, 3000);
+  }
+  // Clearing all history also forgets which sites the icons came from.
+  if (import.meta.env.FIREFOX)
+    browser.history.onVisitRemoved.addListener(({ allHistory }) => {
+      if (allHistory) void browser.storage.local.remove(SITE_ICONS_KEY);
+    });
 
   const detachedTabs = new Set<number>();
   const detachedReady = browser.storage.session.get('detachedTabs').then((stored) => {
@@ -164,6 +197,22 @@ export function startBackground(): void {
   /** Whether the window's side panel is open (in-page popups and popup windows don't count). */
   const hasPanel = (windowId: number) =>
     [...subs.values()].some((s) => s.windowId === windowId && s.surface === 'sidebar');
+  // Firefox only: the framed popup can't listen to browser events itself, so the background
+  // forwards them while a popup is open. Ports counted once, even if they re-subscribe.
+  const popupPorts = new Set<Browser.runtime.Port>();
+  const eventRelay = import.meta.env.FIREFOX
+    ? createEventRelay({
+        listen(event, fn) {
+          const [ns, ev] = event.split('.') as [string, string];
+          // biome-ignore lint/suspicious/noExplicitAny: dynamic dispatch over RELAY_EVENTS
+          const target = (browser as any)[ns]?.[ev];
+          if (!target) return () => {};
+          target.addListener(fn);
+          return () => target.removeListener(fn);
+        },
+        send: (msg) => browser.runtime.sendMessage(msg),
+      })
+    : undefined;
   /** Set by the "focus search" shortcut when the panel isn't connected yet. */
   const pendingFocus = new Set<number>();
 
@@ -202,6 +251,7 @@ export function startBackground(): void {
     for (const tab of all.sort((a, b) => a.index - b.index)) {
       const info = toTabInfo(tab);
       if (!info) continue;
+      noteIcons([info]);
       let list = byWindow.get(info.windowId);
       if (!list) {
         list = [];
@@ -370,6 +420,7 @@ export function startBackground(): void {
       );
     const info = toTabInfo(tab);
     if (!info) return;
+    if (changeInfo.favIconUrl) noteIcons([info]);
     pending.upserts.set(info.id, info);
     // Pinning reorders the tab strip; group changes may too.
     if (changeInfo.pinned !== undefined || changeInfo.groupId !== undefined)
@@ -686,6 +737,22 @@ export function startBackground(): void {
       new URL(sender.url).pathname !== '/sidepanel.html'
     )
       return;
+    if (raw?.type === 'relay') {
+      if (!import.meta.env.FIREFOX) {
+        respond({ ok: false, error: 'Relay is Firefox-only' });
+        return;
+      }
+      void (async () => {
+        const token = (await browser.storage.local.get(POPUP_TOKEN_KEY))[POPUP_TOKEN_KEY];
+        const plan = planRelay(raw, sender, token);
+        respond(
+          'error' in plan
+            ? { ok: false, error: plan.error }
+            : await runRelay(plan, sender.tab?.windowId ?? -1),
+        );
+      })();
+      return true;
+    }
     if (raw?.type === 'importTabs') {
       const result = importTabs(raw);
       void result.then(respond);
@@ -766,6 +833,10 @@ export function startBackground(): void {
           incognito: subs.get(port)?.incognito ?? null,
           surface,
         });
+        if (surface === 'popup' && !popupPorts.has(port)) {
+          popupPorts.add(port);
+          eventRelay?.popupOpened();
+        }
         await ready;
         await windowsReady;
         await pins.loaded;
@@ -869,6 +940,7 @@ export function startBackground(): void {
 
     port.onDisconnect.addListener(() => {
       subs.delete(port);
+      if (popupPorts.delete(port)) eventRelay?.popupClosed();
     });
   });
 

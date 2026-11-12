@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createDisplay, type DisplayApi } from '../src/background/display';
+import { createDisplay, type DisplayApi, launchAction } from '../src/background/display';
 import { mayRender, parseSurface, popupQuery, popupTokenOk } from '../src/shared/surface';
 
 function fakeApi(opts: { injectFails?: boolean; noClose?: boolean; noOverlay?: boolean } = {}) {
@@ -27,8 +27,33 @@ function fakeApi(opts: { injectFails?: boolean; noClose?: boolean; noOverlay?: b
 const tab = { id: 7, windowId: 1, incognito: false };
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-describe('display without the in-page popup (Firefox)', () => {
-  it('a popup setting opens the window instead, and never injects', async () => {
+describe('launchAction', () => {
+  it('Chrome side panel: a notification, whose click is the gesture', () => {
+    expect(launchAction('sidebar', false)).toBe('notify');
+  });
+  it('Firefox sidebar: nothing, since a notification click is not user input there', () => {
+    expect(launchAction('sidebar', true)).toBe('none');
+  });
+  it('popup and window open directly in both browsers', () => {
+    for (const firefox of [false, true]) {
+      expect(launchAction('popup', firefox)).toBe('open');
+      expect(launchAction('window', firefox)).toBe('open');
+    }
+  });
+});
+
+describe('display on Firefox (the in-page popup runs in the framed panel)', () => {
+  it('a popup setting injects the overlay, as in Chrome', async () => {
+    const { api, calls } = fakeApi();
+    const d = createDisplay(api);
+    d.setMode('popup');
+    expect(d.mode).toBe('popup');
+    await d.actionClicked(tab);
+    expect(calls).toContain('inject:7');
+    expect(calls.some((c) => c.startsWith('window:create:'))).toBe(false);
+  });
+
+  it('an api that cannot frame the panel still falls back to the window', async () => {
     const { api, calls } = fakeApi({ noOverlay: true });
     const d = createDisplay(api);
     d.setMode('popup');

@@ -1,7 +1,7 @@
 // "?" shows the keyboard help (and never steals a "?" typed into a field); forced-colour mode
 // keeps borders and theme swatches visible; settings sections still open with their animation.
 import assert from 'node:assert/strict';
-import { extensionDir, launch } from './harness.mjs';
+import { extensionDir, launch, waitUntil } from './harness.mjs';
 
 const { ctx, extId, close } = await launch(extensionDir(), { width: 360, height: 900 });
 try {
@@ -52,7 +52,7 @@ try {
   await page.waitForTimeout(1200);
   await page.getByRole('button', { name: 'New tab', exact: true }).focus();
   await page.keyboard.press(`Alt+${target.n}`);
-  await page.waitForFunction(async (id) => (await chrome.tabs.get(id)).active, target.id);
+  await waitUntil(page, async (id) => (await chrome.tabs.get(id)).active, target.id);
   console.log('PASS Alt+number activates that tab');
 
   await page.emulateMedia({ forcedColors: 'active' });

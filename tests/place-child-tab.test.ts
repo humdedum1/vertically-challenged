@@ -39,7 +39,7 @@ it('does nothing when disabled, no opener is reported, or the parent is pinned',
   expect(api.tabs.query).not.toHaveBeenCalled();
   api.storage.sync.get.mockResolvedValue({});
   await placeChildTab(parent);
-  expect(api.tabs.query).not.toHaveBeenCalled();
+  expect(api.tabs.move).not.toHaveBeenCalled();
   api.tabs.query.mockResolvedValue([{ ...parent, pinned: true }, child]);
   await placeChildTab(child);
   expect(api.tabs.move).not.toHaveBeenCalled();
@@ -51,4 +51,11 @@ it('leaves other native groups and closed openers alone', async () => {
   api.tabs.query.mockResolvedValue([child]);
   await placeChildTab(child);
   expect(api.tabs.move).not.toHaveBeenCalled();
+});
+
+it('reads the opener from the tab list when the created event lacks it', async () => {
+  // Chrome's onCreated omits openerTabId for tabs.create({ openerTabId }); the query has it.
+  const { openerTabId: _, ...created } = child;
+  await placeChildTab(created);
+  expect(api.tabs.move).toHaveBeenCalledWith(3, { index: 1 });
 });

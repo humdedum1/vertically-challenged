@@ -154,6 +154,12 @@ function onkeydown(e: KeyboardEvent): void {
   style:visibility={width ? 'visible' : 'hidden'}
   tabindex="-1"
   {onkeydown}
+  onpointermove={(e) => {
+    // The pointer moves focus, so hover and keyboard share one highlight (as in native menus).
+    const item = (e.target as HTMLElement).closest<HTMLElement>('[data-nav]');
+    if (item && item !== document.activeElement && item.getAttribute('aria-disabled') !== 'true')
+      item.focus({ preventScroll: true });
+  }}
 >
   {#if view}
     <button type="button" role="menuitem" class="entry back" data-nav tabindex="-1" onclick={pop}>

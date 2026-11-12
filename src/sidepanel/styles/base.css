@@ -43,6 +43,12 @@
   --focus-ring: var(--mPrimary);
 }
 
+/* A hairline in the text colour: black icons (GitHub, Notion…) vanish on a dark surface and
+   white ones on a light surface; on coloured icons it is barely visible. */
+.favicon {
+  filter: drop-shadow(0 0 0.6px color-mix(in srgb, var(--mOnSurface) 75%, transparent));
+}
+
 /* Chrome's own tab-group colours (theme-independent): dark-mode variant by default,
    light-mode variant under the same selectors themeToCss uses for the --m* roles. */
 :root {

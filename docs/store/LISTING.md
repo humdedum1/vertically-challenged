@@ -84,7 +84,7 @@ The store shows this as plain text, so sections and bullets use characters, not 
 ```text
 🗂️ Every tab in every window, in one searchable vertical list. Free, open source and local-first.
 
-• Side panel, sidebar or window: side panel and in-page popup on Chrome, sidebar on Firefox, own window on both.
+• Side panel, sidebar or window: side panel on Chrome, sidebar on Firefox, in-page popup or own window on both.
 • One list: every tab in every window, with window names. Incognito stays separate.
 • Staples: a grid of the pages you use all day.
 • Pinned folders and child tabs: nest, drag and arrange.

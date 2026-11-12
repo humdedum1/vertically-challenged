@@ -21,7 +21,9 @@ the developer or to any third party.
   with each other.
 - **Favicons on Firefox.** Chrome gives the extension its cached favicons. Firefox doesn't, so on
   Firefox the panel loads each tab's icon from that site's own server, the same site the tab
-  already talks to. Nothing goes anywhere else.
+  already talks to. Nothing goes anywhere else. So bookmarks, history and Staples get icons too,
+  the extension remembers the icon address of up to 500 sites you've had open in normal (not
+  private) tabs. That list stays on this computer and is erased when you clear all history.
 - **Backups.** Automatic or manual backups contain your settings, themes, layouts, sessions and
   custom CSS. They are saved only where you point them: your Downloads folder, a WebDAV server
   (such as Nextcloud), an S3-compatible bucket, or your own Dropbox app folder. The extension

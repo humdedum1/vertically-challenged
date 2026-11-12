@@ -55,12 +55,14 @@ These are also in `amo-metadata.json` (`version.approval_notes`).
   `script-src 'self'`.
 - **Network:** nothing is contacted by default. With the user's explicit permission it talks to a
   backup server they type in (WebDAV, S3-compatible or Dropbox). It also loads each tab's favicon
-  from that site's own server, since Firefox has no favicon API for extensions. The page's CSP
+  from that site's own server, since Firefox has no favicon API for extensions. Bookmarks, history
+  and Staples reuse the icon their site last had in a normal tab (up to 500 sites, kept in
+  `storage.local`, never from private tabs, erased when all history is cleared). The page's CSP
   allows `img-src https:` for that, and custom CSS that tries to load remote images is not
   applied.
 - **Permissions:** `tabs`, `tabGroups`, `sessions`, `bookmarks`, `history` (the panels),
   `storage`, `alarms`, `contextMenus`, `activeTab` and `scripting` (the optional in-page popup,
-  which Firefox doesn't support, so it's inert), `identity` (Dropbox sign-in only; Firefox doesn't
+  only on the tab where the user opens it), `identity` (Dropbox sign-in only; Firefox doesn't
   allow it as optional). Optional: `notifications`, `downloads` and one host origin for a backup
   server.
 - **Data:** `data_collection_permissions` is `none`. Nothing is sent to the developer.
@@ -88,6 +90,8 @@ Local-first, no tracking, free and open source.
 
 ## What differs from the Chrome listing
 
-- The panel is Firefox's sidebar, or a window. There is no in-page popup on Firefox.
+- The panel is Firefox's sidebar, the in-page popup or a window. The toolbar button and the
+  keyboard shortcut both open the popup (the shortcut grants `activeTab` too, on Firefox 140 and 160).
 - Synced open tabs from other devices aren't available (Firefox has no API for them).
+- "Open on browser launch" works only in Window mode: Firefox opens the sidebar only on user input.
 - Firefox has had much less testing than Chrome; the description says so and asks for fixes.

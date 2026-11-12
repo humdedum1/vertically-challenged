@@ -1,7 +1,7 @@
 // "Tidy up tabs…" (command palette) lists tabs not used for a while by site; Park puts them away
 // and Close closes them. Time is moved 40 days ahead in the page so fresh tabs count as old.
 import assert from 'node:assert/strict';
-import { extensionDir, launch } from './harness.mjs';
+import { extensionDir, launch, waitUntil } from './harness.mjs';
 
 const { ctx, extId, close } = await launch(extensionDir(), { width: 360, height: 900 });
 try {
@@ -27,7 +27,8 @@ try {
   await dialog.getByText(/\d+ tabs? on 1 site/).waitFor();
 
   await dialog.getByRole('button', { name: /^Park \d+ tabs/ }).click();
-  await page.waitForFunction(
+  await waitUntil(
+    page,
     async () => ((await chrome.storage.local.get('vc:snoozed'))['vc:snoozed'] ?? []).length >= 2,
   );
   const gone = await page.evaluate(

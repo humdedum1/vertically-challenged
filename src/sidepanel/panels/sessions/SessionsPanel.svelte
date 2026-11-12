@@ -11,6 +11,7 @@ import {
   type Session,
   sessionTabCount,
 } from '../../../shared/sessions';
+import { api } from '../../api';
 import Button from '../../components/controls/Button.svelte';
 import TextInput from '../../components/controls/TextInput.svelte';
 import Toggle from '../../components/controls/Toggle.svelte';
@@ -140,7 +141,7 @@ function remove(s: Session): void {
 
 async function openTab(url: string): Promise<void> {
   try {
-    await browser.tabs.create({ url });
+    await api.tabs.create({ url });
   } catch (e) {
     status = e instanceof Error ? e.message : 'Could not open that page.';
   }

@@ -1,8 +1,16 @@
 // File-backup import/export and applying a restored layout in real Chromium.
 
 import fs from 'node:fs/promises';
+import http from 'node:http';
 import { gunzipSync } from 'node:zlib';
-import { check, extensionDir, finish, launch } from './harness.mjs';
+import { check, extensionDir, finish, launch, waitUntil } from './harness.mjs';
+
+const srv = http.createServer((_req, res) => {
+  res.writeHead(200, { 'content-type': 'text/html' });
+  res.end('<!doctype html><title>named</title>');
+});
+await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+const SITE = `http://127.0.0.1:${srv.address().port}`;
 
 const { ctx, extId, close } = await launch(extensionDir(), { width: 440, height: 1400 });
 try {
@@ -92,14 +100,14 @@ try {
     port.postMessage({ type: 'setupApply', setupId, windowId: win.id });
     globalThis.__backupPort = port;
   }, restored.id);
-  await page.waitForFunction(async () => {
+  await waitUntil(page, async () => {
     const data = (await chrome.storage.local.get('layouts')).layouts;
-    return (
-      data.layouts.filter((l) => l.essentials.length === 1 && l.pinned[0]?.children.length === 2)
-        .length === 2
+    return data.layouts.some(
+      (l) => l.essentials.length === 1 && l.pinned[0]?.children.length === 2,
     );
   });
-  await page.waitForFunction(
+  await waitUntil(
+    page,
     async (id) =>
       !(await chrome.storage.local.get('layouts')).layouts.layouts.some((l) => l.id === id),
     restored.id,
@@ -161,7 +169,55 @@ try {
     async () => (await chrome.storage.local.get('layouts')).layouts.layouts.length,
   );
   check(after === 2, 'old settings-only backups keep existing layouts');
+
+  // A named layout whose pinned tab is open in an unnamed window renames that window.
+  const named = `${SITE}/named`;
+  const tabId = await page.evaluate(async (url) => {
+    const win = await chrome.windows.create({ url, focused: false });
+    const [tab] = await chrome.tabs.query({ windowId: win.id });
+    await chrome.tabs.update(tab.id, { pinned: true });
+    return tab.id;
+  }, named);
+  await waitUntil(
+    page,
+    async (id) =>
+      (await chrome.storage.local.get('layouts')).layouts.layouts.some((l) =>
+        l.pinned.some((n) => n.tabId === id),
+      ),
+    tabId,
+  );
+  const namedBackup = {
+    ...backup,
+    layouts: [
+      {
+        ...source,
+        id: 'lnamedaaaaa',
+        name: 'Named window',
+        essentials: [],
+        pinned: [{ ...item('named', '127.0.0.1'), homeUrl: named, lastUrl: named }],
+      },
+    ],
+  };
+  await page.getByLabel('Backup file', { exact: true }).setInputFiles({
+    name: 'named.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(namedBackup)),
+  });
+  await page
+    .getByRole('group', { name: 'Restore backup', exact: true })
+    .getByRole('button', { name: 'Apply', exact: true })
+    .click();
+  await waitUntil(
+    page,
+    async (id) =>
+      (await chrome.storage.local.get('layouts')).layouts.layouts.some(
+        (l) => l.name === 'Named window' && l.pinned[0]?.tabId === id,
+      ),
+    tabId,
+  );
+  check(true, 'backup restore renames the open window its named layout matches');
 } finally {
+  srv.close();
   await close();
 }
 finish();

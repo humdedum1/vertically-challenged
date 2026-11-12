@@ -357,18 +357,22 @@ export class PinManager {
    * After a reinstall Chrome keeps the pinned tabs but the extension adopted them as plain
    * pins. A restored layout with Staples or folders is matched (by URL, as at startup) to
    * windows that only have plain pins, so their Staples come back instead of staying a setup.
-   * Layouts without that structure stay setups: they would change nothing in the window.
+   * Named layouts are matched the same way, so the window gets its name back. Layouts with
+   * neither stay setups: they would change nothing in the window. Named windows are never
+   * replaced, so a restore cannot overwrite a name the user gave.
    */
   private rebindRestored(restored: readonly WindowLayout[]): void {
     const structured = restored.filter(
-      (l) => l.essentials.length > 0 || l.pinned.some((n) => n.kind === 'folder'),
+      (l) => l.name || l.essentials.length > 0 || l.pinned.some((n) => n.kind === 'folder'),
     );
     if (!structured.length) return;
     const plain = this.deps.windows().filter((w) => {
       if (w.incognito || this.closed.has(w.id)) return false;
       const id = this.bindings.get(w.id);
       const l = id === undefined ? undefined : this.layouts.get(id);
-      return !l || (l.essentials.length === 0 && l.pinned.every((n) => n.kind === 'item'));
+      return (
+        !l || (!l.name && l.essentials.length === 0 && l.pinned.every((n) => n.kind === 'item'))
+      );
     });
     const matches = matchLayouts(
       structured,
@@ -504,7 +508,6 @@ export class PinManager {
     const ids = [...this.lateWaiting.keys()].filter((w) => !this.closed.has(w));
     this.lateWaiting.clear();
     if (ids.length === 0) return;
-    for (const w of ids) this.lateDone.add(w);
     if (this.inLateRestore()) {
       const windows = ids.flatMap((windowId) => {
         const tabs = this.deps.store.snapshot(windowId).tabs;
@@ -513,6 +516,9 @@ export class PinManager {
         return [this.lateWindow(windowId, tabs)];
       });
       const matches = matchLayouts(this.lateCandidateLayouts(), windows);
+      // Only a match is final: restored tabs can show about:blank until their URL arrives, so
+      // an unmatched window is tried again when its tabs change, until the grace period ends.
+      for (const windowId of matches.keys()) this.lateDone.add(windowId);
       for (const [windowId, m] of matches) this.bindMatch(windowId, m);
       if (matches.size > 0) this.publishSetups();
     }
@@ -1159,9 +1165,9 @@ export class PinManager {
       // Left alone (no layout yet, nothing adopted) until resolveLate matches it.
       if (this.lateEligible(windowId, tabs) && this.holdLate(windowId, tabs)) return null;
       if (this.lateWaiting.delete(windowId)) {
-        // Waited its maximum: matched on its own, now.
-        this.lateDone.add(windowId);
+        // Waited its maximum: matched on its own, now (and again on a later change if not).
         late = this.matchOneLate(windowId, tabs);
+        if (late) this.lateDone.add(windowId);
       }
       late = this.pairDormant(windowId, tabs) || late;
     }

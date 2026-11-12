@@ -13,7 +13,7 @@ describe('built-in themes', () => {
   });
 
   it('our own themes meet WCAG AA for every text pair', () => {
-    for (const id of ['abyss', 'ember']) expect(contrastIssues(findTheme(id)), id).toEqual([]);
+    for (const id of ['abyss', 'velo']) expect(contrastIssues(findTheme(id)), id).toEqual([]);
   });
 
   it('derives terminal palettes that meet WCAG AA', () => {

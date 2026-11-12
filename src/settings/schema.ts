@@ -1,7 +1,7 @@
 import { DEFAULT_THEME_ID } from '../themes/builtin';
 
 /** Bump when the stored shape changes, and add a step to MIGRATIONS in migrate.ts. */
-export const SETTINGS_VERSION = 11;
+export const SETTINGS_VERSION = 12;
 
 export type ColorMode = 'system' | 'light' | 'dark';
 export type Density = 'compact' | 'comfortable';

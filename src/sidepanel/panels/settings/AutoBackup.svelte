@@ -20,6 +20,7 @@ import {
 } from '../../../backup/dropbox';
 import { isPlainHttp } from '../../../backup/targets';
 import { FIREFOX } from '../../../shared/browser-urls';
+import { FRAMED, FRAMED_NOTE } from '../../api';
 import Button from '../../components/controls/Button.svelte';
 import Field from '../../components/controls/Field.svelte';
 import Select from '../../components/controls/Select.svelte';
@@ -125,14 +126,18 @@ const remote = $derived(cfg.target !== 'downloads');
 </script>
 
 <div class="auto" data-sf-group>
-  <Field label="Where to save" for="vc-backup-target">
-    <Select id="vc-backup-target" value={cfg.target} onchange={(v) => (cfg.target = v as TargetKind)}>
-      <option value="downloads">Downloads folder</option>
-      <option value="webdav">WebDAV (Nextcloud, ownCloud…)</option>
-      <option value="s3">S3-compatible (AWS, R2, B2, MinIO…)</option>
-      <option value="dropbox">Dropbox</option>
-    </Select>
-  </Field>
+  {#if FRAMED}
+    <p class="hint">{FRAMED_NOTE}</p>
+  {:else}
+    <Field label="Where to save" for="vc-backup-target">
+      <Select id="vc-backup-target" value={cfg.target} onchange={(v) => (cfg.target = v as TargetKind)}>
+        <option value="downloads">Downloads folder</option>
+        <option value="webdav">WebDAV (Nextcloud, ownCloud…)</option>
+        <option value="s3">S3-compatible (AWS, R2, B2, MinIO…)</option>
+        <option value="dropbox">Dropbox</option>
+      </Select>
+    </Field>
+  {/if}
 
   {#if cfg.target === 'webdav'}
     <Field label="Folder URL" for="vc-wd-url">
@@ -153,10 +158,12 @@ const remote = $derived(cfg.target !== 'downloads');
     <Field label="Dropbox app key" for="vc-db-key">
       <TextInput id="vc-db-key" label="Dropbox app key" mono value={cfg.dropbox.appKey} oninput={(v) => (cfg.dropbox.appKey = v)} />
     </Field>
-    <div class="row">
-      <Button onclick={connectDropbox}>{cfg.dropbox.refreshToken ? 'Reconnect Dropbox' : 'Connect Dropbox'}</Button>
-      <span class="hint">{cfg.dropbox.refreshToken ? 'Connected' : 'Not connected'}</span>
-    </div>
+    {#if !FRAMED}
+      <div class="row">
+        <Button onclick={connectDropbox}>{cfg.dropbox.refreshToken ? 'Reconnect Dropbox' : 'Connect Dropbox'}</Button>
+        <span class="hint">{cfg.dropbox.refreshToken ? 'Connected' : 'Not connected'}</span>
+      </div>
+    {/if}
   {:else if cfg.target === 's3'}
     <Field label="Endpoint" for="vc-s3-endpoint">
       <TextInput id="vc-s3-endpoint" label="S3 endpoint" placeholder="https://s3.eu-west-1.amazonaws.com" mono value={cfg.s3.endpoint} oninput={(v) => (cfg.s3.endpoint = v)} />
@@ -214,10 +221,12 @@ const remote = $derived(cfg.target !== 'downloads');
     </p>
   </details>
 
-  <div class="row">
-    <Button variant="primary" onclick={() => save(cfg)}>Save schedule</Button>
-    <Button disabled={running} onclick={runNow}>{running ? 'Backing up…' : 'Back up now'}</Button>
-  </div>
+  {#if !FRAMED}
+    <div class="row">
+      <Button variant="primary" onclick={() => save(cfg)}>Save schedule</Button>
+      <Button disabled={running} onclick={runNow}>{running ? 'Backing up…' : 'Back up now'}</Button>
+    </div>
+  {/if}
   <p class="hint" role="status">{saved ? 'Saved. ' : ''}Last backup: {last}{status.name ? ` (${status.name})` : ''}</p>
   <p class="error" role="alert">{status.error && !error ? `Last run failed: ${status.error}` : error}</p>
 </div>

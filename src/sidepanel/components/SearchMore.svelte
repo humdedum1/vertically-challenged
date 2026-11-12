@@ -3,6 +3,7 @@ import { browser } from 'wxt/browser';
 import { type SessionHit, searchPutAway } from '../../shared/put-away-search';
 import { isRestorableUrl, parseSessions, SESSIONS_KEY } from '../../shared/sessions';
 import { parseSnoozed, SNOOZE_KEY, type Snoozed } from '../../shared/snooze';
+import { api } from '../api';
 import Favicon from './Favicon.svelte';
 
 /**
@@ -65,8 +66,8 @@ $effect(() => {
     const keep = (h: { url?: string; title?: string }): h is Hit =>
       !!h.url && isRestorableUrl(h.url) && !open.has(h.url);
     const [b, h] = await Promise.all([
-      browser.bookmarks.search(q).catch(() => []),
-      browser.history.search({ text: q, startTime: 0, maxResults: 25 }).catch(() => []),
+      api.bookmarks.search(q).catch(() => []),
+      api.history.search({ text: q, startTime: 0, maxResults: 25 }).catch(() => []),
     ]);
     const away = await loadPutAway().catch(() => null);
     if (stale) return;
@@ -109,7 +110,7 @@ const summary = $derived(
 );
 
 function open(url: string): void {
-  void browser.tabs.create({ url, ...(windowId === null ? {} : { windowId }) });
+  void api.tabs.create({ url, ...(windowId === null ? {} : { windowId }) });
 }
 </script>
 

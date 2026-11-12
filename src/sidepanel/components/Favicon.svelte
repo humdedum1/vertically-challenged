@@ -17,7 +17,7 @@ const showImg = $derived(settled && src !== null && failedFor !== src);
 
 <span class="icon" style:width="{size}px" style:height="{size}px" aria-hidden="true">
   {#if showImg && src}
-    <img {src} width={size} height={size} alt="" loading="lazy" decoding="async" onerror={() => (failedFor = src)} />
+    <img class="favicon" {src} width={size} height={size} alt="" loading="lazy" decoding="async" onerror={() => (failedFor = src)} />
   {:else}
     <svg viewBox="0 0 16 16" width={size} height={size} fill="none" stroke="currentColor" stroke-width="1.2">
       <circle cx="8" cy="8" r="6" />

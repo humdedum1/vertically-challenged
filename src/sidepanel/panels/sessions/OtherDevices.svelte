@@ -6,6 +6,7 @@ import { BROWSER, FIREFOX } from '../../../shared/browser-urls';
 import { isRestorableUrl, type SavedPinNode, sessionTabCount } from '../../../shared/sessions';
 import type { SyncDoc, SyncWorkspace } from '../../../shared/sync';
 import { DEVICE_KEY, DEVICE_PREFIX, readSync } from '../../../shared/sync-store';
+import { api, onRelayed } from '../../api';
 import Button from '../../components/controls/Button.svelte';
 import Favicon from '../../components/Favicon.svelte';
 import Icon from '../../components/Icon.svelte';
@@ -59,12 +60,11 @@ onMount(() => {
     if (area === 'sync' && Object.keys(changes).some((k) => k.startsWith(DEVICE_PREFIX)))
       void loadDocs();
   };
-  const onSessions = () => void loadChrome();
+  const offSessions = onRelayed('sessions.onChanged', () => void loadChrome());
   browser.storage.onChanged.addListener(onStorage);
-  browser.sessions.onChanged.addListener(onSessions);
   return () => {
     browser.storage.onChanged.removeListener(onStorage);
-    browser.sessions.onChanged.removeListener(onSessions);
+    offSessions();
   };
 });
 
@@ -135,7 +135,7 @@ const chromeTabs = (s: Browser.sessions.Session): Browser.tabs.Tab[] =>
 async function openUrl(url: string | undefined): Promise<void> {
   if (!url || !isRestorableUrl(url)) return;
   try {
-    await browser.tabs.create({ url });
+    await api.tabs.create({ url });
   } catch (e) {
     onstatus(e instanceof Error ? e.message : 'Could not open that page.');
   }
@@ -145,7 +145,7 @@ async function openWindow(tabs: Browser.tabs.Tab[]): Promise<void> {
   const urls = tabs.map((t) => t.url).filter((u): u is string => !!u && isRestorableUrl(u));
   if (!urls.length) return;
   try {
-    await browser.windows.create({ url: urls, focused: true });
+    await api.windows.create({ url: urls, focused: true });
     onstatus(`Opened ${pluralize(urls.length, 'tab')} in a new window`);
   } catch (e) {
     onstatus(e instanceof Error ? e.message : 'Could not open that window.');

@@ -38,6 +38,9 @@ html[data-skin="dense"] .cards .category-content > .card + .card {
 
 html[data-skin="dense"] .cards summary {
   padding: 6px var(--pad-card);
+}
+
+html[data-skin="dense"] .cards summary::before {
   border-radius: 0;
 }
 
@@ -259,5 +262,17 @@ html[data-skin="dense"][data-motion="reduce"] #app .row {
   html[data-skin="dense"] .sticky > .card,
   html[data-skin="dense"] .sections > .card {
     border: 1px solid ButtonText;
+  }
+}
+
+/* Menus match the tightened rows. Mouse only: touch keeps the 32px default as a tap target. */
+@media (pointer: fine) {
+  html[data-skin="dense"] .menu {
+    padding: 2px;
+  }
+
+  html[data-skin="dense"] .menu .entry {
+    height: 26px;
+    padding: 0 8px;
   }
 }

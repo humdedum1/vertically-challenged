@@ -1,7 +1,7 @@
 <script lang="ts">
 import { onMount, tick } from 'svelte';
-import { browser } from 'wxt/browser';
 import { displayUrl } from '../../../lib/search/search-index';
+import { api, onRelayed } from '../../api';
 import ContextMenu from '../../components/ContextMenu.svelte';
 import Favicon from '../../components/Favicon.svelte';
 import Icon from '../../components/Icon.svelte';
@@ -88,7 +88,7 @@ const activeTab = $derived(tabState.tabs.find((t) => t.active));
 
 async function load(): Promise<void> {
   try {
-    const tree = await browser.bookmarks.getTree();
+    const tree = await api.bookmarks.getTree();
     root = tree[0] as Node | undefined;
     error = null;
     if (!hasStored && root?.children) {
@@ -115,21 +115,16 @@ function scheduleReload(): void {
 
 onMount(() => {
   void load();
-  const ev = browser.bookmarks;
-  const events = [ev.onCreated, ev.onRemoved, ev.onChanged, ev.onMoved];
-  try {
-    for (const e of events) e.addListener(scheduleReload);
-  } catch {
-    // The load above reports the error state.
-  }
+  const offs = [
+    onRelayed('bookmarks.onCreated', scheduleReload),
+    onRelayed('bookmarks.onRemoved', scheduleReload),
+    onRelayed('bookmarks.onChanged', scheduleReload),
+    onRelayed('bookmarks.onMoved', scheduleReload),
+  ];
   return () => {
     clearTimeout(reloadTimer);
     clearTimeout(searchTimer);
-    try {
-      for (const e of events) e.removeListener(scheduleReload);
-    } catch {
-      // Nothing was registered.
-    }
+    for (const off of offs) off();
   };
 });
 
@@ -148,7 +143,7 @@ async function runSearch(): Promise<void> {
   }
   searching = true;
   try {
-    const found = (await browser.bookmarks.search(q)) as Node[];
+    const found = (await api.bookmarks.search(q)) as Node[];
     if (gen !== searchGen) return;
     results = found.filter((n) => n.url !== undefined);
     status = `${results.length} ${results.length === 1 ? 'result' : 'results'}`;
@@ -194,7 +189,7 @@ async function checkBookmarked(): Promise<void> {
     return;
   }
   try {
-    bookmarkedActive = (await browser.bookmarks.search({ url })).length > 0;
+    bookmarkedActive = (await api.bookmarks.search({ url })).length > 0;
   } catch {
     bookmarkedActive = true;
   }
@@ -217,7 +212,7 @@ async function bookmarkCurrent(): Promise<void> {
   const parentId = otherFolderId();
   if (!t || !parentId) return;
   try {
-    await browser.bookmarks.create({ parentId, title: t.title || t.url, url: t.url });
+    await api.bookmarks.create({ parentId, title: t.title || t.url, url: t.url });
     status = 'Bookmarked this tab.';
     bookmarkedActive = true;
   } catch (e) {
@@ -235,8 +230,8 @@ async function openBookmark(n: Node, mode: 'current' | 'tab' | 'window'): Promis
     return;
   }
   try {
-    if (mode === 'window') await browser.windows.create({ url });
-    else if (mode === 'tab') await browser.tabs.create({ url });
+    if (mode === 'window') await api.windows.create({ url });
+    else if (mode === 'tab') await api.tabs.create({ url });
     else await updateActiveTab(url);
   } catch (e) {
     status = e instanceof Error ? e.message : 'Could not open that bookmark.';
@@ -245,18 +240,18 @@ async function openBookmark(n: Node, mode: 'current' | 'tab' | 'window'): Promis
 
 // Asks the browser instead of trusting the mirrored list, which can lag a tab switch.
 async function updateActiveTab(url: string): Promise<void> {
-  const [active] = await browser.tabs.query({
+  const [active] = await api.tabs.query({
     active: true,
     windowId: tabState.windowId ?? undefined,
   });
-  if (active?.id !== undefined) await browser.tabs.update(active.id, { url });
-  else await browser.tabs.create({ url });
+  if (active?.id !== undefined) await api.tabs.update(active.id, { url });
+  else await api.tabs.create({ url });
 }
 
 async function openAll(folder: Node): Promise<void> {
   const urls = collectUrls(folder).filter((u) => !isScriptUrl(u));
   try {
-    for (const url of urls) await browser.tabs.create({ url, active: false });
+    for (const url of urls) await api.tabs.create({ url, active: false });
     status = `Opened ${urls.length} tabs.`;
   } catch (e) {
     status = e instanceof Error ? e.message : 'Could not open the bookmarks.';
@@ -289,7 +284,7 @@ function askOpenAll(folder: Node): void {
 
 async function removeBookmark(n: Node): Promise<void> {
   try {
-    await browser.bookmarks.remove(n.id);
+    await api.bookmarks.remove(n.id);
     status = `Deleted “${n.title || n.url}”.`;
   } catch (e) {
     status = e instanceof Error ? e.message : 'Could not delete that bookmark.';

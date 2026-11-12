@@ -89,6 +89,11 @@ function onkeydown(e: KeyboardEvent): void {
     background: var(--state-hover);
   }
 
+  /* While the pointer is over the list, only the command under it is highlighted. */
+  .commands:hover button:not(:hover, :focus-visible) {
+    background: transparent;
+  }
+
   button:hover,
   button:focus-visible {
     background: var(--state-hover);

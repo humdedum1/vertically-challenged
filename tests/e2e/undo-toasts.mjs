@@ -1,6 +1,6 @@
 // Deleting a session and resetting settings happen at once and offer Undo in a toast.
 import assert from 'node:assert/strict';
-import { extensionDir, launch } from './harness.mjs';
+import { extensionDir, launch, waitUntil } from './harness.mjs';
 
 const { ctx, extId, close } = await launch(extensionDir(), { width: 360, height: 1600 });
 try {
@@ -32,11 +32,13 @@ try {
   await page.getByRole('button', { name: 'More actions for Trip', exact: true }).click();
   await page.getByRole('button', { name: 'Delete', exact: true }).click();
   await page.getByText('Deleted “Trip”', { exact: true }).first().waitFor();
-  await page.waitForFunction(
+  await waitUntil(
+    page,
     async () => ((await chrome.storage.local.get('sessions')).sessions ?? []).length === 0,
   );
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await page.waitForFunction(
+  await waitUntil(
+    page,
     async () => ((await chrome.storage.local.get('sessions')).sessions ?? []).length === 1,
   );
   assert.deepEqual(await stored(), ['ss1']);
@@ -44,18 +46,21 @@ try {
 
   await page.getByRole('tab', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Use Dracula', exact: true }).click();
-  await page.waitForFunction(
+  await waitUntil(
+    page,
     async () =>
       (await chrome.storage.sync.get('settings')).settings?.appearance?.themeId === 'dracula',
   );
   await page.locator('summary').filter({ hasText: 'Data' }).click();
   await page.getByRole('button', { name: 'Reset to defaults', exact: true }).click();
-  await page.waitForFunction(
+  await waitUntil(
+    page,
     async () =>
       (await chrome.storage.sync.get('settings')).settings?.appearance?.themeId === 'noctalia',
   );
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await page.waitForFunction(
+  await waitUntil(
+    page,
     async () =>
       (await chrome.storage.sync.get('settings')).settings?.appearance?.themeId === 'dracula',
   );

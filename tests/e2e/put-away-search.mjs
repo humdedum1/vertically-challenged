@@ -1,7 +1,7 @@
 // The search box also finds pages inside saved sessions and snoozed tabs, and a snoozed hit
 // reopens the tab.
 import assert from 'node:assert/strict';
-import { extensionDir, launch } from './harness.mjs';
+import { extensionDir, launch, waitUntil } from './harness.mjs';
 
 const { ctx, extId, close } = await launch(extensionDir(), { width: 360, height: 800 });
 try {
@@ -51,7 +51,8 @@ try {
   await search.fill('zebra');
   await page.getByText('Put away', { exact: true }).waitFor();
   await page.getByRole('button', { name: /Zebra reference page/ }).click();
-  await page.waitForFunction(
+  await waitUntil(
+    page,
     async () => (await chrome.storage.local.get('vc:snoozed'))['vc:snoozed']?.length === 0,
   );
   const opened = await page.evaluate(async () =>

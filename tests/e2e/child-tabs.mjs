@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { check, extensionDir, finish, launch } from './harness.mjs';
+import { check, extensionDir, finish, launch, waitUntil } from './harness.mjs';
 
 const server = http.createServer((req, res) => {
   res.setHeader('content-type', 'text/html');
@@ -43,7 +43,8 @@ try {
     });
     return { child: child.id, unrelated: unrelated.id };
   }, origin);
-  await panel.waitForFunction(
+  await waitUntil(
+    panel,
     async ({ child, unrelated }) =>
       (await chrome.tabs.get(child)).index < (await chrome.tabs.get(unrelated)).index,
     endTab,
@@ -131,7 +132,8 @@ try {
     'Child tabs setting is enabled by default',
   );
   await toggle.click();
-  await panel.waitForFunction(
+  await waitUntil(
+    panel,
     async () => (await chrome.storage.sync.get('settings')).settings?.tabs?.childTabs === false,
   );
   await panel.getByRole('tab', { name: 'Tabs', exact: true }).click();

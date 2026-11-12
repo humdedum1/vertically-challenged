@@ -5,14 +5,17 @@ import { migrateSettings } from '../settings/migrate';
 export async function placeChildTab(
   tab: Pick<Browser.tabs.Tab, 'id' | 'windowId' | 'openerTabId' | 'pinned'>,
 ): Promise<void> {
-  if (tab.id === undefined || tab.openerTabId === undefined || tab.pinned) return;
+  if (tab.id === undefined || tab.pinned) return;
   const settings = migrateSettings((await browser.storage.sync.get('settings')).settings);
   if (!settings.tabs.childTabs) return;
   const tabs = (await browser.tabs.query({ windowId: tab.windowId })).sort(
     (a, b) => a.index - b.index,
   );
-  const parent = tabs.find((t) => t.id === tab.openerTabId);
   const child = tabs.find((t) => t.id === tab.id);
+  // Chrome's onCreated omits the opener of tabs.create({ openerTabId }); the query has it.
+  const openerId = tab.openerTabId ?? child?.openerTabId;
+  if (openerId === undefined) return;
+  const parent = tabs.find((t) => t.id === openerId);
   if (
     !parent ||
     !child ||

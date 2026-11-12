@@ -1,6 +1,6 @@
 // Reload actions and command recovery against a live Chromium extension.
 import http from 'node:http';
-import { check, extensionDir, finish, launch, sleep } from './harness.mjs';
+import { check, extensionDir, finish, launch, sleep, waitUntil } from './harness.mjs';
 
 let requests = 0;
 const server = http.createServer((req, res) => {
@@ -18,10 +18,7 @@ try {
   }, `http://127.0.0.1:${server.address().port}/`);
   const row = page.locator(`#vc-row-t${tab.id}`);
   await row.waitFor();
-  await page.waitForFunction(
-    async (id) => (await chrome.tabs.get(id)).status === 'complete',
-    tab.id,
-  );
+  await waitUntil(page, async (id) => (await chrome.tabs.get(id)).status === 'complete', tab.id);
   const before = requests;
   await row.click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Reload', exact: true }).click();
@@ -114,7 +111,7 @@ try {
   const connections = await worker.evaluate(() => globalThis.recoveryConnections);
   check(connections >= 2, 'an unresponsive connection is replaced automatically');
   await row.click();
-  await page.waitForFunction(async (id) => (await chrome.tabs.get(id)).active, tab.id);
+  await waitUntil(page, async (id) => (await chrome.tabs.get(id)).active, tab.id);
   check(true, 'tab clicks activate the browser tab after recovery');
 
   const other = await page.evaluate(() =>

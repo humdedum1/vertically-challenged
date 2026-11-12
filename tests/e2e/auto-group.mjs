@@ -1,6 +1,6 @@
 // Exercises the real menu, native groups, repeat invocation and preserved pinned/grouped tabs.
 import http from 'node:http';
-import { check, extensionDir, finish, launch } from './harness.mjs';
+import { check, extensionDir, finish, launch, waitUntil } from './harness.mjs';
 
 const server = http.createServer((req, res) =>
   res.end(`<title>${req.url.replace(/[<>&"]/g, '')}</title>`),
@@ -28,10 +28,14 @@ try {
     await page.getByRole('menuitem', { name: 'Group tabs by website', exact: true }).click();
   };
   await groupFromMenu();
-  await page.waitForFunction(async ([a, b]) => {
-    const first = await chrome.tabs.get(a);
-    return first.groupId !== -1 && first.groupId === (await chrome.tabs.get(b)).groupId;
-  }, initial.ids);
+  await waitUntil(
+    page,
+    async ([a, b]) => {
+      const first = await chrome.tabs.get(a);
+      return first.groupId !== -1 && first.groupId === (await chrome.tabs.get(b)).groupId;
+    },
+    initial.ids,
+  );
   const state = await page.evaluate(
     async ({ pinned, grouped, ids }) => ({
       pinned: await chrome.tabs.get(pinned),

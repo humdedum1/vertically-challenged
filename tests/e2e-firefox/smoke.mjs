@@ -729,6 +729,115 @@ try {
       await setDisplayMode('sidebar');
     }
   });
+  // Mirrors tests/e2e/incognito.mjs. The real sidebar is out of WebDriver's reach, so the
+  // private window's panel runs as a tab in that window; it scopes itself the same way.
+  await check(
+    'incognito: panels stay per-window and private URLs never reach storage.local',
+    async () => {
+      const SECRET = 'incognito-secret';
+      const home = await driver.getWindowHandle();
+      await driver.get(PANEL);
+      const priv = await inPanel(
+        async (panel, base) => {
+          const w = await browser.windows.create({
+            incognito: true,
+            url: [`${base}#incognito-secret-0`, `${base}#incognito-secret-1`, panel],
+          });
+          await new Promise((r) => setTimeout(r, 2000));
+          const tabs = (await browser.tabs.query({ windowId: w.id })).sort(
+            (a, b) => a.index - b.index,
+          );
+          const me = await browser.tabs.getCurrent();
+          await browser.windows.update(me.windowId, { focused: true });
+          return {
+            win: w.id,
+            tabs: tabs.map((t) => t.id),
+            allowed: await browser.extension.isAllowedIncognitoAccess(),
+          };
+        },
+        PANEL,
+        `http://127.0.0.1:${port}/`,
+      );
+      try {
+        assert.equal(priv.allowed, true, 'allowed in private windows');
+        const rowsHere = () =>
+          driver.executeScript(
+            "return [...document.querySelectorAll('[id^=vc-row-t]')].map((e) => Number(e.id.slice(8)))",
+          );
+        // The normal panel lists none of the private tabs.
+        await driver.get(PANEL);
+        const normal = await waitFor(async () => {
+          const r = await rowsHere();
+          return r.length ? r : null;
+        });
+        assert.ok(!normal.some((id) => priv.tabs.includes(id)), `normal panel: ${normal}`);
+        // The private window's panel lists exactly its own tabs.
+        let found = null;
+        for (const h of await driver.getAllWindowHandles()) {
+          await driver.switchTo().window(h);
+          if (h !== home && (await driver.getCurrentUrl()).startsWith(PANEL)) found = h;
+          if (found) break;
+        }
+        assert.ok(found, 'reached the private panel tab');
+        assert.equal(
+          await driver.executeAsyncScript(
+            'browser.windows.getCurrent().then((w) => arguments[0](w.incognito));',
+          ),
+          true,
+        );
+        const inc = await waitFor(async () => {
+          const r = await rowsHere();
+          return r.length === priv.tabs.length ? r : null;
+        });
+        assert.deepEqual(inc, priv.tabs);
+        // A Staple made in the private window, through that panel's own connection.
+        await driver.executeAsyncScript(
+          `const done = arguments[2];
+         const port = browser.runtime.connect({ name: 'vc-panel' });
+         port.postMessage({ type: 'subscribe', windowId: arguments[0] });
+         setTimeout(() => {
+           port.postMessage({ type: 'pinTabs', tabIds: [arguments[1]], windowId: arguments[0], dest: { zone: 'essentials', index: 0 } });
+           setTimeout(done, 1500);
+         }, 500);`,
+          priv.win,
+          priv.tabs[1],
+        );
+        await waitFor(
+          async () =>
+            (await driver.executeScript(
+              "return document.querySelectorAll('[role=option]').length",
+            )) === 1,
+        );
+        const store = () =>
+          driver.executeAsyncScript(
+            'Promise.all([browser.storage.local.get(null), browser.storage.session.get(null)]).then((v) => arguments[0](v.map((x) => JSON.stringify(x))));',
+          );
+        const [local, session] = await store();
+        assert.equal(
+          await driver.executeAsyncScript(
+            'browser.tabs.get(arguments[0]).then((t) => arguments[1](t.pinned));',
+            priv.tabs[1],
+          ),
+          true,
+          'the Staple is a pinned private tab',
+        );
+        assert.ok(!local.includes(SECRET), 'storage.local holds no private URL');
+        assert.ok(session.includes(SECRET), 'the private layout lives in storage.session only');
+        await driver.switchTo().window(home);
+        await inPanel((w) => browser.windows.remove(w), priv.win);
+        await driver.sleep(1500);
+        const [after] = await store();
+        assert.ok(!after.includes(SECRET), 'after closing it, storage.local still holds none');
+      } finally {
+        await driver
+          .switchTo()
+          .window(home)
+          .catch(() => {});
+        await driver.get(PANEL);
+        await inPanel((w) => browser.windows.remove(w).catch(() => {}), priv.win);
+      }
+    },
+  );
   // Feature checks below mirror tests/e2e/*.mjs. Each one removes what it created.
   const tabRow = (id) =>
     driver.executeScript(
@@ -743,6 +852,33 @@ try {
       ids.filter((x) => x !== undefined),
     );
 
+  // Mirrors tests/e2e/reconnect.mjs: the background is stopped at several moments while the
+  // panel loads; each time the panel must reconnect and list a tab opened after the stop.
+  await check('reconnect: the panel recovers when the background stops mid-load', async () => {
+    const opened = [];
+    try {
+      for (const delay of [0, 50, 150, 400, 1000]) {
+        await driver.get(PANEL);
+        await driver.sleep(delay);
+        const r = await inChrome('await ext.terminateBackground(); return 1;');
+        assert.equal(r, 1, `terminate: ${r?.error}`);
+        const id = await inPanel(
+          // At the top of the list: the virtual list only renders rows in view.
+          async (u) => (await browser.tabs.create({ url: u, active: false, index: 0 })).id,
+          `http://127.0.0.1:${port}/#reconnect-${delay}`,
+        );
+        opened.push(id);
+        await waitFor(
+          () =>
+            driver.executeScript('return !!document.getElementById(arguments[0])', `vc-row-t${id}`),
+          15000,
+        );
+      }
+    } finally {
+      await driver.get(PANEL);
+      await closeTabs(opened);
+    }
+  });
   await check('backup file restores its window setup, which can then be deleted', async () => {
     await driver.get(PANEL);
     const file = path.join(tmpdir(), `vc-smoke-backup-${process.pid}.json`);

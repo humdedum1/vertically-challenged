@@ -87,7 +87,11 @@ try {
   // Install the unpacked directory: Firefox 140 can't load web-accessible files (frames,
   // scripting `files`) from the zipped temporary .xpi that installAddon() builds.
   await driver.execute(
-    new Command('install addon').setParameter('path', EXT).setParameter('temporary', true),
+    new Command('install addon')
+      .setParameter('path', EXT)
+      .setParameter('temporary', true)
+      // Allowed in private windows, so the incognito checks below have private data to refuse.
+      .setParameter('allowPrivateBrowsing', true),
   );
   const fixtures = [];
   for (const p of ['a', 'b']) {
@@ -619,6 +623,109 @@ try {
     } finally {
       await driver.switchTo().defaultContent();
       await driver.get(PANEL);
+      await setDisplayMode('sidebar');
+    }
+  });
+  await check(
+    'popup mode: recently closed restores through the relay; unknown ids are refused',
+    async () => {
+      const url = `http://127.0.0.1:${port}/?closed-in-popup`;
+      await driver.get(PANEL);
+      await setDisplayMode('popup');
+      await inPanel(async (u) => {
+        const t = await browser.tabs.create({ url: u, active: false });
+        await new Promise((r) => setTimeout(r, 800));
+        await browser.tabs.remove(t.id);
+      }, url);
+      await driver.sleep(1000);
+      await driver.get(`http://127.0.0.1:${port}/`);
+      await grantAllUrls(true);
+      try {
+        await clickToolbar();
+        await framedRows();
+        const bogus = await driver.executeAsyncScript(
+          `browser.runtime.sendMessage({ type: 'relay', method: 'sessions.restore', args: ['no-such-session'] }).then(arguments[0]);`,
+        );
+        assert.equal(bogus.ok, false);
+        await waitFor(() =>
+          driver.executeScript(
+            `const b = [...document.querySelectorAll('#vc-recently-closed button.item')]
+               .find((e) => e.title.includes(arguments[0]));
+             b?.click(); return !!b;`,
+            url,
+          ),
+        );
+        await driver.switchTo().defaultContent();
+        await driver.get(PANEL);
+        await waitFor(() =>
+          inPanel(async (u) => (await browser.tabs.query({})).some((t) => t.url === u), url),
+        );
+      } finally {
+        await driver.switchTo().defaultContent();
+        await driver.get(PANEL);
+        await inPanel(async (u) => {
+          // Match patterns can't carry a port, so filter by hand.
+          for (const t of await browser.tabs.query({}))
+            if (t.url === u) await browser.tabs.remove(t.id);
+          // The restore activated its tab; give focus back to the driver's tab.
+          await browser.tabs.update((await browser.tabs.getCurrent()).id, { active: true });
+        }, url);
+        await grantAllUrls(false);
+        await setDisplayMode('sidebar');
+      }
+    },
+  );
+  await check('popup mode: a private closed tab is hidden from the popup and refused', async () => {
+    const url = `http://127.0.0.1:${port}/?closed-in-private`;
+    await driver.get(PANEL);
+    await setDisplayMode('popup');
+    const priv = await inPanel(async (u) => {
+      const w = await browser.windows.create({ incognito: true, url: ['about:blank', u] });
+      await new Promise((r) => setTimeout(r, 1500));
+      const t = (await browser.tabs.query({ windowId: w.id })).find((x) => x.url === u);
+      await browser.tabs.remove(t.id);
+      await new Promise((r) => setTimeout(r, 800));
+      const e = (await browser.sessions.getRecentlyClosed()).find((x) => x.tab?.url === u);
+      // inChrome() acts on the most recent window: put the driver's normal window back on top.
+      const me = await browser.tabs.getCurrent();
+      await browser.windows.update(me.windowId, { focused: true });
+      await new Promise((r) => setTimeout(r, 800));
+      return { win: w.id, id: e?.tab?.sessionId, incognito: e?.tab?.incognito };
+    }, url);
+    try {
+      // The background can see it: proves there is a private entry to leak.
+      assert.ok(priv.id, 'private closed tab is listed to the extension');
+      assert.equal(priv.incognito, true);
+      await driver.get(`http://127.0.0.1:${port}/`);
+      await grantAllUrls(true);
+      await clickToolbar();
+      await framedRows();
+      const relay = (method, args) =>
+        driver.executeAsyncScript(
+          'browser.runtime.sendMessage({ type: "relay", method: arguments[0], args: arguments[1] }).then(arguments[2]);',
+          method,
+          args,
+        );
+      const listed = await relay('sessions.getRecentlyClosed', []);
+      assert.equal(listed.ok, true);
+      assert.ok(!JSON.stringify(listed.value).includes('closed-in-private'), 'hidden from popup');
+      const restored = await relay('sessions.restore', [priv.id]);
+      assert.equal(restored.ok, false);
+      await driver.switchTo().defaultContent();
+      await driver.get(PANEL);
+      assert.equal(
+        await inPanel(async (u) => (await browser.tabs.query({})).some((t) => t.url === u), url),
+        false,
+        'nothing was restored',
+      );
+    } finally {
+      await driver.switchTo().defaultContent();
+      await driver.get(PANEL);
+      await inPanel(async (w) => {
+        await browser.windows.remove(w).catch(() => {});
+        await browser.tabs.update((await browser.tabs.getCurrent()).id, { active: true });
+      }, priv.win);
+      await grantAllUrls(false);
       await setDisplayMode('sidebar');
     }
   });

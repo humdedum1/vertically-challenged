@@ -3,9 +3,10 @@
 //   FIREFOX_BIN=/path/to/firefox node tests/e2e-firefox/smoke.mjs [extension dir]
 // geckodriver is fetched by selenium-manager.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Browser, Builder, By, Key } from 'selenium-webdriver';
 import firefox from 'selenium-webdriver/firefox.js';
@@ -619,6 +620,295 @@ try {
       await driver.switchTo().defaultContent();
       await driver.get(PANEL);
       await setDisplayMode('sidebar');
+    }
+  });
+  // Feature checks below mirror tests/e2e/*.mjs. Each one removes what it created.
+  const tabRow = (id) =>
+    driver.executeScript(
+      "const e = document.getElementById('vc-row-t' + arguments[0]); return e ? e.getAttribute('aria-level') + ' ' + e.classList.contains('discarded') : null;",
+      id,
+    );
+  const closeTabs = (ids) =>
+    inPanel(
+      async (list) => {
+        for (const id of list) await browser.tabs.remove(id).catch(() => {});
+      },
+      ids.filter((x) => x !== undefined),
+    );
+
+  await check('backup file restores its window setup, which can then be deleted', async () => {
+    await driver.get(PANEL);
+    const file = path.join(tmpdir(), `vc-smoke-backup-${process.pid}.json`);
+    const item = (id, host) => ({
+      kind: 'item',
+      id,
+      homeUrl: `http://${host}/`,
+      lastUrl: `http://${host}/page`,
+      title: host,
+      tabId: 999999,
+    });
+    const source = {
+      id: 'lsmokebkup1',
+      name: 'Smoke backup',
+      incognito: false,
+      lastUsed: 1,
+      collapsed: [],
+      essentials: [],
+      pinned: [
+        {
+          kind: 'folder',
+          id: 'work',
+          name: 'Work',
+          icon: 'work',
+          collapsed: false,
+          children: [item('docs', '127.0.0.1')],
+        },
+      ],
+    };
+    writeFileSync(
+      file,
+      JSON.stringify({
+        format: 'vertically-challenged',
+        kind: 'backup',
+        version: 1,
+        themes: [],
+        layouts: [source],
+      }),
+    );
+    const findSetup = () =>
+      inPanel(
+        async () =>
+          (await browser.storage.local.get('layouts')).layouts?.layouts?.find(
+            (l) => l.name === 'Smoke backup',
+          ) ?? null,
+      );
+    try {
+      await (
+        await waitFor(() => driver.findElements(By.css('#vc-tab-settings')).then((t) => t[0]))
+      ).click();
+      await (
+        await waitFor(() =>
+          driver.findElements(By.xpath("//summary[contains(., 'Data')]")).then((t) => t[0]),
+        )
+      ).click();
+      await (await driver.findElement(By.css('[aria-label="Backup file"]'))).sendKeys(file);
+      // The confirm step only renders once the file has been read.
+      await (
+        await waitFor(() =>
+          driver
+            .findElements(
+              By.xpath(
+                "//*[@role='group'][@aria-label='Restore backup']//button[normalize-space()='Apply']",
+              ),
+            )
+            .then((t) => t[0]),
+        )
+      ).click();
+      await waitFor(async () =>
+        (await driver.findElement(By.css('body')).getText()).includes(
+          'Restored settings, 0 themes and 1 pinned layout in Window setups.',
+        ),
+      );
+      const restored = await waitFor(findSetup);
+      assert.equal(
+        restored.pinned[0].children[0].homeUrl,
+        'http://127.0.0.1/',
+        'home URL lost in restore',
+      );
+      assert.notEqual(restored.id, source.id, 'restore kept the backup id');
+    } finally {
+      rmSync(file, { force: true });
+      const setup = await findSetup();
+      if (setup) await panelCmd({ type: 'setupDelete', setupId: setup.id });
+      // The panel remembers its tab; leave Settings so later checks find the tab list.
+      await driver.get(PANEL);
+      await (
+        await waitFor(() => driver.findElements(By.css('#vc-tab-tabs')).then((t) => t[0]))
+      ).click();
+    }
+  });
+
+  await check('snoozing a tab closes it and records it; waking it reopens it', async () => {
+    await driver.get(PANEL);
+    const url = `http://127.0.0.1:${port}/snooze-target`;
+    const id = await inPanel(
+      async (u) => (await browser.tabs.create({ url: u, active: false })).id,
+      url,
+    );
+    const stored = () =>
+      inPanel(
+        async (u) =>
+          ((await browser.storage.local.get('vc:snoozed'))['vc:snoozed'] ?? []).find(
+            (s) => s.url === u,
+          ) ?? null,
+        url,
+      );
+    try {
+      await driver.sleep(1200);
+      await panelCmd({ type: 'snooze', tabIds: [id], wakeAt: Date.now() + 3_600_000 });
+      const entry = await waitFor(stored);
+      assert.equal(
+        await inPanel(
+          (t) =>
+            browser.tabs.get(t).then(
+              () => true,
+              () => false,
+            ),
+          id,
+        ),
+        false,
+        'the snoozed tab is still open',
+      );
+      await panelCmd({ type: 'wakeSnoozed', id: entry.id });
+      await waitFor(() =>
+        inPanel(
+          async (u) => (await browser.tabs.query({})).some((t) => (t.pendingUrl || t.url) === u),
+          url,
+        ),
+      );
+      assert.equal(await stored(), null, 'the entry was not cleared on wake');
+    } finally {
+      const left = await stored();
+      if (left) await panelCmd({ type: 'deleteSnoozed', id: left.id });
+      await inPanel(async (u) => {
+        for (const t of await browser.tabs.query({}))
+          if ((t.pendingUrl || t.url) === u) await browser.tabs.remove(t.id);
+      }, url);
+    }
+  });
+
+  await check('discarding a tab through the extension unloads it in Firefox', async () => {
+    await driver.get(PANEL);
+    const id = await inPanel(
+      async (u) => (await browser.tabs.create({ url: u, active: false })).id,
+      `http://127.0.0.1:${port}/discard-target`,
+    );
+    try {
+      await driver.sleep(1000);
+      await panelCmd({ type: 'discard', tabIds: [id] });
+      await waitFor(() => inPanel((t) => browser.tabs.get(t).then((x) => x.discarded), id));
+    } finally {
+      await closeTabs([id]);
+    }
+  });
+
+  await check('a saved window with a tab group restores the group with its title', async () => {
+    await driver.get(PANEL);
+    const base = `http://127.0.0.1:${port}`;
+    const name = 'vc-smoke-groups';
+    // A window of its own, so the session holds only these two tabs.
+    const win = await inPanel(async (b) => {
+      const w = await browser.windows.create({ url: `${b}/group-a`, focused: false });
+      await browser.tabs.create({ windowId: w.id, url: `${b}/group-b`, active: false });
+      const ids = (await browser.tabs.query({ windowId: w.id })).map((t) => t.id);
+      const gid = await browser.tabs.group({ tabIds: ids, createProperties: { windowId: w.id } });
+      await browser.tabGroups.update(gid, { title: 'vc-saved', color: 'green' });
+      // A new window's tabs reach the background's store a moment after they open.
+      await new Promise((r) => setTimeout(r, 3000));
+      return w.id;
+    }, base);
+    const sessionId = () =>
+      inPanel(async (n) => {
+        const { sessions = [] } = await browser.storage.local.get('sessions');
+        return sessions.find((s) => s.name === n)?.id ?? null;
+      }, name);
+    let sid = null;
+    let restored = null;
+    try {
+      // The background only saves windows that a panel port has subscribed to.
+      await inPanel(
+        async (wid, m) => {
+          const p = browser.runtime.connect({ name: 'vc-panel' });
+          p.postMessage({ type: 'subscribe', windowId: wid });
+          await new Promise((r) => setTimeout(r, 300));
+          p.postMessage({ ...m, windowId: wid });
+          await new Promise((r) => setTimeout(r, 800));
+          p.disconnect();
+        },
+        win,
+        { type: 'saveSession', scope: 'window', name },
+      );
+      sid = await waitFor(sessionId);
+      const before = await inPanel(async () => (await browser.windows.getAll()).map((w) => w.id));
+      await panelCmd({ type: 'restoreSession', id: sid, target: 'newWindow' });
+      restored = await waitFor(() =>
+        inPanel(
+          async (b, before) => {
+            for (const w of await browser.windows.getAll({ populate: true })) {
+              if (before.includes(w.id) || !w.tabs?.some((t) => t.url === `${b}/group-a`)) continue;
+              const groups = await browser.tabGroups.query({ windowId: w.id });
+              return groups.find((g) => g.title === 'vc-saved') ? w.id : null;
+            }
+            return null;
+          },
+          base,
+          before,
+        ),
+      );
+      assert.ok(restored, 'the restored window has no group titled vc-saved');
+    } finally {
+      for (const id of [win, restored])
+        if (id) await inPanel((w) => browser.windows.remove(w).catch(() => {}), id);
+      if (sid) await panelCmd({ type: 'deleteSession', id: sid });
+      await driver.get(PANEL);
+    }
+  });
+
+  await check('a tab opened from another tab nests under it in the panel', async () => {
+    await driver.get(PANEL);
+    const ids = await inPanel(async (b) => {
+      const parent = await browser.tabs.create({ url: `${b}/child-parent`, active: false });
+      const child = await browser.tabs.create({
+        url: `${b}/child-of`,
+        openerTabId: parent.id,
+        active: false,
+      });
+      // The panel draws only the rows in view; activating the parent scrolls its row into view.
+      await browser.tabs.update(parent.id, { active: true });
+      return { parent: parent.id, child: child.id, opener: child.openerTabId };
+    }, `http://127.0.0.1:${port}`);
+    try {
+      assert.equal(ids.opener, ids.parent, 'Firefox dropped openerTabId');
+      await waitFor(async () => (await tabRow(ids.parent))?.startsWith('1'));
+      await waitFor(async () => (await tabRow(ids.child))?.startsWith('2'));
+    } finally {
+      await closeTabs([ids.child, ids.parent]);
+    }
+  });
+
+  await check('an auto-group rule puts a new matching tab into its named group', async () => {
+    await driver.get(PANEL);
+    const rule = { host: `127.0.0.1:${port}`, path: '/vc-auto', action: 'group', group: 'vc-auto' };
+    const original = await inPanel(
+      async () => (await browser.storage.sync.get('settings')).settings ?? null,
+    );
+    let id;
+    try {
+      await inPanel(async (r) => {
+        const { settings } = await browser.storage.sync.get('settings');
+        await browser.storage.sync.set({
+          settings: { ...(settings ?? {}), rules: [...(settings?.rules ?? []), r] },
+        });
+      }, rule);
+      await driver.sleep(1000);
+      id = await inPanel(
+        async (u) => (await browser.tabs.create({ url: u, active: false })).id,
+        `http://127.0.0.1:${port}/vc-auto-target`,
+      );
+      const group = await waitFor(() =>
+        inPanel(async (t) => {
+          const tab = await browser.tabs.get(t);
+          if (tab.groupId === -1) return null;
+          return (await browser.tabGroups.get(tab.groupId)).title;
+        }, id),
+      );
+      assert.equal(group, 'vc-auto');
+    } finally {
+      await closeTabs([id]);
+      await inPanel(async (s) => {
+        if (s === null) await browser.storage.sync.remove('settings');
+        else await browser.storage.sync.set({ settings: s });
+      }, original);
     }
   });
 } finally {

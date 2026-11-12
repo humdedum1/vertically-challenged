@@ -82,8 +82,8 @@ export function planRelay(
 }
 
 interface SessionEntry {
-  tab?: { incognito?: boolean };
-  window?: { incognito?: boolean };
+  tab?: { sessionId?: string; incognito?: boolean };
+  window?: { sessionId?: string; incognito?: boolean };
 }
 const isPrivate = (e: SessionEntry | undefined) => !!(e?.tab?.incognito || e?.window?.incognito);
 
@@ -106,6 +106,12 @@ export async function runRelay(plan: Plan, senderWindowId: number): Promise<Rela
         return { ok: true, value: list.filter((e) => !isPrivate(e)) };
       }
       case 'sessions.restore': {
+        // Refuse before restoring: only sessions the popup could have seen, never private ones.
+        const list: SessionEntry[] = await b.sessions.getRecentlyClosed();
+        const entry = list.find((e) => (e.tab ?? e.window)?.sessionId === args[0]);
+        if (!entry || isPrivate(entry))
+          return { ok: false, error: 'Relay refused: unknown or private session' };
+        // Backstop for a list that changed between the check and the restore.
         const restored: SessionEntry = await b.sessions.restore(...args);
         if (isPrivate(restored)) {
           if (restored.window) await b.windows.remove((restored.window as { id: number }).id);

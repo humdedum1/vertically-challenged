@@ -106,7 +106,28 @@ describe('runRelay', () => {
     const r = await runRelay({ method: 'sessions.getRecentlyClosed', args: [] }, 7);
     expect(r).toEqual({ ok: true, value: [{ tab: { incognito: false } }] });
   });
-  it('closes a private session restore and refuses', async () => {
+  it('refuses a private session without restoring it', async () => {
+    api.sessions.getRecentlyClosed.mockResolvedValue([
+      { tab: { sessionId: '1', incognito: true } },
+      { window: { sessionId: '2', incognito: true } },
+    ]);
+    expect((await runRelay({ method: 'sessions.restore', args: ['1'] }, 7)).ok).toBe(false);
+    expect((await runRelay({ method: 'sessions.restore', args: ['2'] }, 7)).ok).toBe(false);
+    expect(api.sessions.restore).not.toHaveBeenCalled();
+  });
+  it('refuses a session id that is not recently closed', async () => {
+    api.sessions.getRecentlyClosed.mockResolvedValue([]);
+    expect((await runRelay({ method: 'sessions.restore', args: ['9'] }, 7)).ok).toBe(false);
+    expect(api.sessions.restore).not.toHaveBeenCalled();
+  });
+  it('restores a listed normal session', async () => {
+    api.sessions.getRecentlyClosed.mockResolvedValue([{ tab: { sessionId: '1' } }]);
+    api.sessions.restore.mockResolvedValue({ tab: { id: 4 } });
+    const r = await runRelay({ method: 'sessions.restore', args: ['1'] }, 7);
+    expect(r).toEqual({ ok: true, value: { tab: { id: 4 } } });
+  });
+  it('closes a restore that still comes back private and refuses', async () => {
+    api.sessions.getRecentlyClosed.mockResolvedValue([{ tab: { sessionId: '1' } }]);
     api.sessions.restore.mockResolvedValue({ tab: { id: 4, incognito: true } });
     const r = await runRelay({ method: 'sessions.restore', args: ['1'] }, 7);
     expect(r.ok).toBe(false);

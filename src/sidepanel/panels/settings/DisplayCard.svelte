@@ -1,6 +1,7 @@
 <script lang="ts">
 import type { DisplayMode } from '../../../settings/schema';
 import { BROWSER, FIREFOX } from '../../../shared/browser-urls';
+import { FRAMED, FRAMED_NOTE } from '../../api';
 import Field from '../../components/controls/Field.svelte';
 import SegmentedControl from '../../components/controls/SegmentedControl.svelte';
 import Toggle from '../../components/controls/Toggle.svelte';
@@ -78,10 +79,8 @@ async function setOpenOnLaunch(on: boolean): Promise<void> {
       <p class="muted">
         Firefox doesn’t let extensions open the sidebar at launch. To open the panel at launch, choose Window.
       </p>
-    {:else if !browser.permissions && mode === 'popup'}
-      <p class="muted">
-        Change this from the sidebar or the panel window: Firefox doesn’t allow it in the in-page popup.
-      </p>
+    {:else if FRAMED && mode === 'popup'}
+      <p class="muted">{FRAMED_NOTE}</p>
     {:else}
       <Toggle
         label="Open on browser launch"

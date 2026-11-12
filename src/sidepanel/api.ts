@@ -7,6 +7,11 @@ import type {
   RelayResponse,
 } from '../shared/relay';
 
+/** True in the framed Firefox popup, which has no permissions API, so grants can't be requested. */
+export const FRAMED = !browser.permissions;
+export const FRAMED_NOTE =
+  'Change this from the sidebar or the panel window: Firefox doesn’t allow it in the in-page popup.';
+
 // The framed Firefox popup has no tabs/bookmarks/history/sessions APIs, so it asks the background.
 function call<T>(method: RelayMethod, args: unknown[]): Promise<T> {
   if (browser.tabs) {

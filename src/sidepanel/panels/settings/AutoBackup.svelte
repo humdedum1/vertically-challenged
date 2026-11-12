@@ -20,6 +20,7 @@ import {
 } from '../../../backup/dropbox';
 import { isPlainHttp } from '../../../backup/targets';
 import { FIREFOX } from '../../../shared/browser-urls';
+import { FRAMED, FRAMED_NOTE } from '../../api';
 import Button from '../../components/controls/Button.svelte';
 import Field from '../../components/controls/Field.svelte';
 import Select from '../../components/controls/Select.svelte';
@@ -122,15 +123,11 @@ const insecure = $derived(
     (cfg.target === 's3' && isPlainHttp(cfg.s3.endpoint)),
 );
 const remote = $derived(cfg.target !== 'downloads');
-// The framed Firefox popup has no permissions API, so no backup grant can be requested there.
-const framed = !browser.permissions;
-const FRAMED_COPY =
-  'Change this from the sidebar or the panel window: Firefox doesn’t allow it in the in-page popup.';
 </script>
 
 <div class="auto" data-sf-group>
-  {#if framed}
-    <p class="muted">{FRAMED_COPY}</p>
+  {#if FRAMED}
+    <p class="hint">{FRAMED_NOTE}</p>
   {:else}
     <Field label="Where to save" for="vc-backup-target">
       <Select id="vc-backup-target" value={cfg.target} onchange={(v) => (cfg.target = v as TargetKind)}>
@@ -161,7 +158,7 @@ const FRAMED_COPY =
     <Field label="Dropbox app key" for="vc-db-key">
       <TextInput id="vc-db-key" label="Dropbox app key" mono value={cfg.dropbox.appKey} oninput={(v) => (cfg.dropbox.appKey = v)} />
     </Field>
-    {#if !framed}
+    {#if !FRAMED}
       <div class="row">
         <Button onclick={connectDropbox}>{cfg.dropbox.refreshToken ? 'Reconnect Dropbox' : 'Connect Dropbox'}</Button>
         <span class="hint">{cfg.dropbox.refreshToken ? 'Connected' : 'Not connected'}</span>
@@ -224,7 +221,7 @@ const FRAMED_COPY =
     </p>
   </details>
 
-  {#if !framed}
+  {#if !FRAMED}
     <div class="row">
       <Button variant="primary" onclick={() => save(cfg)}>Save schedule</Button>
       <Button disabled={running} onclick={runNow}>{running ? 'Backing up…' : 'Back up now'}</Button>
@@ -238,7 +235,6 @@ const FRAMED_COPY =
   .auto { display: flex; flex-direction: column; gap: var(--gap); }
   .row { display: flex; flex-wrap: wrap; gap: 8px; }
   .hint, .error { margin: 0; font-size: calc(var(--font-size) - 1px); color: var(--mOnSurfaceVariant); }
-  .muted { margin: 0; font-size: calc(var(--font-size) - 1px); color: var(--mOnSurfaceVariant); }
   .error { color: var(--mError); }
   .error:empty { display: none; }
   .how summary { cursor: pointer; font-size: calc(var(--font-size) - 1px); color: var(--mOnSurfaceVariant); }

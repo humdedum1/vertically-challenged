@@ -24,6 +24,8 @@ import {
   parseBackupLayouts,
   parseLayoutStore,
   type WindowLayout,
+  type WindowLook,
+  withLook,
 } from '../../shared/layout';
 import type { SetupSummary, WorkerMessage } from '../../shared/protocol';
 import { type SyncWorkspace, savedFromLayout } from '../../shared/sync';
@@ -62,6 +64,8 @@ export interface RestoredLayout {
   windowId: number;
   essentials: RestoredItem[];
   pinned: RestoredNode[];
+  /** The saved window's name and appearance; applied only where the window has none. */
+  look?: WindowLook;
 }
 
 export interface PinManagerDeps {
@@ -871,12 +875,16 @@ export class PinManager {
     };
     const essentials = r.essentials.map(bind).filter((i): i is PinItem => i !== null);
     const pinned = walk(r.pinned);
-    if (!essentials.length && !pinned.length) return;
-    this.edit(r.windowId, (l) => ({
-      ...l,
-      essentials: [...l.essentials, ...essentials],
-      pinned: [...l.pinned, ...pinned],
-    }));
+    if (!essentials.length && !pinned.length && !r.look) return;
+    this.edit(r.windowId, (l) => {
+      const next = withLook(l, r.look);
+      if (!essentials.length && !pinned.length) return next;
+      return {
+        ...next,
+        essentials: [...l.essentials, ...essentials],
+        pinned: [...l.pinned, ...pinned],
+      };
+    });
   }
 
   /**

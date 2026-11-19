@@ -23,6 +23,22 @@ describe('captureWindow', () => {
     });
   });
 
+  it('saves the window name and appearance, even without pinned tabs', () => {
+    const l: WindowLayout = {
+      id: 'laaaaaaaaaa',
+      name: 'Research',
+      accent: 'green',
+      essentials: [],
+      pinned: [],
+      collapsed: [],
+      incognito: false,
+      lastUsed: 0,
+    };
+    const w = captureWindow([tab(1, { url: 'https://a.com/' })], [], OWN, l);
+    expect(w.look).toEqual({ name: 'Research', accent: 'green' });
+    expect(w).not.toHaveProperty('layout');
+  });
+
   it('skips own-origin and empty URLs', () => {
     const w = captureWindow(
       [
@@ -169,6 +185,20 @@ describe('parseSessions', () => {
 
   it('round-trips a valid session', () => {
     expect(parseSessions([good()])).toEqual([good()]);
+  });
+
+  it('keeps a valid window look and drops invalid parts of it', () => {
+    const w = good().windows[0];
+    const [s] = parseSessions([
+      good({
+        windows: [
+          { ...w, look: { name: '  Work  ', themeId: 'BAD ID', icon: 'code', accent: 'pink' } },
+        ],
+      }),
+    ]);
+    expect(s?.windows[0]?.look).toEqual({ name: 'Work', icon: 'code', accent: 'pink' });
+    // Sessions saved before `look` existed load as they always did.
+    expect(parseSessions([good()])[0]?.windows[0]).not.toHaveProperty('look');
   });
 
   it('non-array -> []', () => {

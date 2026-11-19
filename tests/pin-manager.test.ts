@@ -694,6 +694,32 @@ describe('PinManager restoreLayout', () => {
     ).toEqual([10, 20, 21, 22, 99].sort());
   });
 
+  it('names an unnamed window from the restored look, never renames a named one', async () => {
+    const t = setup({
+      windows: { 1: [tab(10, { windowId: 1 })], 2: [tab(20, { windowId: 2 })] },
+      local: {
+        [LAYOUTS_KEY]: stored(
+          [layout(2, [], { name: 'Mine' })],
+          [{ windowId: 2, layoutId: ID(2) }],
+        ),
+      },
+      session: { [ALIVE_KEY]: true },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+
+    const look = { name: 'Research', accent: 'green' as const };
+    for (const windowId of [1, 2])
+      await pins.restoreLayout(async (report) =>
+        report({ windowId, essentials: [], pinned: [], look }),
+      );
+    await settle();
+
+    expect(pins.layoutOf(1)).toMatchObject({ name: 'Research', accent: 'green' });
+    expect(pins.layoutOf(2)).toMatchObject({ name: 'Mine', accent: 'green' });
+  });
+
   it('stops creating items at MAX_ITEMS; the rest stay plain tabs', async () => {
     const full = layout(
       1,

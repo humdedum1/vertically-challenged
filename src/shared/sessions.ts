@@ -2,11 +2,14 @@ import {
   FOLDER_ICONS,
   type FolderIcon,
   isDebugUrl,
+  lookOf,
   MAX_FOLDER_DEPTH,
   MAX_ITEMS,
   MAX_NAME,
   type PinNode,
+  parseLook,
   type WindowLayout,
+  type WindowLook,
 } from './layout';
 import { GROUP_COLORS, type GroupColor, type GroupInfo, type TabInfo } from './types';
 
@@ -48,6 +51,11 @@ export interface SavedWindow {
   tabs: SavedTab[];
   groups: SavedGroup[];
   layout?: SavedLayout;
+  /**
+   * The window's name and appearance. Optional and ignored by older versions; absent in
+   * sessions saved before it existed, which restore unnamed as they always did.
+   */
+  look?: WindowLook;
 }
 
 export interface Session {
@@ -97,9 +105,13 @@ export function captureWindow(
     out.push({ url: t.url, title: t.title, pinned: t.pinned, group });
   }
   const savedLayout = layout && captureLayout(layout, out, indexOf);
-  return savedLayout
-    ? { tabs: out, groups: saved, layout: savedLayout }
-    : { tabs: out, groups: saved };
+  const look = layout && lookOf(layout);
+  return {
+    tabs: out,
+    groups: saved,
+    ...(savedLayout ? { layout: savedLayout } : {}),
+    ...(look && Object.keys(look).length ? { look } : {}),
+  };
 }
 
 /** The layout restricted to items whose pinned tab was captured; null when nothing is left. */
@@ -226,7 +238,8 @@ export function parseSessions(raw: unknown): Session[] {
       }
       if (!tabs.length) continue;
       const layout = parseLayout(w.layout, tabs, remap);
-      windows.push(layout ? { tabs, groups, layout } : { tabs, groups });
+      const look = parseLook(w.look);
+      windows.push({ tabs, groups, ...(layout ? { layout } : {}), ...(look ? { look } : {}) });
     }
     if (!windows.length) continue;
     out.push({

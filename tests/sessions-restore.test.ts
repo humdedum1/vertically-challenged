@@ -96,4 +96,31 @@ describe('restoreSession with layouts', () => {
       'https://d.com/',
     ]);
   });
+
+  it('reports the name of a window that had no pinned tabs', async () => {
+    h.sessions = [
+      {
+        id: 's2',
+        name: 'S',
+        createdAt: 1,
+        windows: [
+          {
+            groups: [],
+            tabs: [{ url: 'https://c.com/', title: 'C', pinned: false, group: null }],
+            look: { name: 'Research' },
+          },
+        ],
+      },
+    ];
+    const bound: RestoredLayout[] = [];
+    await restoreSession('s2', 'newWindow', 1, false, {
+      layoutOf: () => {
+        throw new Error('unused');
+      },
+      restoreLayout: (run) => run((r) => bound.push(r)),
+    });
+    expect(bound).toEqual([
+      { windowId: 5, essentials: [], pinned: [], look: { name: 'Research' } },
+    ]);
+  });
 });

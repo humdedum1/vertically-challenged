@@ -109,6 +109,8 @@ export type PanelMessage =
     }
   | { type: 'folderDelete'; windowId: number; folderId: string; keepTabs: boolean }
   | { type: 'folderSuspend'; windowId: number; folderId: string }
+  /** Opens a pinned new-tab page as the folder's last item. */
+  | { type: 'folderNewTab'; windowId: number; folderId: string }
   /** Closes the window's unpinned tabs, grouped ones included, except the active tab. */
   | { type: 'clearTabs'; windowId: number }
   | { type: 'renameWindow'; windowId: number; name: string | null }
@@ -183,6 +185,7 @@ export type PinMessage = Extract<
       | 'folderUpdate'
       | 'folderDelete'
       | 'folderSuspend'
+      | 'folderNewTab'
       | 'clearTabs'
       | 'renameWindow'
       | 'setWindowLook'
@@ -206,6 +209,7 @@ const PIN_TYPES = new Set<string>([
   'folderUpdate',
   'folderDelete',
   'folderSuspend',
+  'folderNewTab',
   'clearTabs',
   'renameWindow',
   'setWindowLook',
@@ -354,6 +358,10 @@ function parsePinMessage(m: Record<string, unknown>): PinMessage | null {
     case 'folderSuspend':
       return isId(m.windowId) && isNodeId(m.folderId)
         ? { type: 'folderSuspend', windowId: m.windowId, folderId: m.folderId }
+        : null;
+    case 'folderNewTab':
+      return isId(m.windowId) && isNodeId(m.folderId)
+        ? { type: 'folderNewTab', windowId: m.windowId, folderId: m.folderId }
         : null;
     case 'clearTabs':
       return isId(m.windowId) ? { type: 'clearTabs', windowId: m.windowId } : null;

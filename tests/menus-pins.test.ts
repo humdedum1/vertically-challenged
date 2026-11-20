@@ -70,6 +70,7 @@ describe('pinMenu', () => {
       essentialsCount: 5,
       send: r.send,
       onNewFolder,
+      itemOfTab: (t) => (t.pinned ? { windowId: t.windowId, itemId: `i${t.id}` } : null),
     });
     return { items, ...r, onNewFolder };
   };
@@ -82,6 +83,22 @@ describe('pinMenu', () => {
     expect(sent).toEqual([
       { type: 'pinTabs', tabIds: [7, 8, 9], windowId: 1, dest: { zone: 'essentials', index: 5 } },
       { type: 'autoGroup', windowId: 1 },
+    ]);
+  });
+
+  it('closes the whole selection: pinned rows with their tiles, other tabs plainly', () => {
+    const selected = [
+      tab(7, { pinned: true }),
+      tab(8, { pinned: true, windowId: 2 }),
+      tab(9),
+      tab(10),
+    ];
+    const { items, sent } = build(item(), selected[0] ?? null, 2, selected);
+    find(items, 'Close tabs (4)').onselect();
+    expect(sent).toEqual([
+      { type: 'pinRemove', windowId: 1, itemId: 'i7', mode: 'close' },
+      { type: 'pinRemove', windowId: 2, itemId: 'i8', mode: 'close' },
+      { type: 'close', tabIds: [9, 10] },
     ]);
   });
 

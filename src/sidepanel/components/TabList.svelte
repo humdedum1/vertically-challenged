@@ -33,7 +33,13 @@ import {
   type MouseSettings,
   type ShortcutAction,
 } from '../../settings/schema';
-import { flattenItems, type PinItem, type PinNode, type WindowLayout } from '../../shared/layout';
+import {
+  emptyLayout,
+  flattenItems,
+  type PinItem,
+  type PinNode,
+  type WindowLayout,
+} from '../../shared/layout';
 import type { PanelMessage } from '../../shared/protocol';
 import type { GroupInfo, TabInfo } from '../../shared/types';
 import { activePathDepths } from '../model/active-path';
@@ -702,6 +708,12 @@ function openMenu(i: number, x: number, y: number): void {
         essentialsCount: layoutOf(row.windowId)?.essentials.length ?? 0,
         send,
         onNewFolder: () => expectFolder(row.windowId),
+        itemOfTab: (t) => {
+          const it = flattenItems(layoutOf(t.windowId) ?? emptyLayout(false)).find(
+            (i) => i.tabId === t.id,
+          );
+          return it ? { windowId: t.windowId, itemId: it.id } : null;
+        },
       }),
     };
     return;

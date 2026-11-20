@@ -579,9 +579,22 @@ export interface PinMenuContext {
   send: (msg: PanelMessage) => void;
   /** Called after "New folder" so the UI can open the name field once the folder appears. */
   onNewFolder: () => void;
+  /** The layout item a selected tab backs, if any, so closing the selection removes its row. */
+  itemOfTab: (tab: TabInfo) => { windowId: number; itemId: string } | null;
 }
 
 const NEW_FOLDER = 'New folder';
+
+/** "Close tab" over a selection: items go with their tabs (pinRemove), other tabs just close. */
+function closeSelection(c: PinMenuContext): void {
+  const plain: number[] = [];
+  for (const t of c.tabs) {
+    const it = c.itemOfTab(t);
+    if (it) c.send({ type: 'pinRemove', ...it, mode: 'close' });
+    else plain.push(t.id);
+  }
+  if (plain.length) c.send({ type: 'close', tabIds: plain });
+}
 
 export function pinMenu(c: PinMenuContext): MenuItem[] {
   const { item, tab, windowId } = c;
@@ -641,10 +654,13 @@ export function pinMenu(c: PinMenuContext): MenuItem[] {
     SEP,
     {
       type: 'item',
-      label: 'Close tab',
+      label: c.tabs.length > 1 ? `Close tabs (${c.tabs.length})` : 'Close tab',
       danger: true,
       disabled: tab === null,
-      onselect: () => c.send({ type: 'pinRemove', windowId, itemId, mode: 'close' }),
+      onselect: () =>
+        c.tabs.length > 1
+          ? closeSelection(c)
+          : c.send({ type: 'pinRemove', windowId, itemId, mode: 'close' }),
     },
   ];
 }

@@ -184,6 +184,8 @@ export class PinManager {
   >();
   /** Dormant items whose tab is being created; a second open of the same item is dropped. */
   private readonly opening = new Set<string>();
+  /** Tab id → the item a pass made dormant when that tab vanished; onReplaced may give it back. */
+  private readonly lost = new Map<number, string>();
 
   constructor(private readonly deps: PinManagerDeps) {
     this.loaded = this.load().catch((err: unknown) => {
@@ -711,12 +713,23 @@ export class PinManager {
   onReplaced(added: number, removed: number): void {
     void this.exclusive(() => {
       const changed = new Set<number>();
+      // A flush may have seen the new id first: the item went dormant (see `lost`) and the
+      // new tab was adopted as a second item. The original takes the tab back; the copy goes.
+      const lostItem = this.lost.get(removed);
+      this.lost.delete(removed);
       for (const [w, id] of this.bindings) {
-        const l = this.layouts.get(id);
-        if (!l || !flattenItems(l).some((i) => i.tabId === removed)) continue;
+        let l = this.layouts.get(id);
+        const own =
+          l &&
+          flattenItems(l).find(
+            (i) => i.tabId === removed || (i.id === lostItem && i.tabId === null),
+          );
+        if (!l || !own) continue;
+        for (const copy of flattenItems(l))
+          if (copy.tabId === added && copy.id !== own.id) l = removeItem(l, copy.id);
         this.layouts.set(
           id,
-          withTabIds(l, (i) => (i.tabId === removed ? added : i.tabId)),
+          withTabIds(l, (i) => (i.id === own.id ? added : i.tabId)),
         );
         changed.add(w);
       }
@@ -724,6 +737,12 @@ export class PinManager {
       if (p) {
         this.pending.delete(removed);
         this.pending.set(added, p);
+      }
+      // Until the store has seen the new id, a flush would find the item's tab unknown and
+      // make it dormant, then adopt the new tab as a second item.
+      for (const w of changed) {
+        const t = this.deps.store.get(added);
+        if (!p && !(t?.pinned && t.windowId === w)) this.expect(added, w);
       }
       for (const [w, order] of this.stale) {
         if (order.includes(removed))
@@ -1209,7 +1228,14 @@ export class PinManager {
       inFlight: own || staleness !== 'none' || resumed || moving || settling,
       pending,
     });
-    if (r.changed) this.layouts.set(layout.id, r.layout);
+    if (r.changed) {
+      this.layouts.set(layout.id, r.layout);
+      const now = new Map(flattenItems(r.layout).map((i) => [i.id, i.tabId]));
+      for (const i of flattenItems(layout))
+        if (i.tabId !== null && now.get(i.id) === null) this.lost.set(i.tabId, i.id);
+      // shortcut: oldest entries dropped past 100; onReplaced follows its discard within a flush or two.
+      for (const k of this.lost.keys()) if (this.lost.size > 100) this.lost.delete(k);
+    }
     if (r.moves.length === 0) this.retries.delete(windowId);
     else if (!stale && !this.inFlight.has(windowId)) this.issueMoves(windowId, r.moves);
     if (resumed) void this.writeMoving();

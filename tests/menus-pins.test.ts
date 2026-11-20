@@ -190,6 +190,8 @@ describe('folderMenu', () => {
 
   it('lists the actions in order', () => {
     expect(labels(build(folder()).items)).toEqual([
+      'New tab in folder',
+      '—',
       'Rename',
       'Change icon',
       'New subfolder',
@@ -240,6 +242,15 @@ describe('folderMenu', () => {
       folderId: 'fbbbbbbbbbb',
       collapsed: false,
     });
+  });
+
+  it('New tab in folder sends folderNewTab, expanding a collapsed folder first', () => {
+    const open = build(folder());
+    find(open.items, 'New tab in folder').onselect();
+    expect(open.sent).toEqual([{ type: 'folderNewTab', windowId: 3, folderId: 'fbbbbbbbbbb' }]);
+    const closed = build(folder({ collapsed: true }));
+    find(closed.items, 'New tab in folder').onselect();
+    expect(closed.sent.map((m) => m.type)).toEqual(['folderUpdate', 'folderNewTab']);
   });
 
   it('New subfolder is disabled at depth 3', () => {

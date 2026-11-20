@@ -46,6 +46,7 @@ const valid = [
   { type: 'folderUpdate', windowId: 1, folderId: F, name: 'X', icon: 'star', collapsed: true },
   { type: 'folderDelete', windowId: 1, folderId: F, keepTabs: false },
   { type: 'folderSuspend', windowId: 1, folderId: F },
+  { type: 'folderNewTab', windowId: 1, folderId: F },
   { type: 'clearTabs', windowId: 1 },
   { type: 'renameWindow', windowId: 1, name: 'Research' },
   { type: 'renameWindow', windowId: 1, name: null },
@@ -107,6 +108,7 @@ describe('pin messages: invalid', () => {
     for (const bad of badNodeIds) {
       expect(parsePanelMessage({ type: 'pinOpen', windowId: 1, itemId: bad })).toBeNull();
       expect(parsePanelMessage({ type: 'folderSuspend', windowId: 1, folderId: bad })).toBeNull();
+      expect(parsePanelMessage({ type: 'folderNewTab', windowId: 1, folderId: bad })).toBeNull();
       expect(parsePanelMessage({ type: 'setupDelete', setupId: bad })).toBeNull();
       expect(parsePanelMessage({ type: 'pinClose', windowId: 1, itemIds: [I, bad] })).toBeNull();
       expect(

@@ -665,6 +665,17 @@ export function folderMenu(c: FolderMenuContext): MenuItem[] {
   const { folder, windowId } = c;
   const folderId = folder.id;
   return [
+    {
+      type: 'item',
+      label: 'New tab in folder',
+      onselect: () => {
+        // The new tile would be hidden in a collapsed folder.
+        if (folder.collapsed)
+          c.send({ type: 'folderUpdate', windowId, folderId, collapsed: false });
+        c.send({ type: 'folderNewTab', windowId, folderId });
+      },
+    },
+    SEP,
     { type: 'item', label: 'Rename', onselect: c.onRename },
     {
       type: 'submenu',

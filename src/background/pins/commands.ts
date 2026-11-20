@@ -108,6 +108,10 @@ export async function runPinCommand(
       await Promise.all(tabs.map((t) => deps.chrome.tabs.discard(t.id).catch(() => {})));
       return null;
     }
+    case 'folderNewTab': {
+      const opened = await pins.openInFolder(msg.windowId, msg.folderId, await deps.newTabUrl());
+      return opened || !isFull(pins, msg.windowId, 1) ? null : FULL;
+    }
     case 'clearTabs':
       return clearTabs(msg.windowId, deps);
     case 'renameWindow':

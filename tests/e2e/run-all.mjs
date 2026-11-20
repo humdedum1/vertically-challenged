@@ -27,6 +27,7 @@ const SCRIPTS = [
   'essentials-keys.mjs',
   'pin-transfer.mjs',
   'discard.mjs',
+  'folder-new-tab.mjs',
   'restart.mjs',
   'auto-group.mjs',
   'incognito.mjs',

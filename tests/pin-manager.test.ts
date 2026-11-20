@@ -1145,6 +1145,82 @@ describe('PinManager when Chrome replaces a tab id', () => {
     ]);
     expect(t.moves).toEqual([]);
   });
+
+  /** A folder holding the tab Chrome replaces (10 → 20), and a pin after it. */
+  async function folderWindow() {
+    const saved = layout(1, [], {
+      pinned: [
+        {
+          kind: 'folder',
+          id: 'fx',
+          name: 'X',
+          icon: 'folder',
+          collapsed: false,
+          children: [item('ia', 'https://a.com/', 10)],
+        },
+        item('ib', 'https://b.com/', 11),
+      ],
+    });
+    const t = setup({
+      windows: { 1: [pinned(10, 1, 'https://a.com/'), pinned(11, 1, 'https://b.com/'), tab(12)] },
+      local: { [LAYOUTS_KEY]: stored([saved], [{ windowId: 1, layoutId: ID(1) }]) },
+      session: { [ALIVE_KEY]: true },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    return { t, pins };
+  }
+  const swapped = [
+    pinned(20, 1, 'https://a.com/', { discarded: true }),
+    pinned(11, 1, 'https://b.com/'),
+    tab(12),
+  ];
+
+  it('keeps one item in place when a flush shows the new id before onReplaced', async () => {
+    const { t, pins } = await folderWindow();
+    t.resync(1, swapped);
+    await pins.afterFlush([1]);
+    pins.onReplaced(20, 10);
+    await settle();
+
+    const l = pins.layoutOf(1);
+    expect(flattenItems(l).map((i) => [i.id, i.tabId])).toEqual([
+      ['ia', 20],
+      ['ib', 11],
+    ]);
+    expect(l.pinned.map((n) => n.id)).toEqual(['fx', 'ib']);
+  });
+
+  it('keeps one item when a flush after onReplaced does not show the new id yet', async () => {
+    const { t, pins } = await folderWindow();
+    pins.onReplaced(20, 10);
+    t.resync(1, [pinned(11, 1, 'https://b.com/'), tab(12)]);
+    await pins.afterFlush([1]);
+    t.resync(1, swapped);
+    await pins.afterFlush([1]);
+    await settle();
+
+    expect(flattenItems(pins.layoutOf(1)).map((i) => [i.id, i.tabId])).toEqual([
+      ['ia', 20],
+      ['ib', 11],
+    ]);
+  });
+
+  it('keeps one item when a flush shows both ids before onReplaced', async () => {
+    const { t, pins } = await folderWindow();
+    t.resync(1, [pinned(10, 1, 'https://a.com/'), ...swapped]);
+    await pins.afterFlush([1]);
+    pins.onReplaced(20, 10);
+    t.resync(1, swapped);
+    await pins.afterFlush([1]);
+    await settle();
+
+    expect(flattenItems(pins.layoutOf(1)).map((i) => [i.id, i.tabId])).toEqual([
+      ['ia', 20],
+      ['ib', 11],
+    ]);
+  });
 });
 
 describe('PinManager final review fixes', () => {

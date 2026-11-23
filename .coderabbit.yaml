@@ -1,4 +1,8 @@
 reviews:
+  auto_review:
+    # Ticket PRs target dev; CodeRabbit reviews only the default branch otherwise.
+    base_branches:
+      - "^dev$"
   auto_approvals:
     # Options: minimal, low, moderate, high, critical
     max_merge_risk: low

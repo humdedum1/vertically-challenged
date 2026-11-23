@@ -5,6 +5,7 @@
       "**",
       "!.output",
       "!.wxt",
+      "!.agents",
       "!.superpowers",
       "!.claude",
       "!node_modules",

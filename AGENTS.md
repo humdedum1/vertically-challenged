@@ -121,10 +121,12 @@ Before reporting work as done, run the checks matching the change, in this order
 ## Delegation
 
 - **Main agent** plans, decides and verifies.
-- **Subagents** handle exploration, search, routine edits, docs and test scaffolding.
-- **Model default:** cheapest (Haiku).
-- **Sonnet only** for security boundaries, migrations, or debugging Haiku has failed at.
-- **Model choice:** state it when delegating.
+- **Workers** take ready tickets and independent parallel work, each in its own worktree. Tickets that touch the same files run one after another. At most 4 at once.
+- **Complex work** (unclear cause, design choices, security boundaries, migrations, concurrency, UI judged by eye): Claude Opus at medium effort.
+- **Well-specified work** (implementation, refactors, tests): Codex Sol at high effort or Claude Opus at medium effort.
+- **Codebase search** across several files: Claude Haiku. A known symbol or path stays inline.
+- **Very easy work** (lookups, renames, one-file docs fixes): Claude Haiku at low effort.
+- **Model choice:** set the model and effort explicitly and state them when delegating. Raise effort only when the user asks.
 
 ## Issues and labels
 

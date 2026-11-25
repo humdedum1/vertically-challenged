@@ -58,6 +58,15 @@ try {
   for (const label of ['Folder URL', 'User', 'Password (use an app password)']) {
     assert.equal(await page.locator('label', { hasText: label }).count(), 1, label);
   }
+  await page.getByLabel('Where to save', { exact: true }).selectOption('oxicloud');
+  for (const label of [
+    'Server',
+    'Username',
+    'App password (Profile → App Passwords)',
+    'Folder in your drive',
+  ]) {
+    assert.equal(await page.locator('label', { hasText: label }).count(), 1, label);
+  }
   console.log('PASS backup server fields have visible labels');
 
   // Sessions: the common actions are visible; Rename, Export and Delete sit behind More.

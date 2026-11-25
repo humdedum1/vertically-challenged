@@ -34,6 +34,7 @@ const KEYS = [
   'wakeAt',
   'target',
   'webdav',
+  'oxicloud',
   's3',
   'dropbox',
   'sessions',
@@ -108,7 +109,8 @@ describe('fuzz: parsers never throw and keep their invariants', () => {
   it('parseConfig never keeps a URL that is not https or private http', () => {
     each(3, (v) => {
       const c = parseConfig(v);
-      for (const u of [c.webdav.url, c.s3.endpoint]) if (u) expect(u).toMatch(/^https?:\/\//);
+      for (const u of [c.webdav.url, c.oxicloud.server, c.s3.endpoint])
+        if (u) expect(u).toMatch(/^https?:\/\//);
       expect(c.keep).toBeGreaterThanOrEqual(1);
     });
   });

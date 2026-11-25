@@ -3,6 +3,7 @@ import {
   type BackupTarget,
   backupHealth,
   CONFIG_KEY,
+  DEFAULT_CONFIG,
   originPattern,
   parseConfig,
   requiredAccess,
@@ -177,6 +178,61 @@ describe('dropbox config', () => {
   });
 });
 
+describe('oxicloud config', () => {
+  const oxicloud = {
+    server: 'https://oxi.example/files/a9752e33-10df-4488-8ece-88643d64f950',
+    user: ' me ',
+    password: ' app-pw\n',
+    folder: '',
+  };
+
+  it('keeps only the server from a pasted web link and fills in the default folder', () => {
+    expect(parseConfig({ target: 'oxicloud', oxicloud }).oxicloud).toEqual({
+      server: 'https://oxi.example',
+      user: 'me',
+      password: 'app-pw',
+      folder: 'Vertically Challenged Backups',
+    });
+    expect(parseConfig({ oxicloud: { server: 'http://oxi.example' } }).oxicloud.server).toBe('');
+  });
+
+  it('loads a config saved before OxiCloud existed without losing anything', () => {
+    const old = {
+      interval: 'daily',
+      target: 'webdav',
+      webdav: { url: 'https://nc.example/remote.php/dav/files/me/B', user: 'me', password: 'pw' },
+      s3: {
+        endpoint: 'https://s3.example',
+        region: 'eu',
+        bucket: 'b',
+        prefix: 'p',
+        accessKey: 'a',
+        secretKey: 's',
+      },
+      dropbox: { appKey: 'k', refreshToken: 't' },
+      passphrase: 'pp',
+      keep: 14,
+    };
+    expect(parseConfig(old)).toEqual({ ...old, oxicloud: DEFAULT_CONFIG.oxicloud });
+  });
+
+  it('asks only for that server, and only once the login is complete', () => {
+    const cfg = parseConfig({ target: 'oxicloud', oxicloud });
+    expect(requiredAccess(cfg)).toEqual({ origins: ['https://oxi.example/*'] });
+    expect(() => requiredAccess(parseConfig({ target: 'oxicloud' }))).toThrow(/valid http/);
+    expect(() => requiredAccess({ ...cfg, oxicloud: { ...cfg.oxicloud, password: '' } })).toThrow(
+      /app password/,
+    );
+  });
+
+  it('treats each user as a separate destination, without secrets', () => {
+    const a = parseConfig({ target: 'oxicloud', oxicloud });
+    const b = parseConfig({ target: 'oxicloud', oxicloud: { ...oxicloud, user: 'you' } });
+    expect(targetKey(a)).not.toBe(targetKey(b));
+    expect(targetKey(a)).not.toContain('app-pw');
+  });
+});
+
 describe('hardening', () => {
   it('never selects names that are not plain backup file names', () => {
     const evil = [
@@ -233,7 +289,7 @@ describe('makeTarget', () => {
     const local: BackupTarget = { put: async () => {} };
     const pick = (target: string) => makeTarget(parseConfig({ target }), () => local);
     expect(pick('downloads')).toBe(local);
-    for (const kind of ['webdav', 's3', 'dropbox']) {
+    for (const kind of ['webdav', 'oxicloud', 's3', 'dropbox']) {
       const t = pick(kind);
       expect(t).not.toBe(local);
       expect(typeof t.list).toBe('function');

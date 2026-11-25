@@ -350,6 +350,49 @@ describe('PinManager window close', () => {
     expect(t.sent.some(({ msg }) => msg.type === 'setups')).toBe(true);
   });
 
+  it('re-attaches Staples and folders when Chrome reopens the closed window', async () => {
+    const closed = layout(1, [], {
+      essentials: [item('ess', 'https://a.com/', 10)],
+      pinned: [
+        {
+          kind: 'folder',
+          id: 'f1',
+          name: 'Work',
+          icon: 'work',
+          collapsed: false,
+          children: [item('inner', 'https://b.com/', 11)],
+        },
+      ],
+    });
+    const t = setup({
+      windows: { 1: [pinned(10, 1, 'https://a.com/'), pinned(11, 1, 'https://b.com/')] },
+      local: { [LAYOUTS_KEY]: stored([closed], [{ windowId: 1, layoutId: ID(1) }]) },
+      session: { [ALIVE_KEY]: true },
+    });
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    expect(pins.layoutOf(1).id).toBe(ID(1));
+
+    pins.onWindowRemoved(1);
+    await settle();
+    // Reopen closed window: same pinned tabs, new window and tab ids.
+    t.setWindows([{ id: 2, incognito: false, focused: true }]);
+    t.resync(2, [pinned(20, 2, 'https://a.com/'), pinned(21, 2, 'https://b.com/')]);
+    await pins.afterFlush([2]);
+    await settle();
+
+    const l = pins.layoutOf(2);
+    expect(l.id).toBe(ID(1));
+    expect(l.essentials.map((i) => [i.id, i.tabId])).toEqual([['ess', 20]]);
+    expect(l.pinned[0]).toMatchObject({ kind: 'folder', id: 'f1' });
+    expect(flattenItems(l).map((i) => [i.id, i.tabId])).toEqual([
+      ['ess', 20],
+      ['inner', 21],
+    ]);
+    expect(pins.setups()).toEqual([]);
+  });
+
   it('evicts the least recently used setup past the cap and says so', async () => {
     const setups = Array.from({ length: MAX_SETUPS }, (_, k) =>
       layout(k + 1, [item(`i${k}`, `https://s${k}.com/`)], { name: `Setup ${k + 1}` }),

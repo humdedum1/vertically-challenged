@@ -744,7 +744,17 @@ export class PinManager {
   onWindowRemoved(windowId: number): void {
     this.closed.add(windowId);
     void this.exclusive(() => {
+      const id = this.bindings.get(windowId);
       this.unbind(windowId, true);
+      // Reopening a closed window brings its pinned tabs back under new ids; match them to
+      // the setup as a late restore would, or its Staples and folders are lost.
+      // shortcut: only within LATE_RESTORE_MS of the close; later reopens stay plain pins, add a longer window if users reopen later.
+      if (id !== undefined && this.setupLayout(id)) {
+        this.lateCandidates.add(id);
+        this.lateUntil = Math.max(this.lateUntil, this.now() + LATE_RESTORE_MS);
+        this.lateDirty = true;
+        this.markDirty(true);
+      }
       this.publishSetups();
     });
   }

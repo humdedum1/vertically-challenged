@@ -1289,6 +1289,54 @@ describe('named windows without pinned tabs', () => {
     await settle();
     expect(pins.layoutOf(7).name).toBe('Work');
   });
+
+  it.each([
+    ['settles', 0],
+    ['never settles', 6000],
+  ])('names a late window that %s by its own tabs when its pins were copied', async (_, waited) => {
+    const pins17 = Array.from({ length: 17 }, (_, i) => `https://pin.example.test/${i}`);
+    const own = ['https://home.example.test/a', 'https://home.example.test/b'];
+    const named = (n: number, name: string, p: string[], urls: string[], lastUsed: number) =>
+      layout(
+        n,
+        p.map((url, i) => item(`${name}${i}`, url)),
+        { name, tabUrls: [...p, ...urls], lastUsed },
+      );
+    const other = ['https://work.example.test/a', 'https://work.example.test/b'];
+    const copies = (windowId: number, urls: string[]) => [
+      ...pins17.map((url, i) => pinned(windowId * 100 + i, windowId, url)),
+      ...urls.map((url, i) => tab(windowId * 100 + 50 + i, { windowId, url })),
+    ];
+    const t = setup({
+      windows: { 2: copies(2, other) },
+      local: {
+        [LAYOUTS_KEY]: stored([
+          named(1, 'Work', pins17.slice(0, 11), other, 1),
+          named(2, 'Home', pins17.slice(11), own, 1),
+          named(3, 'Stale', pins17.slice(0, 9), ['https://old.example.test/'], 9),
+        ]),
+      },
+    });
+    let clock = 1_000_000;
+    t.deps.now = () => clock;
+    const pins = new PinManager(t.deps);
+    await pins.loaded;
+    await settle();
+    expect(pins.layoutOf(2).name).toBe('Work');
+
+    t.setWindows([
+      { id: 2, focused: false, incognito: false },
+      { id: 7, focused: true, incognito: false },
+    ]);
+    t.resync(7, copies(7, own));
+    await pins.afterFlush([7]);
+    if (waited) {
+      clock += waited;
+      await pins.afterFlush([7]);
+    }
+    await settle();
+    expect(pins.layoutOf(7).name).toBe('Home');
+  });
 });
 
 it('keeps a named window after close and keeps incognito evidence off disk', async () => {

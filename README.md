@@ -36,7 +36,7 @@ Open the panel with the toolbar icon or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>V</
 - **Organize.** Tabs from all windows in one list. Child tabs nest under the tab that opened them. Pin daily sites to a grid of Staples, sort pins into nested folders, and use native tab groups.
 - **Find.** Fuzzy search across tabs, bookmarks, history, saved sessions and snoozed tabs. Type `>` for the command palette. Select a range of tabs to act on them all at once.
 - **Declutter.** Suspend idle tabs, snooze tabs until later (they come back even after a restart), and close tabs you haven't touched in 7, 30 or 90 days.
-- **Save and restore.** Save window layouts and sessions, pick up workspaces from your other computers, and schedule full backups (optionally encrypted) to Downloads, WebDAV, S3-compatible storage or Dropbox.
+- **Save and restore.** Save window layouts and sessions, pick up workspaces from your other computers, and schedule full backups (optionally encrypted) to Downloads, WebDAV, OxiCloud, S3-compatible storage or Dropbox.
 - **Customize.** Three styles (Classic, Dense, Glass), themes, accent colors, custom CSS, density, fonts and rebindable shortcuts.
 
 ## Chrome and Firefox differences

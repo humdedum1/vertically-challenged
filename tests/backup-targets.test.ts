@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sha256Hex, signRequest } from '../src/backup/sigv4';
-import { s3Target, webdavTarget } from '../src/backup/targets';
+import { oxicloudUrl, s3Target, webdavTarget } from '../src/backup/targets';
 
 describe('sigv4', () => {
   it('matches the AWS documentation example (GET object with Range)', async () => {
@@ -61,6 +61,27 @@ describe('webdav', () => {
     expect(await t.list?.()).toContain('vc-backup-1 x.vcb');
     const bad = webdavTarget(cfg, fake(() => new Response('', { status: 401 })).f);
     await expect(bad.put('a', new Uint8Array())).rejects.toThrow('WebDAV upload failed (HTTP 401)');
+  });
+});
+
+describe('oxicloud', () => {
+  const cfg = { server: 'https://oxi.example', user: 'me', password: 'pw', folder: 'Backups' };
+
+  it("builds the URL inside the signed-in user's own drive", () => {
+    expect(oxicloudUrl(cfg)).toBe('https://oxi.example/webdav/Backups');
+    expect(oxicloudUrl({ ...cfg, folder: '/My files/Backups/' })).toBe(
+      'https://oxi.example/webdav/My%20files/Backups',
+    );
+    expect(oxicloudUrl({ ...cfg, folder: '@drive/Team' })).toBe(
+      'https://oxi.example/webdav/%40drive/Team',
+    );
+  });
+
+  it('never leaves the WebDAV root', () => {
+    expect(oxicloudUrl({ ...cfg, folder: '../../api/./x' })).toBe(
+      'https://oxi.example/webdav/api/x',
+    );
+    expect(oxicloudUrl({ ...cfg, folder: 'a?b#c' })).toBe('https://oxi.example/webdav/a%3Fb%23c');
   });
 });
 

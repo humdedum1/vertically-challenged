@@ -120,6 +120,7 @@ const last = $derived(status.at ? new Date(status.at).toLocaleString() : 'never'
 const redirectUri = browser.identity?.getRedirectURL?.() ?? '';
 const insecure = $derived(
   (cfg.target === 'webdav' && isPlainHttp(cfg.webdav.url)) ||
+    (cfg.target === 'oxicloud' && isPlainHttp(cfg.oxicloud.server)) ||
     (cfg.target === 's3' && isPlainHttp(cfg.s3.endpoint)),
 );
 const remote = $derived(cfg.target !== 'downloads');
@@ -133,6 +134,7 @@ const remote = $derived(cfg.target !== 'downloads');
       <Select id="vc-backup-target" value={cfg.target} onchange={(v) => (cfg.target = v as TargetKind)}>
         <option value="downloads">Downloads folder</option>
         <option value="webdav">WebDAV (Nextcloud, ownCloud…)</option>
+        <option value="oxicloud">OxiCloud</option>
         <option value="s3">S3-compatible (AWS, R2, B2, MinIO…)</option>
         <option value="dropbox">Dropbox</option>
       </Select>
@@ -148,6 +150,19 @@ const remote = $derived(cfg.target !== 'downloads');
     </Field>
     <Field label="Password (use an app password)" for="vc-wd-pass">
       <TextInput id="vc-wd-pass" secret label="WebDAV password" value={cfg.webdav.password} oninput={(v) => (cfg.webdav.password = v)} />
+    </Field>
+  {:else if cfg.target === 'oxicloud'}
+    <Field label="Server" for="vc-oxi-server">
+      <TextInput id="vc-oxi-server" label="OxiCloud server" placeholder="https://cloud.example.com" mono value={cfg.oxicloud.server} oninput={(v) => (cfg.oxicloud.server = v)} />
+    </Field>
+    <Field label="Username" for="vc-oxi-user">
+      <TextInput id="vc-oxi-user" label="OxiCloud username" value={cfg.oxicloud.user} oninput={(v) => (cfg.oxicloud.user = v)} />
+    </Field>
+    <Field label="App password (Profile → App Passwords)" for="vc-oxi-pass">
+      <TextInput id="vc-oxi-pass" secret label="OxiCloud app password" value={cfg.oxicloud.password} oninput={(v) => (cfg.oxicloud.password = v)} />
+    </Field>
+    <Field label="Folder in your drive" for="vc-oxi-folder">
+      <TextInput id="vc-oxi-folder" label="OxiCloud folder" value={cfg.oxicloud.folder} oninput={(v) => (cfg.oxicloud.folder = v)} />
     </Field>
   {:else if cfg.target === 'dropbox'}
     <p class="hint">

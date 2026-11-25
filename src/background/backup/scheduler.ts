@@ -2,7 +2,7 @@ import { encode } from '../../backup/codec';
 import type { DropboxConfig } from '../../backup/dropbox';
 import { backupName, selectToDelete } from '../../backup/retention';
 import { buildFullBackup, type FullParts } from '../../backup/snapshot';
-import type { BackupTarget, S3Config, WebDavConfig } from '../../backup/targets';
+import type { BackupTarget, OxiCloudConfig, S3Config, WebDavConfig } from '../../backup/targets';
 
 export type { BackupTarget };
 
@@ -11,7 +11,7 @@ export const STATUS_KEY = 'vc:backup:status';
 export const BACKUP_ALARM = 'vc-auto-backup';
 
 export type Interval = 'off' | 'daily' | 'weekly';
-export type TargetKind = 'downloads' | 'webdav' | 's3' | 'dropbox';
+export type TargetKind = 'downloads' | 'webdav' | 'oxicloud' | 's3' | 'dropbox';
 /**
  * Per machine, in storage.local: never synced and never part of a backup. Server credentials
  * live here in plain form (the extension needs them unattended); use an app password or a
@@ -21,6 +21,7 @@ export interface BackupConfig {
   interval: Interval;
   target: TargetKind;
   webdav: WebDavConfig;
+  oxicloud: OxiCloudConfig;
   s3: S3Config;
   dropbox: DropboxConfig;
   /** Empty = unencrypted. Stored locally so unattended runs can encrypt; see the design spec. */
@@ -55,6 +56,7 @@ export const DEFAULT_CONFIG: BackupConfig = {
   interval: 'off',
   target: 'downloads',
   webdav: { url: '', user: '', password: '' },
+  oxicloud: { server: '', user: '', password: '', folder: 'Vertically Challenged Backups' },
   s3: { endpoint: '', region: 'us-east-1', bucket: '', prefix: '', accessKey: '', secretKey: '' },
   dropbox: { appKey: '', refreshToken: '' },
   passphrase: '',
@@ -127,18 +129,32 @@ export function parseConfig(raw: unknown): BackupConfig {
   const interval: Interval = r.interval === 'daily' || r.interval === 'weekly' ? r.interval : 'off';
   const keep = typeof r.keep === 'number' && r.keep >= 1 && r.keep <= 100 ? Math.floor(r.keep) : 7;
   const w = obj(r.webdav);
+  const o = obj(r.oxicloud);
+  const server = url(o.server);
   const c = obj(r.s3);
   const d = DEFAULT_CONFIG.s3;
   return {
     interval,
     keep,
     target:
-      r.target === 'webdav' || r.target === 's3' || r.target === 'dropbox' ? r.target : 'downloads',
+      r.target === 'webdav' ||
+      r.target === 'oxicloud' ||
+      r.target === 's3' ||
+      r.target === 'dropbox'
+        ? r.target
+        : 'downloads',
     webdav: {
       url: davUrl(url(w.url), text(w.user)),
       user: text(w.user),
       // Trimmed: a pasted app password with a stray space/newline gets a 401.
       password: typeof w.password === 'string' ? w.password.trim() : '',
+    },
+    oxicloud: {
+      // A pasted /files/… web link isn't WebDAV; only its server is wanted.
+      server: server && new URL(server).origin,
+      user: text(o.user),
+      password: typeof o.password === 'string' ? o.password.trim() : '',
+      folder: text(o.folder) || DEFAULT_CONFIG.oxicloud.folder,
     },
     s3: {
       endpoint: url(c.endpoint),
@@ -164,11 +180,13 @@ export function targetKey(c: BackupConfig): string {
 function rawTargetKey(c: BackupConfig): string {
   return c.target === 'webdav'
     ? `webdav:${c.webdav.url}`
-    : c.target === 's3'
-      ? `s3:${c.s3.endpoint}/${c.s3.bucket}/${c.s3.prefix}`
-      : c.target === 'dropbox'
-        ? `dropbox:${c.dropbox.appKey}`
-        : 'downloads';
+    : c.target === 'oxicloud'
+      ? `oxicloud:${c.oxicloud.user}@${c.oxicloud.server}/${c.oxicloud.folder}`
+      : c.target === 's3'
+        ? `s3:${c.s3.endpoint}/${c.s3.bucket}/${c.s3.prefix}`
+        : c.target === 'dropbox'
+          ? `dropbox:${c.dropbox.appKey}`
+          : 'downloads';
 }
 
 /** What the browser must grant before this config can back up; throws on incomplete input. */
@@ -182,11 +200,18 @@ export function requiredAccess(
     if (!c.dropbox.refreshToken) throw new Error('Connect Dropbox first');
     return { origins: dropboxOrigins };
   }
-  const origin = originOf(c.target === 'webdav' ? c.webdav.url : c.s3.endpoint);
+  const address = {
+    webdav: c.webdav.url,
+    oxicloud: c.oxicloud.server,
+    s3: c.s3.endpoint,
+  }[c.target];
+  const origin = originOf(address);
   if (!origin)
     throw new Error('Enter a valid https:// address (http:// works only on your own network)');
   if (c.target === 'webdav' && !(c.webdav.user && c.webdav.password))
     throw new Error('Enter the WebDAV user and password');
+  if (c.target === 'oxicloud' && !(c.oxicloud.user && c.oxicloud.password))
+    throw new Error('Enter your OxiCloud username and app password');
   if (c.target === 's3' && !(c.s3.bucket && c.s3.accessKey && c.s3.secretKey))
     throw new Error('Enter the bucket, access key and secret key');
   return { origins: [origin] };

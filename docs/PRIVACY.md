@@ -26,7 +26,7 @@ the developer or to any third party.
   private) tabs. That list stays on this computer and is erased when you clear all history.
 - **Backups.** Automatic or manual backups contain your settings, themes, layouts, sessions and
   custom CSS. They are saved only where you point them: your Downloads folder, a WebDAV server
-  (such as Nextcloud), an S3-compatible bucket, or your own Dropbox app folder. The extension
+  (such as Nextcloud or OxiCloud), an S3-compatible bucket, or your own Dropbox app folder. The extension
   contacts only the address you enter, after the browser asks for your permission for that
   address. Set a passphrase to encrypt the file; without one, the backup lists every saved
   address in readable form. If you lose the passphrase the backup can't be recovered.

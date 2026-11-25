@@ -15,6 +15,15 @@ export interface WebDavConfig {
   user: string;
   password: string;
 }
+export interface OxiCloudConfig {
+  /** Origin only, e.g. https://cloud.example.com */
+  server: string;
+  user: string;
+  /** An app password: OxiCloud refuses the account password over WebDAV. */
+  password: string;
+  /** Folder inside the user's own drive. */
+  folder: string;
+}
 export interface S3Config {
   /** e.g. https://s3.eu-west-1.amazonaws.com or https://<id>.r2.cloudflarestorage.com */
   endpoint: string;
@@ -94,6 +103,12 @@ export function webdavTarget(c: WebDavConfig, fetcher: Fetch = fetch): BackupTar
       return readBody(res);
     },
   };
+}
+
+/** OxiCloud resolves /webdav/ to the signed-in user's own drive, so the login picks whose it is. */
+export function oxicloudUrl(c: OxiCloudConfig): string {
+  const dirs = c.folder.split('/').filter((s) => s && s !== '.' && s !== '..');
+  return [c.server, 'webdav', ...dirs.map(encodeURIComponent)].join('/');
 }
 
 export function s3Target(

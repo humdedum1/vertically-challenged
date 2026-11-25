@@ -9,6 +9,7 @@ import {
   findNode,
   flattenItems,
   folderHeight,
+  lookOf,
   MAX_FOLDER_DEPTH,
   MAX_ITEMS,
   MAX_NAME,
@@ -18,6 +19,7 @@ import {
   type PinItem,
   type PinNode,
   type WindowLayout,
+  withLook,
 } from '../../shared/layout';
 
 type PinnedDest = Extract<PinDest, { zone: 'pinned' }>;
@@ -166,7 +168,8 @@ export function deleteFolder(
 /**
  * "Apply setup": the source's Essentials and pinned tree are appended to the target
  * with fresh ids and no live tabs, so applying the same setup twice never collides.
- * Items past the item cap are skipped.
+ * Items past the item cap are skipped. The source's name and appearance fill in only
+ * what the target lacks.
  */
 export function appendLayout(target: WindowLayout, source: WindowLayout): WindowLayout {
   const out = clone(target);
@@ -188,5 +191,5 @@ export function appendLayout(target: WindowLayout, source: WindowLayout): Window
     const c = fresh(n);
     if (c) out.pinned.push(c);
   }
-  return out;
+  return withLook(out, lookOf(source));
 }

@@ -8,11 +8,13 @@ import { EXTENSION_SCHEME } from './browser-urls';
 import {
   flattenItems,
   isLayoutUrl,
+  lookOf,
   MAX_NAME,
   newId,
   type PinItem,
   type PinNode,
   type WindowLayout,
+  withLook,
 } from './layout';
 import {
   captureWindow,
@@ -106,13 +108,17 @@ export function savedFromLayout(
       essentials: layout.essentials.map((i) => index.get(i.id) as number),
       pinned: tree(layout.pinned),
     },
+    // Always present, even empty: that is how a reader tells "unnamed" from an older doc.
+    look: lookOf(layout),
   };
 }
 
 /**
  * A new, unbound layout (fresh ids, every item dormant) from a saved window's layout, for
  * keeping another device's workspace as a setup here. Tabs outside the layout are ignored;
- * items on URLs a layout can't hold are dropped.
+ * items on URLs a layout can't hold are dropped. The name and appearance come from the
+ * window's `look`; `name` (the workspace's display name) only stands in for a document
+ * from an older version, which had no `look`.
  */
 export function layoutFromSaved(win: SavedWindow, name: string | null): WindowLayout {
   const item = (tab: number): PinItem | null => {
@@ -149,15 +155,19 @@ export function layoutFromSaved(win: SavedWindow, name: string | null): WindowLa
     }
     return out;
   };
-  return {
-    id: newId('l'),
-    name: name?.trim().slice(0, MAX_NAME) || null,
-    essentials: (win.layout?.essentials ?? []).map(item).filter((i): i is PinItem => i !== null),
-    pinned: tree(win.layout?.pinned ?? []),
-    collapsed: [],
-    incognito: false,
-    lastUsed: Date.now(),
-  };
+  const fallback = name?.trim().slice(0, MAX_NAME);
+  return withLook(
+    {
+      id: newId('l'),
+      name: null,
+      essentials: (win.layout?.essentials ?? []).map(item).filter((i): i is PinItem => i !== null),
+      pinned: tree(win.layout?.pinned ?? []),
+      collapsed: [],
+      incognito: false,
+      lastUsed: Date.now(),
+    },
+    win.look ?? (fallback ? { name: fallback } : undefined),
+  );
 }
 
 // --- Validation ------------------------------------------------------------------------------

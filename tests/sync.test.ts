@@ -111,6 +111,41 @@ describe('layout <-> saved window', () => {
     expect(back.id).not.toBe(layout.id);
   });
 
+  it('keeps an unnamed window unnamed, not named after its display fallback', () => {
+    const w = savedFromLayout({ ...layout, name: null });
+    // The publisher shows unnamed windows under their first pin's title.
+    expect(layoutFromSaved(w, 'T ia').name).toBeNull();
+  });
+
+  it('carries the window name and appearance', () => {
+    const styled: WindowLayout = {
+      ...layout,
+      themeId: 'custom-abc',
+      icon: 'code',
+      density: 'compact',
+      accent: 'blue',
+    };
+    const synced = parseSyncDoc(
+      JSON.parse(JSON.stringify(doc({ workspaces: [workspace('lcccccccccc', styled)] }))),
+    );
+    const back = layoutFromSaved(
+      synced?.workspaces[0]?.window as ReturnType<typeof savedFromLayout>,
+      'ignored',
+    );
+    expect(back).toMatchObject({
+      name: 'Work',
+      themeId: 'custom-abc',
+      icon: 'code',
+      density: 'compact',
+      accent: 'blue',
+    });
+  });
+
+  it('uses the workspace name for a document from an older version (no look)', () => {
+    const { look: _, ...old } = savedFromLayout({ ...layout, name: null });
+    expect(layoutFromSaved(old, 'Work').name).toBe('Work');
+  });
+
   it('drops items on URLs a layout cannot hold', () => {
     const w = savedFromLayout(layout);
     w.tabs[0] = { ...w.tabs[0], url: 'javascript:alert(1)' } as (typeof w.tabs)[0];

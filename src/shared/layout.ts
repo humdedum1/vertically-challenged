@@ -165,6 +165,64 @@ export function isEmptyLayout(l: WindowLayout): boolean {
   );
 }
 
+/** A window's name and appearance, carried by saved sessions and synced workspaces. */
+export interface WindowLook {
+  name?: string;
+  themeId?: string;
+  icon?: FolderIcon;
+  density?: 'compact' | 'comfortable';
+  accent?: GroupColor;
+}
+
+/** The layout's name and appearance; only the fields that are set. */
+export function lookOf(l: WindowLayout): WindowLook {
+  return {
+    ...(l.name ? { name: l.name } : {}),
+    ...(l.themeId ? { themeId: l.themeId } : {}),
+    ...(l.icon ? { icon: l.icon } : {}),
+    ...(l.density ? { density: l.density } : {}),
+    ...(l.accent ? { accent: l.accent } : {}),
+  };
+}
+
+function parseAppearance(raw: Record<string, unknown>): Omit<WindowLook, 'name'> {
+  return {
+    ...(typeof raw.themeId === 'string' && THEME_ID.test(raw.themeId)
+      ? { themeId: raw.themeId }
+      : {}),
+    ...((FOLDER_ICONS as readonly unknown[]).includes(raw.icon)
+      ? { icon: raw.icon as FolderIcon }
+      : {}),
+    ...(raw.density === 'compact' || raw.density === 'comfortable' ? { density: raw.density } : {}),
+    ...((GROUP_COLORS as readonly unknown[]).includes(raw.accent)
+      ? { accent: raw.accent as GroupColor }
+      : {}),
+  };
+}
+
+/** Untrusted (synced or imported) input; null when it isn't an object. */
+export function parseLook(raw: unknown): WindowLook | null {
+  if (!isObj(raw)) return null;
+  const name = typeof raw.name === 'string' ? raw.name.trim().slice(0, MAX_NAME) : '';
+  return { ...(name ? { name } : {}), ...parseAppearance(raw) };
+}
+
+/** Fills only what the layout doesn't set itself, so a name the user gave is never replaced. */
+export function withLook(l: WindowLayout, look: WindowLook | undefined): WindowLayout {
+  if (!look) return l;
+  const next = {
+    ...l,
+    name: l.name ?? look.name ?? null,
+    themeId: l.themeId || look.themeId,
+    icon: l.icon || look.icon,
+    density: l.density ?? look.density,
+    accent: l.accent ?? look.accent,
+  };
+  for (const k of ['themeId', 'icon', 'density', 'accent'] as const)
+    if (next[k] === undefined) delete next[k];
+  return JSON.stringify(next) === JSON.stringify(l) ? l : next;
+}
+
 type NodeHit = {
   node: PinNode;
   parent: PinFolder | null;
@@ -330,16 +388,7 @@ function parseLayout(raw: Record<string, unknown>): WindowLayout | null {
   return {
     id,
     name,
-    ...(typeof raw.themeId === 'string' && THEME_ID.test(raw.themeId)
-      ? { themeId: raw.themeId }
-      : {}),
-    ...((FOLDER_ICONS as readonly unknown[]).includes(raw.icon)
-      ? { icon: raw.icon as FolderIcon }
-      : {}),
-    ...(raw.density === 'compact' || raw.density === 'comfortable' ? { density: raw.density } : {}),
-    ...((GROUP_COLORS as readonly unknown[]).includes(raw.accent)
-      ? { accent: raw.accent as GroupColor }
-      : {}),
+    ...parseAppearance(raw),
     ...(Array.isArray(raw.tabUrls)
       ? {
           tabUrls: raw.tabUrls

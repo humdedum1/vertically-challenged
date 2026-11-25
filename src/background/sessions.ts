@@ -134,7 +134,7 @@ function restoredLayout(
   windowId: number,
   created: Created[],
 ): RestoredLayout | null {
-  if (!w.layout) return null;
+  if (!w.layout && !w.look) return null;
   const byAt = new Map(created.map((c) => [c.at, c.id]));
   const item = (at: number): Extract<RestoredNode, { kind: 'item' }> | null => {
     const id = byAt.get(at);
@@ -156,8 +156,9 @@ function restoredLayout(
   };
   return {
     windowId,
-    essentials: w.layout.essentials.map(item).filter((i) => i !== null),
-    pinned: walk(w.layout.pinned),
+    essentials: (w.layout?.essentials ?? []).map(item).filter((i) => i !== null),
+    pinned: walk(w.layout?.pinned ?? []),
+    ...(w.look ? { look: w.look } : {}),
   };
 }
 
@@ -203,7 +204,7 @@ async function restoreWindow(
     if (first && !(await openFirst(first))) return;
     await openRest(pinnedRest);
   };
-  if (w.layout && layouts) {
+  if ((w.layout || w.look) && layouts) {
     // Only the pinned tabs are created inside the layout queue, where binding keeps them
     // from being adopted as plain items; the (possibly many) others are created after, so
     // the queue isn't held for every window while a large restore runs.

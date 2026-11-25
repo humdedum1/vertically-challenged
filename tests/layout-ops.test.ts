@@ -227,4 +227,11 @@ describe('appendLayout', () => {
     expect(f.children[0]?.id).toMatch(/^i/);
     expect(r.id).toBe(t.id);
   });
+
+  it("takes the setup's name and appearance only where the window has none", () => {
+    const s = { ...layout([], []), name: 'Work', icon: 'code' as const, accent: 'red' as const };
+    expect(appendLayout(layout([], []), s)).toMatchObject({ name: 'Work', icon: 'code' });
+    const mine = { ...layout([], []), name: 'Mine', accent: 'blue' as const };
+    expect(appendLayout(mine, s)).toMatchObject({ name: 'Mine', icon: 'code', accent: 'blue' });
+  });
 });

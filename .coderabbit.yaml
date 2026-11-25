@@ -8,3 +8,6 @@ reviews:
     max_merge_risk: low
     # Allows the author to use "@coderabbitai approve" if needed
     allow_author_approval: true
+knowledge_base:
+  # Store no knowledge-base data (learnings) for this repo.
+  opt_out: true

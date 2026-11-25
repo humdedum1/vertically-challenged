@@ -72,6 +72,19 @@ describe('reconcile', () => {
     expect(r.moves).toEqual([]);
   });
 
+  it('makes the first real page home while the home is still a new-tab page', () => {
+    const fresh = { ...item('a', 1), homeUrl: 'chrome://newtab/', lastUrl: 'chrome://newtab/' };
+    const l = layout([], [fresh, item('b', 2)]);
+    const r = run(l, [
+      pinnedTab(1, { url: 'https://site.com/' }),
+      pinnedTab(2, { url: 'https://other.com/' }),
+    ]);
+    const [a, b] = flattenItems(r.layout);
+    expect(a).toMatchObject({ homeUrl: 'https://site.com/', lastUrl: 'https://site.com/' });
+    // A real home is never replaced by navigating.
+    expect(b).toMatchObject({ homeUrl: 'https://example.com/2', lastUrl: 'https://other.com/' });
+  });
+
   it('removes an item whose tab was unpinned', () => {
     const l = layout([], [item('a', 1), item('b', 2)]);
     const r = run(l, [pinnedTab(2), tab(1), tab(3)]);

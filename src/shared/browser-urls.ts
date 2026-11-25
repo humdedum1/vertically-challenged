@@ -13,6 +13,8 @@ export const SHORTCUTS_HINT = firefox
 export function isNewTabUrl(url: string | undefined): boolean {
   return !!url && /^(chrome:\/\/newtab|about:(newtab|home))(\/|$|[?#])/i.test(url);
 }
+/** Home of an item opened on the new-tab page, until its first real page replaces it (see reconcile). */
+export const NEW_TAB_URL = firefox ? 'about:newtab' : 'chrome://newtab/';
 
 /** Names for user-facing copy. */
 export const BROWSER = firefox ? 'Firefox' : 'Chrome';

@@ -489,6 +489,30 @@ describe('folders', () => {
       bindings: [{ windowId: 1, layoutId: ID(1) }],
     });
 
+  it('folderNewTab opens a pinned new-tab page at the end of the folder', async () => {
+    const s = withFolder();
+    await s.flush();
+    await s.run({ type: 'folderNewTab', windowId: 1, folderId: FO('x') });
+    expect(s.creates()).toBe(1);
+    await s.flush();
+    await s.flush();
+    const f = findNode(s.pins.layoutOf(1), FO('x'))?.node;
+    const last = f?.kind === 'folder' ? (f.children.at(-1) as PinItem) : undefined;
+    expect(last).toMatchObject({ tabId: 900, homeUrl: 'chrome://newtab/' });
+    expect(flattenItems(s.pins.layoutOf(1))).toHaveLength(5);
+    // In Chrome's strip it sits after the folder's live tabs, before the next pin.
+    expect(s.order(1)).toEqual([1, 2, 900, 4, 3]);
+    expect(s.tabs.get(1)?.find((t) => t.id === 900)).toMatchObject({ pinned: true, active: true });
+  });
+
+  it('folderNewTab opens the custom new-tab URL when one is set', async () => {
+    const s = withFolder();
+    s.deps.newTabUrl = async () => 'https://start.example/';
+    await s.flush();
+    await s.run({ type: 'folderNewTab', windowId: 1, folderId: FO('x') });
+    expect(s.calls).toContain('create https://start.example/');
+  });
+
   it('folderDelete(keepTabs: false) closes the live tabs and removes every item', async () => {
     const s = withFolder();
     await s.flush();

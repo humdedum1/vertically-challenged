@@ -4,6 +4,7 @@
  * against the TabStore, persists the result and pushes it to the panels.
  */
 import type { Browser } from 'wxt/browser';
+import { NEW_TAB_URL } from '../../shared/browser-urls';
 import {
   emptyLayout,
   type FolderIcon,
@@ -814,6 +815,44 @@ export class PinManager {
       } finally {
         this.opening.delete(itemId);
       }
+    });
+  }
+
+  /**
+   * Opens a pinned, focused tab at `url` (the browser's new-tab page when empty) as the
+   * folder's last item. Created and bound in one exclusive step, like openItem, so rule 2
+   * can't adopt it at the pinned root first. False when the folder is gone or the layout full.
+   */
+  openInFolder(windowId: number, folderId: string, url: string): Promise<boolean> {
+    return this.exclusive(async () => {
+      if (this.closed.has(windowId)) return false;
+      const l = this.layoutOf(windowId);
+      const hit = findNode(l, folderId);
+      if (hit?.node.kind !== 'folder' || flattenItems(l).length >= MAX_ITEMS) return false;
+      const tab = await this.deps.tabsApi.create({
+        windowId,
+        pinned: true,
+        active: true,
+        ...(url ? { url } : {}),
+      });
+      if (tab.id === undefined) return false;
+      const tabId = tab.id;
+      const homeUrl = url || NEW_TAB_URL;
+      this.expect(tabId, windowId);
+      this.edit(windowId, (cur) => {
+        const f = findNode(cur, folderId)?.node;
+        if (f?.kind !== 'folder') return cur;
+        const item: PinItem = {
+          kind: 'item',
+          id: newId('i'),
+          homeUrl,
+          lastUrl: homeUrl,
+          title: '',
+          tabId,
+        };
+        return insertItems(cur, [item], { zone: 'pinned', folderId, index: f.children.length });
+      });
+      return true;
     });
   }
 

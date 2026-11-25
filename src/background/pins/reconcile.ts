@@ -4,6 +4,8 @@
  * the layout is the truth for order, except when the user reorders in Chrome's own
  * strip. Pure; the worker applies the result after every TabStore flush.
  */
+
+import { isNewTabUrl } from '../../shared/browser-urls';
 import {
   flattenItems,
   isLayoutUrl,
@@ -86,8 +88,10 @@ export function reconcile(
     bound.add(orig.tabId);
     // A URL the layout can't store would cost the item on the next load; keep the old one.
     const lastUrl = isLayoutUrl(t.url) ? t.url : orig.lastUrl;
-    if (orig.lastUrl !== lastUrl || orig.title !== t.title) {
-      setFields(own(), orig.id, { lastUrl, title: t.title });
+    // An item opened on the new-tab page ("New tab in folder") makes its first real page home.
+    const homeUrl = isNewTabUrl(orig.homeUrl) && !isNewTabUrl(lastUrl) ? lastUrl : orig.homeUrl;
+    if (orig.lastUrl !== lastUrl || orig.title !== t.title || orig.homeUrl !== homeUrl) {
+      setFields(own(), orig.id, { lastUrl, homeUrl, title: t.title });
     }
   }
   for (const id of removals) out = removeItem(out, id);

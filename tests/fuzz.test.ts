@@ -113,6 +113,11 @@ describe('fuzz: parsers never throw and keep their invariants', () => {
         if (u) expect(u).toMatch(/^https?:\/\//);
       expect(c.keep).toBeGreaterThanOrEqual(1);
     });
+    // Random objects hardly ever hold a server, so each string is tried as one.
+    for (const server of STRINGS) {
+      const got = parseConfig({ oxicloud: { server } }).oxicloud.server;
+      expect(got).toBe(server === 'https://example.com/a' ? 'https://example.com' : '');
+    }
   });
 
   it('parsePanelMessage returns null or a typed message', () => {

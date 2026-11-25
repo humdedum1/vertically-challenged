@@ -66,20 +66,25 @@ export function pair(
   return bind;
 }
 
+interface MatchWindow {
+  windowId: number;
+  incognito: boolean;
+  pinned: readonly PinnedTabLite[];
+  urls?: readonly string[];
+}
+
 /**
  * Assigns layouts to windows one-to-one. A pair qualifies when at least half the
  * window's pinned tabs find an item, so one shared site does not claim a whole layout.
  * Saved URLs break pinned-match ties and recover named windows without pins when a
  * strict majority overlaps. Ambiguous named windows stay unmatched.
+ * Pinned tabs that another of the `open` windows also has cannot tell windows apart, so
+ * saved URLs are compared without them, and then decide before the pinned tabs do.
  */
 export function matchLayouts(
   layouts: readonly WindowLayout[],
-  windows: readonly {
-    windowId: number;
-    incognito: boolean;
-    pinned: readonly PinnedTabLite[];
-    urls?: readonly string[];
-  }[],
+  windows: readonly MatchWindow[],
+  open: readonly MatchWindow[] = windows,
 ): Map<number, Match> {
   const flat = new Map(layouts.map((l) => [l.id, flattenItems(l)]));
   const candidates: {
@@ -89,17 +94,32 @@ export function matchLayouts(
     overlap: number;
   }[] = [];
   const urlCandidates: typeof candidates = [];
+  const copiedCandidates: typeof candidates = [];
+  const pinnedUrls = open.map((w) => ({
+    ...w,
+    set: new Set(w.pinned.map((t) => normalise(t.url))),
+  }));
   for (const w of windows) {
+    const others = pinnedUrls.filter(
+      (o) => o.windowId !== w.windowId && o.incognito === w.incognito,
+    );
+    const copied = new Set(
+      w.pinned.map((t) => normalise(t.url)).filter((url) => others.some((o) => o.set.has(url))),
+    );
+    const own = (urls: readonly string[] = []) =>
+      new Set(urls.map(normalise).filter((url) => !copied.has(url)));
     const need = Math.ceil(w.pinned.length / 2);
     for (const layout of layouts) {
       if (layout.incognito !== w.incognito) continue;
       const bind = pair(flat.get(layout.id) ?? [], w.pinned);
-      const saved = new Set(layout.tabUrls?.map(normalise));
-      const live = new Set(w.urls?.slice(0, MAX_ITEMS).map(normalise));
+      const saved = own(layout.tabUrls);
+      const live = own(w.urls?.slice(0, MAX_ITEMS));
       const overlap = [...live].filter((url) => saved.has(url)).length;
       const c = { windowId: w.windowId, layout, bind, overlap };
+      const majority = layout.name && overlap > Math.max(saved.size, live.size) / 2;
+      if (majority && copied.size > 0 && overlap >= 2) copiedCandidates.push(c);
       if (bind.size > 0 && bind.size >= need) candidates.push(c);
-      else if (layout.name && overlap > Math.max(saved.size, live.size) / 2) urlCandidates.push(c);
+      else if (majority) urlCandidates.push(c);
     }
   }
   candidates.sort(
@@ -112,6 +132,28 @@ export function matchLayouts(
 
   const out = new Map<number, Match>();
   const taken = new Set<string>();
+  const matchUrls = (from: typeof candidates) => {
+    const available = from.filter((c) => !out.has(c.windowId) && !taken.has(c.layout.id));
+    available.sort((a, b) => b.overlap - a.overlap);
+    for (const c of available) {
+      if (out.has(c.windowId) || taken.has(c.layout.id)) continue;
+      // Identical evidence cannot identify a window safely; never choose a name by id or recency.
+      if (
+        available.some(
+          (other) =>
+            other !== c &&
+            !out.has(other.windowId) &&
+            !taken.has(other.layout.id) &&
+            other.overlap >= c.overlap &&
+            (other.windowId === c.windowId || other.layout.id === c.layout.id),
+        )
+      )
+        continue;
+      out.set(c.windowId, { layoutId: c.layout.id, bind: c.bind });
+      taken.add(c.layout.id);
+    }
+  };
+  matchUrls(copiedCandidates);
   for (const c of candidates) {
     if (out.has(c.windowId) || taken.has(c.layout.id)) continue;
     if (
@@ -131,24 +173,6 @@ export function matchLayouts(
     out.set(c.windowId, { layoutId: c.layout.id, bind: c.bind });
     taken.add(c.layout.id);
   }
-  const available = urlCandidates.filter((c) => !out.has(c.windowId) && !taken.has(c.layout.id));
-  available.sort((a, b) => b.overlap - a.overlap);
-  for (const c of available) {
-    if (out.has(c.windowId) || taken.has(c.layout.id)) continue;
-    // Identical evidence cannot identify a window safely; never choose a name by id or recency.
-    if (
-      available.some(
-        (other) =>
-          other !== c &&
-          !out.has(other.windowId) &&
-          !taken.has(other.layout.id) &&
-          other.overlap >= c.overlap &&
-          (other.windowId === c.windowId || other.layout.id === c.layout.id),
-      )
-    )
-      continue;
-    out.set(c.windowId, { layoutId: c.layout.id, bind: c.bind });
-    taken.add(c.layout.id);
-  }
+  matchUrls(urlCandidates);
   return out;
 }

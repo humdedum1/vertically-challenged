@@ -330,15 +330,8 @@ export class PinManager {
     const bound = new Set(this.bindings.values());
     const matches = matchLayouts(
       [...this.layouts.values()].filter((x) => !bound.has(x.id)),
-      open.map((w) => ({
-        windowId: w.id,
-        incognito: w.incognito,
-        urls: this.deps.store.snapshot(w.id).tabs.map((t) => t.url),
-        pinned: this.deps.store
-          .snapshot(w.id)
-          .tabs.filter((t) => t.pinned)
-          .map((t) => ({ id: t.id, url: t.url, title: t.title })),
-      })),
+      open.map((w) => this.matchWindow(w.id)),
+      windows.map((w) => this.matchWindow(w.id)),
     );
     for (const [windowId, m] of matches) this.bindMatch(windowId, m);
     // Bound layouts were exempt from the stored cap; unmatched ones are setups now.
@@ -426,7 +419,8 @@ export class PinManager {
   }
 
   /** A window as matchLayouts sees it. */
-  private lateWindow(windowId: number, tabs: readonly TabInfo[]) {
+  private matchWindow(windowId: number) {
+    const tabs = this.deps.store.snapshot(windowId).tabs;
     return {
       windowId,
       incognito: this.incognitoOf(windowId) ?? true,
@@ -513,9 +507,13 @@ export class PinManager {
         const tabs = this.deps.store.snapshot(windowId).tabs;
         const l = this.boundLayout(windowId);
         if ((l && !isEmptyLayout(l)) || tabs.length === 0) return [];
-        return [this.lateWindow(windowId, tabs)];
+        return [this.matchWindow(windowId)];
       });
-      const matches = matchLayouts(this.lateCandidateLayouts(), windows);
+      const matches = matchLayouts(
+        this.lateCandidateLayouts(),
+        windows,
+        this.deps.windows().map((w) => this.matchWindow(w.id)),
+      );
       // Only a match is final: restored tabs can show about:blank until their URL arrives, so
       // an unmatched window is tried again when its tabs change, until the grace period ends.
       for (const windowId of matches.keys()) this.lateDone.add(windowId);
@@ -526,10 +524,12 @@ export class PinManager {
   }
 
   /** resolveLate for one window that has waited LATE_SETTLE_MAX_MS. */
-  private matchOneLate(windowId: number, tabs: readonly TabInfo[]): boolean {
-    const m = matchLayouts(this.lateCandidateLayouts(), [this.lateWindow(windowId, tabs)]).get(
-      windowId,
-    );
+  private matchOneLate(windowId: number): boolean {
+    const m = matchLayouts(
+      this.lateCandidateLayouts(),
+      [this.matchWindow(windowId)],
+      this.deps.windows().map((w) => this.matchWindow(w.id)),
+    ).get(windowId);
     if (!m) return false;
     this.bindMatch(windowId, m);
     this.publishSetups();
@@ -1166,7 +1166,7 @@ export class PinManager {
       if (this.lateEligible(windowId, tabs) && this.holdLate(windowId, tabs)) return null;
       if (this.lateWaiting.delete(windowId)) {
         // Waited its maximum: matched on its own, now (and again on a later change if not).
-        late = this.matchOneLate(windowId, tabs);
+        late = this.matchOneLate(windowId);
         if (late) this.lateDone.add(windowId);
       }
       late = this.pairDormant(windowId, tabs) || late;

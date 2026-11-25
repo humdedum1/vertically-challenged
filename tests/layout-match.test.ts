@@ -242,3 +242,80 @@ it('recovers overlapping named windows once the stronger match is assigned', () 
   expect(matches.get(7)?.layoutId).toBe('Work');
   expect(matches.get(8)?.layoutId).toBe('Home');
 });
+
+describe('pinned tabs copied into every window', () => {
+  const own = (name: string, count: number) =>
+    Array.from({ length: count }, (_, i) => `https://${name}.example.test/${i}`);
+  // 17 pins now shown by every window; before the copying each window had its own part.
+  const workPins = own('work-pin', 11);
+  const homePins = own('home-pin', 6);
+  const all = [...workPins, ...homePins];
+  const saved = (id: string, pins: string[], urls: string[], over: Partial<WindowLayout> = {}) =>
+    layout(
+      id,
+      pins.map((url) => item(url)),
+      { name: id, tabUrls: [...pins, ...urls], ...over },
+    );
+  const open = (windowId: number, urls: string[], incognito = false) => ({
+    ...win(windowId, tabs(...all), incognito),
+    urls: [...all, ...urls],
+  });
+  const work = own('work', 5);
+  const home = own('home', 4);
+  const play = own('play', 5);
+  const ids = (m: ReturnType<typeof matchLayouts>) =>
+    Object.fromEntries([...m].map(([w, x]) => [w, x.layoutId]));
+
+  it('returns every name by the tabs that only one window has', () => {
+    const m = matchLayouts(
+      [
+        saved('Work', workPins, work),
+        saved('Home', homePins, home),
+        saved('Play', [], play),
+        // Old duplicate binding at least half of the pins of any window.
+        saved('Stale', all.slice(0, 9), own('stale', 5), { lastUsed: 99 }),
+      ],
+      [open(1, home), open(2, play), open(3, work)],
+    );
+    expect(ids(m)).toEqual({ 1: 'Home', 2: 'Play', 3: 'Work' });
+    expect(m.get(3)?.bind.size).toBe(11);
+    expect(m.get(1)?.bind.size).toBe(6);
+    expect(m.get(2)?.bind.size).toBe(0);
+  });
+
+  it('compares with open windows that are not being matched', () => {
+    const late = open(1, home);
+    const m = matchLayouts(
+      [saved('Home', homePins, home), saved('Stale', all, own('stale', 5), { lastUsed: 99 })],
+      [late],
+      [late, open(2, work)],
+    );
+    expect(ids(m)).toEqual({ 1: 'Home' });
+  });
+
+  it('does not guess a name when the own tabs fit two windows', () => {
+    const m = matchLayouts(
+      [saved('Home', homePins, home)],
+      [open(1, home), open(2, home), open(3, work)],
+    );
+    expect(m.size).toBe(0);
+  });
+
+  it('needs more than one own tab to overrule the pinned tabs', () => {
+    const m = matchLayouts(
+      [saved('Pins', all, own('pins', 3)), saved('One', [], own('one', 1))],
+      [open(1, own('one', 1))],
+      [open(1, own('one', 1)), open(2, work)],
+    );
+    expect(ids(m)).toEqual({ 1: 'Pins' });
+  });
+
+  it('never treats a pin as copied across the incognito boundary', () => {
+    const layouts = [saved('Pins', all, []), saved('Home', [], home)];
+    const m = matchLayouts(layouts, [open(1, home)], [open(1, home), open(2, work, true)]);
+    expect(ids(m)).toEqual({ 1: 'Pins' });
+    expect(
+      ids(matchLayouts(layouts, [open(1, home, true)], [open(1, home, true), open(2, work)])),
+    ).toEqual({});
+  });
+});
